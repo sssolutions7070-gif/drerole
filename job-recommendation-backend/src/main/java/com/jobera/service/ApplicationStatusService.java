@@ -8,6 +8,8 @@ import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 
+import java.util.Map;
+
 import com.jobera.entity.Application;
 import com.jobera.repository.ApplicationRepository;
 
@@ -18,11 +20,14 @@ public class ApplicationStatusService {
 
     private final ApplicationRepository applicationRepository;
     private final NotificationService notificationService;
+    private final RealtimeNotifier realtimeNotifier;
 
     public ApplicationStatusService(ApplicationRepository applicationRepository,
-                                    NotificationService notificationService) {
+                                    NotificationService notificationService,
+                                    RealtimeNotifier realtimeNotifier) {
         this.applicationRepository = applicationRepository;
         this.notificationService = notificationService;
+        this.realtimeNotifier = realtimeNotifier;
     }
 
     private String jobTitleOf(Application application) {
@@ -30,8 +35,17 @@ public class ApplicationStatusService {
     }
 
     private void notifyStatusChanged(Application application, String status) {
+        String jobTitle = jobTitleOf(application);
         notificationService.sendApplicationStatusChanged(
-            application.getSafeApplicantEmail(), application.getSafeApplicantName(), jobTitleOf(application), status);
+            application.getSafeApplicantEmail(), application.getSafeApplicantName(), jobTitle, status);
+        pushRealtime(application, "APPLICATION_STATUS_CHANGED", Map.of(
+            "applicationId", application.getId(), "jobTitle", jobTitle, "status", status));
+    }
+
+    private void pushRealtime(Application application, String type, Map<String, Object> data) {
+        if (application.getUser() != null) {
+            realtimeNotifier.notifyUser(application.getUser().getId(), type, data);
+        }
     }
     
     public Application updateApplicationStatus(Long applicationId, String newStatus, String recruiterNotes) {
@@ -87,9 +101,13 @@ public class ApplicationStatusService {
         application.setRecruiterNotes(notes);
 
         Application saved = applicationRepository.save(application);
-        notificationService.sendInterviewScheduled(saved.getSafeApplicantEmail(), saved.getSafeApplicantName(),
-            jobTitleOf(saved), interviewDate != null ? interviewDate.toString() : "TBD",
-            interviewLocation != null ? interviewLocation : "TBD");
+        String jobTitle = jobTitleOf(saved);
+        String dateText = interviewDate != null ? interviewDate.toString() : "TBD";
+        String locationText = interviewLocation != null ? interviewLocation : "TBD";
+        notificationService.sendInterviewScheduled(
+            saved.getSafeApplicantEmail(), saved.getSafeApplicantName(), jobTitle, dateText, locationText);
+        pushRealtime(saved, "INTERVIEW_SCHEDULED", Map.of(
+            "applicationId", saved.getId(), "jobTitle", jobTitle, "interviewDate", dateText, "interviewLocation", locationText));
         return saved;
     }
 

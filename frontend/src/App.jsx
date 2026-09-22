@@ -8,6 +8,7 @@ import ForgotPassword from './components/ForgotPassword';
 import ResetPassword from './components/ResetPassword';
 import ProtectedRoute from './components/ProtectedRoute';
 import VoiceAssistant from './components/VoiceAssistant';
+import NotificationToast from './components/NotificationToast';
 import authService from './services/auth';
 
 // Your existing components
@@ -182,6 +183,7 @@ function App() {
           </Suspense>
         </main>
         <VoiceAssistant />
+        <NotificationToast />
       </div>
     </Router>
   );
