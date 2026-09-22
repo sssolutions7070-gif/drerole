@@ -302,8 +302,10 @@ const VoiceAssistant = () => {
       language: currentLanguage 
     }]);
     
-    // Fetch all jobs on load
-    fetchAllJobs();
+    // Fetch all jobs on load (only once a user is logged in; the API requires auth)
+    if (currentUser) {
+      fetchAllJobs();
+    }
   }, []);
 
   // Play sound effects
