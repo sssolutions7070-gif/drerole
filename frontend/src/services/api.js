@@ -23,20 +23,22 @@ api.interceptors.request.use(
   }
 );
 
-// Add response interceptor for error handling
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    const publicPaths = ['/login', '/register', '/recruiter/register', '/forgot-password', '/reset-password'];
-    if (error.response?.status === 401 && !publicPaths.includes(window.location.pathname)) {
-      // Token expired or invalid
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
+// Paths a logged-out visitor can be on; a 401 here must not force a redirect, since that would
+// reload the very page it's already on (see handleResponseError).
+export const PUBLIC_PATHS = ['/login', '/register', '/recruiter/register', '/forgot-password', '/reset-password'];
+
+export const handleResponseError = (error) => {
+  if (error.response?.status === 401 && !PUBLIC_PATHS.includes(window.location.pathname)) {
+    // Token expired or invalid
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.location.href = '/login';
   }
-);
+  return Promise.reject(error);
+};
+
+// Add response interceptor for error handling
+api.interceptors.response.use((response) => response, handleResponseError);
 
 // Job Rating API calls
 export const jobRatingAPI = {
