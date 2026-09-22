@@ -24,7 +24,9 @@ import com.jobera.repository.UserRepository;
 public class ResumeService {
     private static final Logger log = LoggerFactory.getLogger(ResumeService.class);
 
-    
+    /** Older resumes beyond this many per user are pruned (DB row + physical file) after each upload. */
+    private static final int MAX_RESUMES_PER_USER = 5;
+
     private final ResumeRepository resumeRepository;
     private final UserRepository userRepository;
     private final ResumeProcessingService resumeProcessingService;
@@ -121,8 +123,19 @@ public class ResumeService {
         // Save resume to database
         Resume savedResume = resumeRepository.save(resume);
         log.debug("✅ Resume saved successfully with ID: " + savedResume.getId());
-        
+
+        pruneOldResumes(userId);
+
         return savedResume;
+    }
+
+    /** Keeps only the {@value #MAX_RESUMES_PER_USER} most recent resumes for a user; older ones are deleted (DB + disk). */
+    void pruneOldResumes(Long userId) {
+        List<Resume> oldestFirst = resumeRepository.findByUserIdOrderByUploadDateAsc(userId);
+        int excess = oldestFirst.size() - MAX_RESUMES_PER_USER;
+        for (int i = 0; i < excess; i++) {
+            deleteResume(oldestFirst.get(i).getId());
+        }
     }
     
     public List<Resume> getResumesByUserId(Long userId) {
