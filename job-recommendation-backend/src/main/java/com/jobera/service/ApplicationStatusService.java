@@ -15,11 +15,23 @@ import com.jobera.repository.ApplicationRepository;
 public class ApplicationStatusService {
     private static final Logger log = LoggerFactory.getLogger(ApplicationStatusService.class);
 
-    
+
     private final ApplicationRepository applicationRepository;
-    
-    public ApplicationStatusService(ApplicationRepository applicationRepository) {
+    private final NotificationService notificationService;
+
+    public ApplicationStatusService(ApplicationRepository applicationRepository,
+                                    NotificationService notificationService) {
         this.applicationRepository = applicationRepository;
+        this.notificationService = notificationService;
+    }
+
+    private String jobTitleOf(Application application) {
+        return application.getJobPosting() != null ? application.getJobPosting().getTitle() : "your application";
+    }
+
+    private void notifyStatusChanged(Application application, String status) {
+        notificationService.sendApplicationStatusChanged(
+            application.getSafeApplicantEmail(), application.getSafeApplicantName(), jobTitleOf(application), status);
     }
     
     public Application updateApplicationStatus(Long applicationId, String newStatus, String recruiterNotes) {
@@ -57,48 +69,58 @@ public class ApplicationStatusService {
         Application application = applicationOpt.get();
         application.shortlist();
         application.setRecruiterNotes(notes);
-        
-        return applicationRepository.save(application);
+
+        Application saved = applicationRepository.save(application);
+        notifyStatusChanged(saved, saved.getStatus());
+        return saved;
     }
-    
-    public Application scheduleInterview(Long applicationId, LocalDateTime interviewDate, 
+
+    public Application scheduleInterview(Long applicationId, LocalDateTime interviewDate,
                                        String interviewLocation, String notes) {
         Optional<Application> applicationOpt = applicationRepository.findById(applicationId);
         if (applicationOpt.isEmpty()) {
             throw new ApplicationStatusException("Application not found with ID: " + applicationId);
         }
-        
+
         Application application = applicationOpt.get();
         application.scheduleInterview(interviewDate, interviewLocation);
         application.setRecruiterNotes(notes);
-        
-        return applicationRepository.save(application);
+
+        Application saved = applicationRepository.save(application);
+        notificationService.sendInterviewScheduled(saved.getSafeApplicantEmail(), saved.getSafeApplicantName(),
+            jobTitleOf(saved), interviewDate != null ? interviewDate.toString() : "TBD",
+            interviewLocation != null ? interviewLocation : "TBD");
+        return saved;
     }
-    
+
     public Application rejectApplication(Long applicationId, String rejectionReason) {
         Optional<Application> applicationOpt = applicationRepository.findById(applicationId);
         if (applicationOpt.isEmpty()) {
             throw new ApplicationStatusException("Application not found with ID: " + applicationId);
         }
-        
+
         Application application = applicationOpt.get();
         application.reject();
         application.setRecruiterNotes(rejectionReason);
-        
-        return applicationRepository.save(application);
+
+        Application saved = applicationRepository.save(application);
+        notifyStatusChanged(saved, saved.getStatus());
+        return saved;
     }
-    
+
     public Application sendOffer(Long applicationId, String offerDetails) {
         Optional<Application> applicationOpt = applicationRepository.findById(applicationId);
         if (applicationOpt.isEmpty()) {
             throw new ApplicationStatusException("Application not found with ID: " + applicationId);
         }
-        
+
         Application application = applicationOpt.get();
         application.sendOffer();
         application.setRecruiterNotes(offerDetails);
-        
-        return applicationRepository.save(application);
+
+        Application saved = applicationRepository.save(application);
+        notifyStatusChanged(saved, saved.getStatus());
+        return saved;
     }
     
     public List<Application> getUserApplications(Long userId) {

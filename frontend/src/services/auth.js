@@ -27,6 +27,24 @@ class AuthService {
     }
   }
 
+  async forgotPassword(email) {
+    try {
+      const response = await api.post('/auth/forgot-password', { email });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { error: 'Request failed' };
+    }
+  }
+
+  async resetPassword(token, password) {
+    try {
+      const response = await api.post('/auth/reset-password', { token, password });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { error: 'Reset failed' };
+    }
+  }
+
   logout() {
     const token = this.getToken();
     if (token) {

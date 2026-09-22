@@ -27,7 +27,7 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    const publicPaths = ['/login', '/register', '/recruiter/register'];
+    const publicPaths = ['/login', '/register', '/recruiter/register', '/forgot-password', '/reset-password'];
     if (error.response?.status === 401 && !publicPaths.includes(window.location.pathname)) {
       // Token expired or invalid
       localStorage.removeItem('token');

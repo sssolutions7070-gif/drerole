@@ -4,6 +4,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Navbar from './components/Navbar';
 import Login from './components/Login';
 import Register from './components/Register';
+import ForgotPassword from './components/ForgotPassword';
+import ResetPassword from './components/ResetPassword';
 import ProtectedRoute from './components/ProtectedRoute';
 import VoiceAssistant from './components/VoiceAssistant';
 import authService from './services/auth';
@@ -93,7 +95,13 @@ function App() {
             <Route path="/recruiter/register" element={
               user ? <Navigate to="/dashboard" replace /> : <RecruiterRegister onAuthChange={handleAuthChange} />
             } />
-            
+            <Route path="/forgot-password" element={
+              user ? <Navigate to="/dashboard" replace /> : <ForgotPassword />
+            } />
+            <Route path="/reset-password" element={
+              user ? <Navigate to="/dashboard" replace /> : <ResetPassword />
+            } />
+
             {/* Proctoring Test Route - For debugging */}
             <Route path="/proctoring-test" element={<ProctoringTest />} />
             

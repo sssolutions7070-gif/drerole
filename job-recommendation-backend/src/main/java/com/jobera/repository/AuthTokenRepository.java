@@ -15,7 +15,11 @@ import com.jobera.entity.AuthToken;
 @Repository
 public interface AuthTokenRepository extends JpaRepository<AuthToken, Long> {
     Optional<AuthToken> findByToken(String token);
+
+    @Transactional
     void deleteByToken(String token);
+
+    @Transactional
     void deleteByUserId(Long userId);
 
     @Transactional

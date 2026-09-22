@@ -1,12 +1,6 @@
 package com.jobera.service;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.time.LocalDateTime;
-import java.util.Base64;
-import java.util.HexFormat;
 import java.util.Optional;
 
 import org.springframework.stereotype.Service;
@@ -16,11 +10,11 @@ import com.jobera.entity.User;
 import com.jobera.repository.AuthTokenRepository;
 import com.jobera.repository.UserRepository;
 import com.jobera.util.PasswordEncoder;
+import com.jobera.util.TokenHasher;
 
 @Service
 public class AuthenticationService {
-    
-    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
     private static final long TOKEN_VALIDITY_DAYS = 7;
     
     private final UserRepository userRepository;
@@ -82,29 +76,17 @@ public class AuthenticationService {
     }
     
     public String generateAuthToken(User user) {
-        byte[] bytes = new byte[32];
-        SECURE_RANDOM.nextBytes(bytes);
-        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        String token = TokenHasher.generate();
         LocalDateTime expiryDate = LocalDateTime.now().plusDays(TOKEN_VALIDITY_DAYS);
-        
-        AuthToken authToken = new AuthToken(user, hashToken(token), expiryDate);
+
+        AuthToken authToken = new AuthToken(user, TokenHasher.hash(token), expiryDate);
         authTokenRepository.save(authToken);
-        
+
         return token;
     }
-    
-    /** Tokens are stored as SHA-256 hex digests so a database leak does not expose usable sessions. */
-    static String hashToken(String token) {
-        try {
-            byte[] digest = MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(digest);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 is not available", e);
-        }
-    }
-    
+
     public Optional<User> validateToken(String token) {
-        Optional<AuthToken> authTokenOptional = authTokenRepository.findByToken(hashToken(token));
+        Optional<AuthToken> authTokenOptional = authTokenRepository.findByToken(TokenHasher.hash(token));
         
         if (authTokenOptional.isEmpty()) {
             return Optional.empty();
@@ -121,7 +103,7 @@ public class AuthenticationService {
     }
     
     public void logout(String token) {
-        authTokenRepository.deleteByToken(hashToken(token));
+        authTokenRepository.deleteByToken(TokenHasher.hash(token));
     }
     
     public void logoutAllUserSessions(Long userId) {
