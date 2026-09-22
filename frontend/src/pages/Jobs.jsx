@@ -34,7 +34,6 @@ const Jobs = () => {
     fetchJobs();
 
     const handleSkillsUpdate = (event) => {
-      console.log('🎯 Skills updated event received in Jobs page:', event.detail);
       if (event.detail && event.detail.skills) {
         setUserSkills(event.detail.skills);
         setRefreshKey(prev => prev + 1);

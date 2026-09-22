@@ -1,5 +1,7 @@
 package com.jobera.service;
 
+import org.slf4j.LoggerFactory;
+import org.slf4j.Logger;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -20,6 +22,8 @@ import com.jobera.repository.UserRepository;
 
 @Service
 public class ResumeService {
+    private static final Logger log = LoggerFactory.getLogger(ResumeService.class);
+
     
     private final ResumeRepository resumeRepository;
     private final UserRepository userRepository;
@@ -34,14 +38,14 @@ public class ResumeService {
     }
     
     public Resume processAndSaveResume(Long userId, MultipartFile file) throws ResumeProcessingException {
-        System.out.println("=== PROCESSING AND SAVING RESUME ===");
-        System.out.println("User ID: " + userId);
-        System.out.println("File Name: " + file.getOriginalFilename());
-        System.out.println("File Size: " + file.getSize() + " bytes");
+        log.debug("=== PROCESSING AND SAVING RESUME ===");
+        log.debug("User ID: " + userId);
+        log.debug("File Name: " + file.getOriginalFilename());
+        log.debug("File Size: " + file.getSize() + " bytes");
         
         Optional<User> user = userRepository.findById(userId);
         if (user.isEmpty()) {
-            System.out.println("❌ User not found with ID: " + userId);
+            log.error("❌ User not found with ID: " + userId);
             throw new ResumeProcessingException("User not found with ID: " + userId);
         }
         
@@ -49,9 +53,9 @@ public class ResumeService {
         java.nio.file.Path uploadsDir = Paths.get("uploads");
         try {
             Files.createDirectories(uploadsDir);
-            System.out.println("✅ Uploads directory: " + uploadsDir.toAbsolutePath());
+            log.debug("✅ Uploads directory: " + uploadsDir.toAbsolutePath());
         } catch (IOException e) {
-            System.out.println("❌ Failed to create uploads directory: " + e.getMessage());
+            log.error("❌ Failed to create uploads directory: " + e.getMessage());
             throw new ResumeProcessingException("Failed to create uploads directory");
         }
         
@@ -63,24 +67,24 @@ public class ResumeService {
         try {
             // Save the file physically
             Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
-            System.out.println("✅ File saved to: " + filePath.toAbsolutePath());
+            log.debug("✅ File saved to: " + filePath.toAbsolutePath());
             
             if ("pdf".equalsIgnoreCase(fileExtension)) {
-                System.out.println("📄 Processing PDF file...");
+                log.debug("📄 Processing PDF file...");
                 textContent = resumeProcessingService.extractTextFromPdf(file);
             } else if ("txt".equalsIgnoreCase(fileExtension)) {
-                System.out.println("📄 Processing text file...");
+                log.debug("📄 Processing text file...");
                 textContent = resumeProcessingService.extractTextFromTextFile(file);
             } else {
-                System.out.println("📄 Processing as text file...");
+                log.debug("📄 Processing as text file...");
                 textContent = resumeProcessingService.extractTextFromTextFile(file);
             }
         } catch (IOException e) {
-            System.out.println("❌ Failed to save/process file: " + e.getMessage());
+            log.error("❌ Failed to save/process file: " + e.getMessage());
             throw new ResumeProcessingException("Failed to save/process file: " + e.getMessage(), e);
         }
         
-        System.out.println("✅ Text extraction successful. Content length: " + textContent.length() + " characters");
+        log.debug("✅ Text extraction successful. Content length: " + textContent.length() + " characters");
         
         // Parse resume content
         Map<String, Object> parsedData = resumeProcessingService.parseResumeContent(textContent);
@@ -97,9 +101,9 @@ public class ResumeService {
             Set<String> skills = (Set<String>) parsedData.get("skills");
             String skillsJson = resumeProcessingService.convertSkillsToJson(skills);
             resume.setSkills(skillsJson);
-            System.out.println("✅ Extracted " + skills.size() + " skills from resume");
+            log.debug("✅ Extracted " + skills.size() + " skills from resume");
         } catch (Exception e) {
-            System.out.println("❌ Failed to process skills: " + e.getMessage());
+            log.error("❌ Failed to process skills: " + e.getMessage());
             throw new ResumeProcessingException("Failed to process skills: " + e.getMessage(), e);
         }
         
@@ -110,25 +114,25 @@ public class ResumeService {
         resume.setExperienceYears(experienceYears);
         resume.setEducationLevel(educationLevel);
         
-        System.out.println("✅ Resume analysis completed:");
-        System.out.println("   - Experience: " + experienceYears + " years");
-        System.out.println("   - Education: " + educationLevel);
+        log.debug("✅ Resume analysis completed:");
+        log.debug("   - Experience: " + experienceYears + " years");
+        log.debug("   - Education: " + educationLevel);
         
         // Save resume to database
         Resume savedResume = resumeRepository.save(resume);
-        System.out.println("✅ Resume saved successfully with ID: " + savedResume.getId());
+        log.debug("✅ Resume saved successfully with ID: " + savedResume.getId());
         
         return savedResume;
     }
     
     public List<Resume> getResumesByUserId(Long userId) {
         try {
-            System.out.println("📋 Fetching resumes for user ID: " + userId);
+            log.debug("📋 Fetching resumes for user ID: " + userId);
             List<Resume> resumes = resumeRepository.findByUserId(userId);
-            System.out.println("✅ Found " + resumes.size() + " resumes for user " + userId);
+            log.debug("✅ Found " + resumes.size() + " resumes for user " + userId);
             return resumes;
         } catch (Exception e) {
-            System.out.println("❌ Error fetching resumes for user " + userId + ": " + e.getMessage());
+            log.error("❌ Error fetching resumes for user " + userId + ": " + e.getMessage());
             return List.of();
         }
     }
@@ -136,20 +140,20 @@ public class ResumeService {
     // FIXED: Enhanced getLatestResumeByUserId with better error handling
     public Optional<Resume> getLatestResumeByUserId(Long userId) {
         try {
-            System.out.println("📋 Fetching latest resume for user ID: " + userId);
+            log.debug("📋 Fetching latest resume for user ID: " + userId);
             
             // First check if user exists
             Optional<User> user = userRepository.findById(userId);
             if (user.isEmpty()) {
-                System.out.println("❌ User not found with ID: " + userId);
+                log.error("❌ User not found with ID: " + userId);
                 return Optional.empty();
             }
             
             List<Resume> resumes = resumeRepository.findByUserId(userId);
-            System.out.println("✅ Found " + resumes.size() + " total resumes for user " + userId);
+            log.debug("✅ Found " + resumes.size() + " total resumes for user " + userId);
             
             if (resumes.isEmpty()) {
-                System.out.println("ℹ️ No resume found for user " + userId);
+                log.debug("ℹ️ No resume found for user " + userId);
                 return Optional.empty();
             }
             
@@ -160,73 +164,73 @@ public class ResumeService {
             
             if (latestResume.isPresent()) {
                 Resume resume = latestResume.get();
-                System.out.println("✅ Found latest resume with ID: " + resume.getId());
-                System.out.println("   Skills: " + resume.getSkills());
-                System.out.println("   Experience: " + resume.getExperienceYears());
-                System.out.println("   Education: " + resume.getEducationLevel());
+                log.debug("✅ Found latest resume with ID: " + resume.getId());
+                log.debug("   Skills: " + resume.getSkills());
+                log.debug("   Experience: " + resume.getExperienceYears());
+                log.debug("   Education: " + resume.getEducationLevel());
             }
             
             return latestResume;
             
         } catch (Exception e) {
-            System.out.println("❌ Error fetching latest resume for user " + userId + ": " + e.getMessage());
-            e.printStackTrace();
+            log.error("❌ Error fetching latest resume for user " + userId + ": " + e.getMessage());
+            log.error("Unexpected error", e);
             return Optional.empty();
         }
     }
     
     public Optional<Resume> getResumeById(Long resumeId) {
         try {
-            System.out.println("📋 Fetching resume by ID: " + resumeId);
+            log.debug("📋 Fetching resume by ID: " + resumeId);
             Optional<Resume> resume = resumeRepository.findById(resumeId);
             if (resume.isPresent()) {
-                System.out.println("✅ Found resume with ID: " + resumeId);
+                log.debug("✅ Found resume with ID: " + resumeId);
             } else {
-                System.out.println("❌ Resume not found with ID: " + resumeId);
+                log.error("❌ Resume not found with ID: " + resumeId);
             }
             return resume;
         } catch (Exception e) {
-            System.out.println("❌ Error fetching resume by ID " + resumeId + ": " + e.getMessage());
+            log.error("❌ Error fetching resume by ID " + resumeId + ": " + e.getMessage());
             return Optional.empty();
         }
     }
     
     public Map<String, Object> analyzeResume(Long resumeId) throws ResumeProcessingException {
-        System.out.println("🔍 Analyzing resume with ID: " + resumeId);
+        log.debug("🔍 Analyzing resume with ID: " + resumeId);
         
         Optional<Resume> resume = resumeRepository.findById(resumeId);
         if (resume.isPresent()) {
             Resume resumeEntity = resume.get();
-            System.out.println("✅ Resume found: " + resumeEntity.getFileName());
-            System.out.println("📝 Parsing resume content...");
+            log.debug("✅ Resume found: " + resumeEntity.getFileName());
+            log.debug("📝 Parsing resume content...");
             
             Map<String, Object> analysis = resumeProcessingService.parseResumeContent(resumeEntity.getParsedText());
-            System.out.println("✅ Resume analysis completed for ID: " + resumeId);
+            log.debug("✅ Resume analysis completed for ID: " + resumeId);
             
             return analysis;
         }
         
-        System.out.println("❌ Resume not found with ID: " + resumeId);
+        log.error("❌ Resume not found with ID: " + resumeId);
         throw new ResumeProcessingException("Resume not found with ID: " + resumeId);
     }
     
     @SuppressWarnings("unchecked")
     public Set<String> extractSkillsFromText(String text) {
         try {
-            System.out.println("🔧 Extracting skills from text (length: " + text.length() + " characters)");
+            log.debug("🔧 Extracting skills from text (length: " + text.length() + " characters)");
             Map<String, Object> parsedData = resumeProcessingService.parseResumeContent(text);
             Set<String> skills = (Set<String>) parsedData.get("skills");
-            System.out.println("✅ Extracted " + skills.size() + " skills from text");
+            log.debug("✅ Extracted " + skills.size() + " skills from text");
             return skills;
         } catch (Exception e) {
-            System.out.println("❌ Error extracting skills from text: " + e.getMessage());
+            log.error("❌ Error extracting skills from text: " + e.getMessage());
             return Set.of();
         }
     }
     
     public boolean deleteResume(Long resumeId) {
         try {
-            System.out.println("🗑️ Deleting resume with ID: " + resumeId);
+            log.debug("🗑️ Deleting resume with ID: " + resumeId);
             
             Optional<Resume> resume = resumeRepository.findById(resumeId);
             if (resume.isPresent()) {
@@ -237,60 +241,60 @@ public class ResumeService {
                         java.nio.file.Path filePath = Paths.get(resumeEntity.getFilePath().replace("/uploads/", "uploads/"));
                         if (Files.exists(filePath)) {
                             Files.delete(filePath);
-                            System.out.println("✅ Physical file deleted: " + filePath);
+                            log.debug("✅ Physical file deleted: " + filePath);
                         }
                     } catch (IOException e) {
-                        System.out.println("⚠️ Could not delete physical file: " + e.getMessage());
+                        log.warn("⚠️ Could not delete physical file: " + e.getMessage());
                     }
                 }
                 
                 resumeRepository.delete(resumeEntity);
-                System.out.println("✅ Resume deleted successfully: " + resumeId);
+                log.debug("✅ Resume deleted successfully: " + resumeId);
                 return true;
             } else {
-                System.out.println("❌ Resume not found for deletion: " + resumeId);
+                log.error("❌ Resume not found for deletion: " + resumeId);
                 return false;
             }
         } catch (Exception e) {
-            System.out.println("❌ Error deleting resume " + resumeId + ": " + e.getMessage());
+            log.error("❌ Error deleting resume " + resumeId + ": " + e.getMessage());
             return false;
         }
     }
     
     public List<Resume> getAllResumes() {
         try {
-            System.out.println("📋 Fetching all resumes");
+            log.debug("📋 Fetching all resumes");
             List<Resume> resumes = resumeRepository.findAll();
-            System.out.println("✅ Found " + resumes.size() + " resumes in total");
+            log.debug("✅ Found " + resumes.size() + " resumes in total");
             return resumes;
         } catch (Exception e) {
-            System.out.println("❌ Error fetching all resumes: " + e.getMessage());
+            log.error("❌ Error fetching all resumes: " + e.getMessage());
             return List.of();
         }
     }
     
     public boolean userHasResume(Long userId) {
         try {
-            System.out.println("🔍 Checking if user " + userId + " has resumes");
+            log.debug("🔍 Checking if user " + userId + " has resumes");
             List<Resume> resumes = resumeRepository.findByUserId(userId);
             boolean hasResume = !resumes.isEmpty();
-            System.out.println("✅ User " + userId + " has resumes: " + hasResume);
+            log.debug("✅ User " + userId + " has resumes: " + hasResume);
             return hasResume;
         } catch (Exception e) {
-            System.out.println("❌ Error checking if user has resume: " + e.getMessage());
+            log.error("❌ Error checking if user has resume: " + e.getMessage());
             return false;
         }
     }
     
     public int getResumeCountByUserId(Long userId) {
         try {
-            System.out.println("📊 Getting resume count for user: " + userId);
+            log.debug("📊 Getting resume count for user: " + userId);
             List<Resume> resumes = resumeRepository.findByUserId(userId);
             int count = resumes.size();
-            System.out.println("✅ User " + userId + " has " + count + " resumes");
+            log.debug("✅ User " + userId + " has " + count + " resumes");
             return count;
         } catch (Exception e) {
-            System.out.println("❌ Error getting resume count: " + e.getMessage());
+            log.error("❌ Error getting resume count: " + e.getMessage());
             return 0;
         }
     }
@@ -298,11 +302,11 @@ public class ResumeService {
     // NEW METHOD: Fix file paths for existing resumes
     public boolean fixResumeFilePath(Long resumeId) {
         try {
-            System.out.println("🔧 Fixing file path for resume ID: " + resumeId);
+            log.debug("🔧 Fixing file path for resume ID: " + resumeId);
             
             Optional<Resume> resumeOpt = resumeRepository.findById(resumeId);
             if (resumeOpt.isEmpty()) {
-                System.out.println("❌ Resume not found: " + resumeId);
+                log.error("❌ Resume not found: " + resumeId);
                 return false;
             }
             
@@ -310,14 +314,14 @@ public class ResumeService {
             String currentPath = resume.getFilePath();
             
             if (currentPath == null || currentPath.isEmpty()) {
-                System.out.println("❌ No file path to fix");
+                log.error("❌ No file path to fix");
                 return false;
             }
             
             // Check if file exists at current path
             File currentFile = new File(currentPath);
             if (currentFile.exists()) {
-                System.out.println("✅ File already exists at: " + currentPath);
+                log.debug("✅ File already exists at: " + currentPath);
                 return true;
             }
             
@@ -330,15 +334,15 @@ public class ResumeService {
                 // Update with correct path
                 resume.setFilePath("/uploads/" + fileName);
                 resumeRepository.save(resume);
-                System.out.println("✅ Fixed file path to: /uploads/" + fileName);
+                log.debug("✅ Fixed file path to: /uploads/" + fileName);
                 return true;
             }
             
-            System.out.println("❌ Could not find file for resume: " + resumeId);
+            log.error("❌ Could not find file for resume: " + resumeId);
             return false;
             
         } catch (Exception e) {
-            System.out.println("❌ Error fixing resume file path: " + e.getMessage());
+            log.error("❌ Error fixing resume file path: " + e.getMessage());
             return false;
         }
     }
@@ -363,7 +367,7 @@ public class ResumeService {
                 }
             }
         } catch (Exception e) {
-            System.out.println("❌ Error getting physical file path: " + e.getMessage());
+            log.error("❌ Error getting physical file path: " + e.getMessage());
         }
         return null;
     }
@@ -374,7 +378,7 @@ public class ResumeService {
             java.nio.file.Path physicalPath = getPhysicalFilePath(resumeId);
             return physicalPath != null && Files.exists(physicalPath);
         } catch (Exception e) {
-            System.out.println("❌ Error checking physical file existence: " + e.getMessage());
+            log.error("❌ Error checking physical file existence: " + e.getMessage());
             return false;
         }
     }

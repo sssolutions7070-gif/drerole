@@ -1,0 +1,462 @@
+package com.jobera.security;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.AntPathMatcher;
+
+import com.jobera.entity.Application;
+import com.jobera.entity.Recruiter;
+import com.jobera.entity.User;
+import com.jobera.repository.ApplicationRepository;
+import com.jobera.repository.AptitudeTestRepository;
+import com.jobera.repository.DreamRoleTestAssignmentRepository;
+import com.jobera.repository.DreamRoleTestRepository;
+import com.jobera.repository.ExternalCandidateRepository;
+import com.jobera.repository.ExternalJobPostingRepository;
+import com.jobera.repository.JobPostingRepository;
+import com.jobera.repository.JobRatingRepository;
+import com.jobera.repository.RecruiterRepository;
+import com.jobera.repository.ResumeRepository;
+import com.jobera.repository.TestAssignmentRepository;
+
+/**
+ * Central, fail-closed authorization rules for every /api endpoint. A request is only
+ * allowed when a rule matches it and that rule's check passes. Rules cover roles,
+ * "the user in the URL is the caller" and ownership of recruiter-owned resources.
+ */
+@Component
+@Transactional(readOnly = true)
+public class AccessPolicy {
+
+    private static final long ROLE_ADMIN = 2L;
+    private static final long ROLE_RECRUITER = 3L;
+    private static final Pattern CREDENTIALS_FILE = Pattern.compile("credentials_job_([0-9]+)_[0-9]+\\.csv");
+
+    @FunctionalInterface
+    interface Check {
+        boolean allow(AccessContext ctx);
+    }
+
+    @FunctionalInterface
+    interface BodyCheck {
+        boolean allow(AccessContext ctx, Map<String, Object> body);
+    }
+
+    private record Rule(String method, String pattern, Check check, BodyCheck bodyCheck) {
+    }
+
+    private final AntPathMatcher matcher = new AntPathMatcher();
+    private final List<Rule> rules = new ArrayList<>();
+
+    private final RecruiterRepository recruiterRepository;
+    private final JobPostingRepository jobPostingRepository;
+    private final ExternalJobPostingRepository externalJobRepository;
+    private final ExternalCandidateRepository externalCandidateRepository;
+    private final AptitudeTestRepository aptitudeTestRepository;
+    private final DreamRoleTestRepository dreamRoleTestRepository;
+    private final ApplicationRepository applicationRepository;
+    private final TestAssignmentRepository assignmentRepository;
+    private final DreamRoleTestAssignmentRepository dreamRoleAssignmentRepository;
+    private final JobRatingRepository jobRatingRepository;
+    private final ResumeRepository resumeRepository;
+
+    public AccessPolicy(RecruiterRepository recruiterRepository,
+                        JobPostingRepository jobPostingRepository,
+                        ExternalJobPostingRepository externalJobRepository,
+                        ExternalCandidateRepository externalCandidateRepository,
+                        AptitudeTestRepository aptitudeTestRepository,
+                        DreamRoleTestRepository dreamRoleTestRepository,
+                        ApplicationRepository applicationRepository,
+                        TestAssignmentRepository assignmentRepository,
+                        DreamRoleTestAssignmentRepository dreamRoleAssignmentRepository,
+                        JobRatingRepository jobRatingRepository,
+                        ResumeRepository resumeRepository) {
+        this.recruiterRepository = recruiterRepository;
+        this.jobPostingRepository = jobPostingRepository;
+        this.externalJobRepository = externalJobRepository;
+        this.externalCandidateRepository = externalCandidateRepository;
+        this.aptitudeTestRepository = aptitudeTestRepository;
+        this.dreamRoleTestRepository = dreamRoleTestRepository;
+        this.applicationRepository = applicationRepository;
+        this.assignmentRepository = assignmentRepository;
+        this.dreamRoleAssignmentRepository = dreamRoleAssignmentRepository;
+        this.jobRatingRepository = jobRatingRepository;
+        this.resumeRepository = resumeRepository;
+        registerRules();
+    }
+
+    // ------------------------------------------------------------------ rules
+
+    private void registerRules() {
+        Check authenticated = c -> true;
+        Check admin = c -> isAdmin(c.user());
+        Check recruiter = c -> isRecruiter(c.user());
+
+        // Everyone logged in
+        rule(null, "/api/auth/me", authenticated);
+
+        // Administration
+        rule(null, "/api/admin/**", admin);
+
+        // Jobs and ratings
+        rule("GET", "/api/jobs", authenticated);
+        rule("GET", "/api/jobs/search", authenticated);
+        rule("GET", "/api/jobs/recommendations/skills", authenticated);
+        rule("GET", "/api/jobs/recommendations/{userId}", self("userId"));
+        rule("GET", "/api/jobs/recommendations/{userId}/detailed", self("userId"));
+        rule("POST", "/api/jobs/{jobId}/apply-with-resume/{userId}", self("userId"));
+        rule("POST", "/api/jobs/{jobId}/apply/{userId}", self("userId"));
+        rule("POST", "/api/jobs/{jobId}/rate/{userId}", self("userId"));
+        rule("GET", "/api/jobs/{jobId}/rating/user/{userId}", self("userId"));
+        rule("GET", "/api/jobs/{jobId}/ratings", authenticated);
+        rule("GET", "/api/jobs/{jobId}/rating/stats", authenticated);
+        rule("DELETE", "/api/jobs/ratings/{ratingId}", this::ownsRating);
+        rule("GET", "/api/jobs/{jobId}", authenticated);
+
+        // Internships
+        rule("GET", "/api/internships", authenticated);
+        rule("GET", "/api/internships/stats", authenticated);
+        rule("GET", "/api/internships/recommendations/{userId}", self("userId"));
+        rule("POST", "/api/internships/{internshipId}/apply/{userId}", self("userId"));
+        rule("POST", "/api/internships/{internshipId}/rate/{userId}", self("userId"));
+        rule("GET", "/api/internships/{internshipId}/rating/user/{userId}", self("userId"));
+
+        // Recruiter profile and job management
+        rule("POST", "/api/recruiters/register", authenticated);
+        rule("GET", "/api/recruiters/user/{userId}", self("userId"));
+        rule("PUT", "/api/recruiters/user/{userId}/profile", self("userId"));
+        rule("POST", "/api/recruiters/jobs", recruiter);
+        rule("GET", "/api/recruiters/jobs/recruiter/{recruiterId}", ownRecruiterId("recruiterId"));
+        rule("PUT", "/api/recruiters/jobs/{jobId}", ownsJob("jobId"));
+        rule("DELETE", "/api/recruiters/jobs/{jobId}", ownsJob("jobId"));
+        rule("GET", "/api/recruiters/jobs/{jobId}/applications", ownsJob("jobId"));
+
+        // Application tracking
+        rule("GET", "/api/applications/user/{userId}", self("userId"));
+        rule("GET", "/api/applications/job/{jobId}", ownsJob("jobId"));
+        rule("GET", "/api/applications/recruiter/{recruiterId}/**", ownRecruiterId("recruiterId"));
+        rule("PUT", "/api/applications/{applicationId}/*", c -> recruiterManagesApplication(c, "applicationId"));
+
+        // Aptitude tests
+        rule("POST", "/api/aptitude-tests/create", recruiter);
+        rule("GET", "/api/aptitude-tests/recruiter/{recruiterId}", ownRecruiterId("recruiterId"));
+        rule("GET", "/api/aptitude-tests/recruiter/{recruiterId}/results", ownRecruiterId("recruiterId"));
+        rule("GET", "/api/aptitude-tests/stats/recruiter/{recruiterId}", ownRecruiterId("recruiterId"));
+        rule("POST", "/api/aptitude-tests/assign", recruiter, this::checkAptitudeAssignBody);
+        rule("GET", "/api/aptitude-tests/application/{applicationId}", c -> participatesInApplication(c, "applicationId"));
+        rule("GET", "/api/aptitude-tests/start/{assignmentId}", c -> isAptitudeApplicant(c, "assignmentId"));
+        rule("POST", "/api/aptitude-tests/submit", authenticated,
+            (c, body) -> isAptitudeApplicant(c.user(), AccessContext.toId(body.get("assignmentId"))));
+        rule("GET", "/api/aptitude-tests/results/{assignmentId}", c -> participatesInAptitudeAssignment(c, "assignmentId"));
+        rule("GET", "/api/aptitude-tests/test/{testId}/results/unscheduled", c -> ownsAptitudeTest(c, "testId"));
+        rule("POST", "/api/aptitude-tests/{assignmentId}/violations", admin);
+        rule("GET", "/api/aptitude-tests/{testId}/questions", c -> ownsAptitudeTest(c, "testId"));
+        rule("POST", "/api/aptitude-tests/{testId}/add-multiple-questions", c -> ownsAptitudeTest(c, "testId"));
+
+        // DreamRole tests
+        rule("POST", "/api/dream-role-tests/create", recruiter);
+        rule("GET", "/api/dream-role-tests/branches/stats", recruiter);
+        rule("GET", "/api/dream-role-tests/recruiter/{recruiterId}", ownRecruiterId("recruiterId"));
+        rule("POST", "/api/dream-role-tests/assign", recruiter, this::checkDreamRoleAssignBody);
+        rule("GET", "/api/dream-role-tests/application/{applicationId}", c -> participatesInApplication(c, "applicationId"));
+        rule("GET", "/api/dream-role-tests/start/{assignmentId}", c -> isDreamRoleApplicant(c, "assignmentId"));
+        rule("POST", "/api/dream-role-tests/submit", authenticated,
+            (c, body) -> isDreamRoleApplicant(c.user(), AccessContext.toId(body.get("assignmentId"))));
+        rule("GET", "/api/dream-role-tests/results/{assignmentId}", c -> participatesInDreamRoleAssignment(c, "assignmentId"));
+        rule("GET", "/api/dream-role-tests/test/{testId}/results/unscheduled", c -> ownsDreamRoleTest(c, "testId"));
+        rule("POST", "/api/dream-role-tests/{testId}/add-technical-questions", c -> ownsDreamRoleTest(c, "testId"));
+
+        // External hiring
+        rule("POST", "/api/external-jobs/create", recruiter);
+        rule("POST", "/api/external-jobs/assign-test", recruiter, this::checkExternalAssignBody);
+        rule("GET", "/api/external-jobs/download-credentials/{fileName}", this::ownsCredentialsFile);
+        rule("GET", "/api/external-jobs/recruiter/{recruiterId}", ownRecruiterId("recruiterId"));
+        rule("GET", "/api/external-jobs/recruiter/{recruiterId}/**", ownRecruiterId("recruiterId"));
+        rule(null, "/api/external-jobs/candidates/{candidateId}/**", c -> ownsExternalCandidate(c, "candidateId"));
+        rule(null, "/api/external-jobs/{jobId}", c -> ownsExternalJob(c, "jobId"));
+        rule(null, "/api/external-jobs/{jobId}/*", c -> ownsExternalJob(c, "jobId"));
+
+        // Resumes
+        rule("POST", "/api/resumes/upload/{userId}", self("userId"));
+        rule("GET", "/api/resumes/user/{userId}", self("userId"));
+        rule("GET", "/api/resumes/user/{userId}/latest", self("userId"));
+        rule("GET", "/api/resumes/download/{applicationId}", c -> participatesInApplication(c, "applicationId"));
+        rule("GET", "/api/resumes/{resumeId}/analysis", this::ownsResume);
+        rule("GET", "/api/resume-matching/job/{jobId}/applications/sorted", ownsJob("jobId"));
+        rule("GET", "/api/resume-matching/application/{applicationId}/resume-analysis",
+            c -> participatesInApplication(c, "applicationId"));
+
+        // Own profile
+        rule(null, "/api/users/{userId}/**", self("userId"));
+    }
+
+    private void rule(String method, String pattern, Check check) {
+        rules.add(new Rule(method, pattern, check, null));
+    }
+
+    private void rule(String method, String pattern, Check check, BodyCheck bodyCheck) {
+        rules.add(new Rule(method, pattern, check, bodyCheck));
+    }
+
+    // ------------------------------------------------------------- entry points
+
+    public boolean hasRule(String method, String path) {
+        return findRule(method, path).isPresent();
+    }
+
+    /** Decides whether {@code user} may call {@code method path}; unknown routes are denied. */
+    public boolean isAllowed(User user, String method, String path, Map<String, String[]> params) {
+        Optional<Rule> rule = findRule(method, path);
+        if (rule.isEmpty()) {
+            return false;
+        }
+        AccessContext ctx = context(user, rule.get(), path, params);
+        if (!rule.get().check().allow(ctx)) {
+            return false;
+        }
+        Long recruiterParam = ctx.param("recruiterId");
+        if (recruiterParam != null && !ownsRecruiterId(user, recruiterParam)) {
+            return false;
+        }
+        Long userParam = ctx.param("userId");
+        return userParam == null || isAdmin(user) || Objects.equals(user.getId(), userParam);
+    }
+
+    /** Validates identifiers carried in a JSON request body (recruiterId, userId, testId, ...). */
+    public boolean isBodyAllowed(User user, String method, String path, Map<String, String[]> params,
+                                 Map<String, Object> body) {
+        if (isAdmin(user)) {
+            return true;
+        }
+        Optional<Rule> rule = findRule(method, path);
+        if (rule.isEmpty()) {
+            return false;
+        }
+        AccessContext ctx = context(user, rule.get(), path, params);
+        if (body.containsKey("recruiterId") && !ownsRecruiterId(user, AccessContext.toId(body.get("recruiterId")))) {
+            return false;
+        }
+        if (body.containsKey("userId") && !Objects.equals(user.getId(), AccessContext.toId(body.get("userId")))) {
+            return false;
+        }
+        return rule.get().bodyCheck() == null || rule.get().bodyCheck().allow(ctx, body);
+    }
+
+    private Optional<Rule> findRule(String method, String path) {
+        return rules.stream()
+            .filter(r -> (r.method() == null || r.method().equalsIgnoreCase(method)) && matcher.match(r.pattern(), path))
+            .findFirst();
+    }
+
+    private AccessContext context(User user, Rule rule, String path, Map<String, String[]> params) {
+        return new AccessContext(user, matcher.extractUriTemplateVariables(rule.pattern(), path), params);
+    }
+
+    // ------------------------------------------------------------------- roles
+
+    public boolean isAdmin(User user) {
+        return user != null && Objects.equals(user.getRoleId(), ROLE_ADMIN);
+    }
+
+    public boolean isRecruiter(User user) {
+        return isAdmin(user) || (user != null && Objects.equals(user.getRoleId(), ROLE_RECRUITER));
+    }
+
+    private Optional<Recruiter> recruiterOf(User user) {
+        return user == null ? Optional.empty() : recruiterRepository.findByUserId(user.getId());
+    }
+
+    private boolean ownsRecruiterId(User user, Long recruiterId) {
+        if (recruiterId == null) {
+            return false;
+        }
+        return isAdmin(user) || recruiterOf(user).map(r -> r.getId().equals(recruiterId)).orElse(false);
+    }
+
+    private boolean isRecruiterEntity(User user, Recruiter owner) {
+        return owner != null && ownsRecruiterId(user, owner.getId());
+    }
+
+    // ------------------------------------------------------------ rule factories
+
+    private Check self(String var) {
+        return c -> isAdmin(c.user()) || Objects.equals(c.user().getId(), c.var(var));
+    }
+
+    private Check ownRecruiterId(String var) {
+        return c -> ownsRecruiterId(c.user(), c.var(var));
+    }
+
+    private Check ownsJob(String var) {
+        return c -> isAdmin(c.user()) || (isRecruiter(c.user()) && c.var(var) != null
+            && jobPostingRepository.findById(c.var(var))
+                .map(job -> isRecruiterEntity(c.user(), job.getRecruiter())).orElse(false));
+    }
+
+    // ------------------------------------------------------- resource ownership
+
+    private boolean ownsExternalJob(AccessContext c, String var) {
+        return ownsExternalJobId(c.user(), c.var(var));
+    }
+
+    private boolean ownsExternalJobId(User user, Long jobId) {
+        return isAdmin(user) || (isRecruiter(user) && jobId != null
+            && externalJobRepository.findById(jobId).map(j -> isRecruiterEntity(user, j.getRecruiter())).orElse(false));
+    }
+
+    private boolean ownsExternalCandidate(AccessContext c, String var) {
+        return ownsExternalCandidateId(c.user(), c.var(var));
+    }
+
+    private boolean ownsExternalCandidateId(User user, Long candidateId) {
+        return isAdmin(user) || (isRecruiter(user) && candidateId != null
+            && externalCandidateRepository.findById(candidateId)
+                .map(cand -> cand.getJobPosting() != null && isRecruiterEntity(user, cand.getJobPosting().getRecruiter()))
+                .orElse(false));
+    }
+
+    private boolean ownsCredentialsFile(AccessContext c) {
+        Matcher m = CREDENTIALS_FILE.matcher(c.vars().getOrDefault("fileName", ""));
+        return m.matches() && ownsExternalJobId(c.user(), Long.valueOf(m.group(1)));
+    }
+
+    private boolean ownsAptitudeTest(AccessContext c, String var) {
+        return ownsAptitudeTestId(c.user(), c.var(var));
+    }
+
+    private boolean ownsAptitudeTestId(User user, Long testId) {
+        return isAdmin(user) || (isRecruiter(user) && testId != null
+            && aptitudeTestRepository.findById(testId).map(t -> isRecruiterEntity(user, t.getRecruiter())).orElse(false));
+    }
+
+    private boolean ownsDreamRoleTest(AccessContext c, String var) {
+        return ownsDreamRoleTestId(c.user(), c.var(var));
+    }
+
+    private boolean ownsDreamRoleTestId(User user, Long testId) {
+        return isAdmin(user) || (isRecruiter(user) && testId != null
+            && dreamRoleTestRepository.findById(testId).map(t -> isRecruiterEntity(user, t.getRecruiter())).orElse(false));
+    }
+
+    private boolean ownsRating(AccessContext c) {
+        Long ratingId = c.var("ratingId");
+        return isAdmin(c.user()) || (ratingId != null && jobRatingRepository.findById(ratingId)
+            .map(r -> r.getUser() != null && Objects.equals(r.getUser().getId(), c.user().getId())).orElse(false));
+    }
+
+    private boolean ownsResume(AccessContext c) {
+        Long resumeId = c.var("resumeId");
+        return isAdmin(c.user()) || (resumeId != null && resumeRepository.findById(resumeId)
+            .map(r -> r.getUser() != null && Objects.equals(r.getUser().getId(), c.user().getId())).orElse(false));
+    }
+
+    /** True when a recruiter's job, or a test/external listing they own, is behind this application. */
+    private boolean recruiterOwnsApplication(User user, Application application) {
+        if (application == null || !isRecruiter(user)) {
+            return false;
+        }
+        if (isAdmin(user)) {
+            return true;
+        }
+        if (application.getJobPosting() != null) {
+            return isRecruiterEntity(user, application.getJobPosting().getRecruiter());
+        }
+        Long applicationId = application.getId();
+        boolean viaAptitude = assignmentRepository.findByApplicationId(applicationId).stream()
+            .anyMatch(a -> a.getTest() != null && isRecruiterEntity(user, a.getTest().getRecruiter()));
+        boolean viaDreamRole = dreamRoleAssignmentRepository.findByApplicationId(applicationId).stream()
+            .anyMatch(a -> a.getDreamRoleTest() != null && isRecruiterEntity(user, a.getDreamRoleTest().getRecruiter()));
+        if (viaAptitude || viaDreamRole) {
+            return true;
+        }
+        return application.getUser() != null && externalCandidateRepository
+            .findAllByUserId(application.getUser().getId()).stream()
+            .anyMatch(cand -> cand.getJobPosting() != null
+                && isRecruiterEntity(user, cand.getJobPosting().getRecruiter()));
+    }
+
+    private boolean recruiterManagesApplication(AccessContext c, String var) {
+        Long id = c.var(var);
+        return id != null && applicationRepository.findById(id)
+            .map(app -> recruiterOwnsApplication(c.user(), app)).orElse(false);
+    }
+
+    private boolean participatesInApplication(AccessContext c, String var) {
+        Long id = c.var(var);
+        if (id == null) {
+            return false;
+        }
+        return isAdmin(c.user()) || applicationRepository.findById(id)
+            .map(app -> (app.getUser() != null && Objects.equals(app.getUser().getId(), c.user().getId()))
+                || recruiterOwnsApplication(c.user(), app))
+            .orElse(false);
+    }
+
+    private boolean isAptitudeApplicant(AccessContext c, String var) {
+        return isAptitudeApplicant(c.user(), c.var(var));
+    }
+
+    private boolean isAptitudeApplicant(User user, Long assignmentId) {
+        return isAdmin(user) || (assignmentId != null && assignmentRepository.findById(assignmentId)
+            .map(a -> a.getApplication() != null && a.getApplication().getUser() != null
+                && Objects.equals(a.getApplication().getUser().getId(), user.getId()))
+            .orElse(false));
+    }
+
+    private boolean participatesInAptitudeAssignment(AccessContext c, String var) {
+        Long id = c.var(var);
+        return isAptitudeApplicant(c.user(), id) || (id != null && assignmentRepository.findById(id)
+            .map(a -> a.getTest() != null && isRecruiter(c.user()) && isRecruiterEntity(c.user(), a.getTest().getRecruiter()))
+            .orElse(false));
+    }
+
+    private boolean isDreamRoleApplicant(AccessContext c, String var) {
+        return isDreamRoleApplicant(c.user(), c.var(var));
+    }
+
+    private boolean isDreamRoleApplicant(User user, Long assignmentId) {
+        return isAdmin(user) || (assignmentId != null && dreamRoleAssignmentRepository.findById(assignmentId)
+            .map(a -> a.getApplication() != null && a.getApplication().getUser() != null
+                && Objects.equals(a.getApplication().getUser().getId(), user.getId()))
+            .orElse(false));
+    }
+
+    private boolean participatesInDreamRoleAssignment(AccessContext c, String var) {
+        Long id = c.var(var);
+        return isDreamRoleApplicant(c.user(), id) || (id != null && dreamRoleAssignmentRepository.findById(id)
+            .map(a -> a.getDreamRoleTest() != null && isRecruiter(c.user())
+                && isRecruiterEntity(c.user(), a.getDreamRoleTest().getRecruiter()))
+            .orElse(false));
+    }
+
+    // -------------------------------------------------------------- body checks
+
+    private boolean checkAptitudeAssignBody(AccessContext c, Map<String, Object> body) {
+        return ownsAptitudeTestId(c.user(), AccessContext.toId(body.get("testId")))
+            && canManageApplicationId(c.user(), AccessContext.toId(body.get("applicationId")));
+    }
+
+    private boolean checkDreamRoleAssignBody(AccessContext c, Map<String, Object> body) {
+        return ownsDreamRoleTestId(c.user(), AccessContext.toId(body.get("testId")))
+            && canManageApplicationId(c.user(), AccessContext.toId(body.get("applicationId")));
+    }
+
+    private boolean checkExternalAssignBody(AccessContext c, Map<String, Object> body) {
+        Long testId = AccessContext.toId(body.get("testId"));
+        return ownsExternalCandidateId(c.user(), AccessContext.toId(body.get("candidateId")))
+            && (ownsAptitudeTestId(c.user(), testId) || ownsDreamRoleTestId(c.user(), testId));
+    }
+
+    private boolean canManageApplicationId(User user, Long applicationId) {
+        return applicationId != null && applicationRepository.findById(applicationId)
+            .map(app -> recruiterOwnsApplication(user, app)).orElse(false);
+    }
+}

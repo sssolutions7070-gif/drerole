@@ -1,0 +1,20 @@
+# Dependencies and build output
+node_modules/
+dist/
+target/
+venv/
+__pycache__/
+*.pyc
+
+# JVM crash logs
+hs_err_pid*.log
+replay_pid*.log
+
+# Uploaded user files (resumes, profile pictures, credentials)
+job-recommendation-backend/uploads/
+camera-proctoring/violations/
+
+# Local environment and IDE files
+.env
+.env.local
+secrets.properties

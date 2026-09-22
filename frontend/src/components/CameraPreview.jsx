@@ -1,5 +1,6 @@
 // src/components/CameraPreview.jsx - SEPARATE COMPONENT
 import React, { useState, useEffect, useRef } from 'react';
+import { PROCTORING_URL } from '../config';
 import { Camera, AlertTriangle, Maximize2, Minimize2, RefreshCw, XCircle, Wifi, WifiOff, Loader, CheckCircle } from 'lucide-react';
 
 const CameraPreview = ({ 
@@ -22,7 +23,6 @@ const CameraPreview = ({
   const imgRef = useRef(null);
   const refreshIntervalRef = useRef(null);
   
-  const PROCTORING_URL = 'http://localhost:5001';
   const videoFeedUrl = `${PROCTORING_URL}/video-feed/${assignmentId}`;
 
   // Network status monitoring
@@ -217,14 +217,12 @@ const CameraPreview = ({
               alt="Camera Feed"
               className={`w-full ${heightClass} object-cover bg-gray-900`}
               onLoad={() => {
-                console.log('✅ Feed loaded');
                 setHasError(false);
                 setIsLoading(false);
                 setRetryCount(0);
                 setFeedActive(true);
               }}
               onError={() => {
-                console.log('❌ Feed error');
                 setHasError(true);
                 setIsLoading(false);
                 setFeedActive(false);

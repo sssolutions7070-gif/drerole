@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8081/api';
+import { API_BASE_URL } from '../config';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -69,14 +69,6 @@ export const resumeMatchingAPI = {
   // Get detailed resume analysis for an application
   getResumeAnalysis: (applicationId) =>
     api.get(`/resume-matching/application/${applicationId}/resume-analysis`),
-
-  // Get applications with resume data
-  getApplicationsWithResume: (jobId, recruiterId) =>
-    api.get(`/resume-matching/job/${jobId}/applications?recruiterId=${recruiterId}`),
-
-  // Recalculate match percentages for a job
-  recalculateMatches: (jobId) =>
-    api.post(`/resume-matching/job/${jobId}/recalculate`),
 };
 
 // Enhanced Job Application API calls
@@ -84,18 +76,6 @@ export const jobApplicationAPI = {
   // Apply for job with resume
   applyWithResume: (jobId, userId, applicationData) =>
     api.post(`/jobs/${jobId}/apply-with-resume/${userId}`, applicationData),
-
-  // Simple apply (backward compatibility)
-  simpleApply: (jobId, userId, applicationData) =>
-    api.post(`/jobs/${jobId}/simple-apply/${userId}`, applicationData),
-
-  // Debug apply endpoint
-  debugApply: (jobId, userId, applicationData) =>
-    api.post(`/jobs/${jobId}/debug-apply/${userId}`, applicationData),
-
-  // Test apply endpoint
-  testApply: (jobId, userId) =>
-    api.post(`/jobs/${jobId}/test-apply/${userId}`),
 };
 
 // Enhanced Resume API calls
@@ -122,10 +102,6 @@ export const resumeAPI = {
   // Get latest resume
   getLatestResume: (userId) =>
     api.get(`/resumes/user/${userId}/latest`),
-
-  // Extract skills from text
-  extractSkills: (text) =>
-    api.post('/resumes/extract-skills', { text }),
 };
 
 // Enhanced Application Status API calls
@@ -184,10 +160,6 @@ export const jobManagementAPI = {
   // Get job applications (recruiter)
   getJobApplications: (jobId, recruiterId) =>
     api.get(`/recruiters/jobs/${jobId}/applications?recruiterId=${recruiterId}`),
-
-  // Get job applications (debug - no recruiter verification)
-  getJobApplicationsDebug: (jobId) =>
-    api.get(`/recruiters/jobs/${jobId}/applications/debug`),
 };
 
 // Job Recommendation API calls
@@ -219,10 +191,6 @@ export const authAPI = {
   login: (credentials) =>
     api.post('/auth/login', credentials),
 
-  // Debug login
-  debugLogin: (credentials) =>
-    api.post('/auth/debug-login', credentials),
-
   // Logout user
   logout: () =>
     api.post('/auth/logout'),
@@ -249,18 +217,6 @@ export const utilityAPI = {
   // Health check
   healthCheck: () =>
     api.get('/health'),
-
-  // Test endpoint
-  test: () =>
-    api.get('/test'),
-
-  // Debug all applications
-  debugAllApplications: () =>
-    api.get('/jobs/debug/applications'),
-
-  // Debug job applications
-  debugJobApplications: (jobId) =>
-    api.get(`/jobs/${jobId}/applications/debug`),
 };
 
 // Default export for backward compatibility

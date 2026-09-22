@@ -1,12 +1,13 @@
 // frontend/src/components/ProctoringTest.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { PROCTORING_URL } from '../config';
 
 const ProctoringTest = () => {
   const [status, setStatus] = useState('Checking...');
   const [cameraStatus, setCameraStatus] = useState(null);
   const [videoStream, setVideoStream] = useState(null);
-  const [proctoringUrl, setProctoringUrl] = useState('http://localhost:5001');
+  const [proctoringUrl, setProctoringUrl] = useState(PROCTORING_URL);
   const [testAssignmentId, setTestAssignmentId] = useState('24');
   const [videoFeedUrl, setVideoFeedUrl] = useState('');
   const [videoFeedError, setVideoFeedError] = useState(false);

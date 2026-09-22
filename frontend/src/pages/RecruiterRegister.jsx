@@ -84,7 +84,6 @@ const RecruiterRegister = ({ onAuthChange }) => {
     setError('');
 
     try {
-      console.log('Starting registration process...');
       
       // First register as regular user
       const userResponse = await api.post('/auth/register', {
@@ -94,7 +93,6 @@ const RecruiterRegister = ({ onAuthChange }) => {
         password: formData.password
       });
 
-      console.log('User registration successful:', userResponse.data);
       const user = userResponse.data.user;
       const token = userResponse.data.token;
 
@@ -103,7 +101,6 @@ const RecruiterRegister = ({ onAuthChange }) => {
       localStorage.setItem('user', JSON.stringify(user));
 
       // Then register as recruiter
-      console.log('Starting recruiter registration with user ID:', user.id);
       const recruiterResponse = await api.post('/recruiters/register', {
         userId: user.id,
         companyName: formData.companyName,
@@ -114,8 +111,6 @@ const RecruiterRegister = ({ onAuthChange }) => {
         contactEmail: formData.contactEmail || formData.email,
         contactPhone: formData.contactPhone || formData.phone
       });
-
-      console.log('Recruiter registration successful:', recruiterResponse.data);
 
       // IMPORTANT: Update the user role to ROLE_RECRUITER and include recruiter ID
       const updatedUser = { 

@@ -8,6 +8,7 @@ import {
   Trash2, Code, Heart, Cake, Plus, ExternalLink
 } from 'lucide-react';
 import api from '../services/api';
+import { BACKEND_ORIGIN } from '../config';
 
 const UserProfile = () => {
   const [profile, setProfile] = useState(null);
@@ -339,7 +340,7 @@ const UserProfile = () => {
   const getImageUrl = (path) => {
     if (!path) return null;
     if (path.startsWith('http')) return path;
-    return `http://localhost:8081${path}`;
+    return `${BACKEND_ORIGIN}${path}`;
   };
 
   if (loading) {

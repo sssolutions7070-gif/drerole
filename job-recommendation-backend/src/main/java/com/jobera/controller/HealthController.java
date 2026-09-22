@@ -20,12 +20,4 @@ public class HealthController {
             "database", "connected"
         ));
     }
-    
-    @GetMapping("/test")
-    public ResponseEntity<Map<String, String>> testEndpoint() {
-        return ResponseEntity.ok(Map.of(
-            "message", "Backend is working perfectly!",
-            "timestamp", java.time.LocalDateTime.now().toString()
-        ));
-    }
 }

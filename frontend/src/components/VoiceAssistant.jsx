@@ -347,7 +347,6 @@ const VoiceAssistant = () => {
       oscillator.start();
       oscillator.stop(context.currentTime + duration / 1000);
     } catch (error) {
-      console.log('Audio beep not supported:', error);
     }
   };
 
@@ -414,7 +413,6 @@ const VoiceAssistant = () => {
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getTracks().forEach(track => {
         track.stop();
-        console.log('Microphone track stopped');
       });
       mediaStreamRef.current = null;
     }
@@ -432,7 +430,6 @@ const VoiceAssistant = () => {
       try {
         recognitionRef.current.stop();
       } catch (e) {
-        console.log('Recognition stop error:', e);
       }
     }
     
@@ -601,7 +598,6 @@ const VoiceAssistant = () => {
       const response = await api.get('/jobs');
       const jobs = response.data || [];
       setAllJobs(jobs);
-      console.log(`✅ Loaded ${jobs.length} jobs`);
       return jobs;
     } catch (error) {
       console.error('Error fetching jobs:', error);
@@ -629,8 +625,6 @@ const VoiceAssistant = () => {
       const jobs = allJobs.length > 0 ? allJobs : await fetchAllJobs();
       
       // Log for debugging
-      console.log(`Searching for "${searchTerm}" in ${jobs.length} jobs`);
-      console.log('Available job titles:', jobs.map(j => j.title));
       
       // Better matching algorithm
       const searchLower = searchTerm.toLowerCase().trim();
@@ -643,14 +637,12 @@ const VoiceAssistant = () => {
         
         // Check for exact match first
         if (title.includes(searchLower)) {
-          console.log(`✅ Exact match: ${job.title} for "${searchTerm}"`);
           return true;
         }
         
         // Check for word-by-word match
         for (const word of searchWords) {
           if (title.includes(word)) {
-            console.log(`✅ Word match: ${job.title} contains "${word}"`);
             return true;
           }
         }
@@ -665,7 +657,6 @@ const VoiceAssistant = () => {
         return false;
       });
       
-      console.log(`Found ${filteredJobs.length} matches for "${searchTerm}"`);
       
       setSearchResults(filteredJobs);
       setShowSearchResults(true);

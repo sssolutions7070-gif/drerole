@@ -1,4 +1,4 @@
-// File: src/main/java/com/jobera/controller/DreamRoleTestController.java
+// src/main/java/com/jobera/controller/DreamRoleTestController.java
 package com.jobera.controller;
 
 import java.time.LocalDateTime;
@@ -12,7 +12,6 @@ import java.util.stream.Collectors;
 
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -38,7 +37,6 @@ import com.jobera.repository.RecruiterRepository;
 
 @RestController
 @RequestMapping("/api/dream-role-tests")
-@CrossOrigin(origins = "http://localhost:3000")
 public class DreamRoleTestController {
     
     private static final String ERROR_KEY = "error";
@@ -48,6 +46,7 @@ public class DreamRoleTestController {
     private static final String IN_PROGRESS_STATUS = "IN_PROGRESS";
     private static final String PENDING_STATUS = "PENDING";
     private static final String EXPIRED_STATUS = "EXPIRED";
+    private static final String FAILED_PROCTORING_STATUS = "FAILED_PROCTORING";
     private static final String INTERVIEW_SCHEDULED_STATUS = "INTERVIEW_SCHEDULED";
     
     private final DreamRoleTestRepository dreamRoleTestRepository;
@@ -340,8 +339,8 @@ public class DreamRoleTestController {
                 return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "Test deadline has passed"));
             }
             
-            if (COMPLETED_STATUS.equals(assignment.getStatus())) {
-                return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "Test already completed"));
+            if (COMPLETED_STATUS.equals(assignment.getStatus()) || FAILED_PROCTORING_STATUS.equals(assignment.getStatus())) {
+                return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "Test already completed or failed"));
             }
             
             List<Map<String, Object>> questions = objectMapper.readValue(
@@ -405,10 +404,39 @@ public class DreamRoleTestController {
             
             DreamRoleTestAssignment assignment = assignmentOpt.get();
             
-            if (COMPLETED_STATUS.equals(assignment.getStatus())) {
+            if (COMPLETED_STATUS.equals(assignment.getStatus()) || FAILED_PROCTORING_STATUS.equals(assignment.getStatus())) {
                 return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "Test already submitted"));
             }
-            
+
+            if (Boolean.parseBoolean(String.valueOf(request.get("terminated")))) {
+                assignment.setCompletedAt(LocalDateTime.now());
+                assignment.setStatus(FAILED_PROCTORING_STATUS);
+                assignment.setScore(0);
+                assignment.setCorrectAnswers(0);
+                assignment.setPassed(false);
+                if (answers != null) {
+                    assignment.setAnswers(objectMapper.writeValueAsString(answers));
+                }
+                assignmentRepository.save(assignment);
+
+                Application terminatedApplication = assignment.getApplication();
+                if (terminatedApplication != null) {
+                    terminatedApplication.setStatus("TEST_FAILED");
+                    applicationRepository.save(terminatedApplication);
+                }
+
+                return ResponseEntity.ok(Map.of(
+                    MESSAGE_KEY, "Test terminated due to proctoring violations",
+                    "terminated", true,
+                    "passed", false,
+                    "score", 0
+                ));
+            }
+
+            if (answers == null) {
+                answers = new HashMap<>();
+            }
+
             if (LocalDateTime.now().isAfter(assignment.getDeadline())) {
                 assignment.setStatus(EXPIRED_STATUS);
                 assignmentRepository.save(assignment);
@@ -446,13 +474,9 @@ public class DreamRoleTestController {
             
             assignmentRepository.save(assignment);
             
-            if (passed) {
-                Application application = assignment.getApplication();
-                application.setStatus("TEST_PASSED");
-                applicationRepository.save(application);
-            } else {
-                Application application = assignment.getApplication();
-                application.setStatus("TEST_FAILED");
+            Application application = assignment.getApplication();
+            if (application != null) {
+                application.setStatus(passed ? "TEST_PASSED" : "TEST_FAILED");
                 applicationRepository.save(application);
             }
             
@@ -470,6 +494,21 @@ public class DreamRoleTestController {
         }
     }
 
+    @GetMapping("/test/{testId}/results/unscheduled")
+    public ResponseEntity<Map<String, Object>> getUnscheduledResults(@PathVariable Long testId) {
+        List<Map<String, Object>> results = assignmentRepository.findByDreamRoleTestId(testId).stream()
+            .filter(a -> a.getApplication() != null
+                && !INTERVIEW_SCHEDULED_STATUS.equals(a.getApplication().getStatus()))
+            .map(a -> {
+                Map<String, Object> row = createAssignmentResponse(a);
+                row.put("candidateName", a.getApplication().getSafeApplicantName());
+                row.put("candidateEmail", a.getApplication().getSafeApplicantEmail());
+                return row;
+            })
+            .collect(Collectors.toList());
+        return ResponseEntity.ok(Map.of("results", results));
+    }
+
     @GetMapping("/results/{assignmentId}")
     public ResponseEntity<Map<String, Object>> getDreamRoleTestResults(@PathVariable Long assignmentId) {
         try {
@@ -479,122 +518,31 @@ public class DreamRoleTestController {
             }
             
             DreamRoleTestAssignment assignment = assignmentOpt.get();
-            
             Application application = assignment.getApplication();
-            User candidate = application.getUser();
-            
-            if (candidate == null) {
-                return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "Candidate not found"));
-            }
+            User candidate = application != null ? application.getUser() : null;
             
             Map<String, Object> response = new HashMap<>();
             response.put("assignment", createAssignmentResponse(assignment));
-            response.put("candidateName", candidate.getFullName());
-            response.put("candidateEmail", candidate.getEmail());
-            response.put("jobTitle", application.getJobPosting() != null ? 
-                application.getJobPosting().getTitle() : "Unknown Job");
+            response.put("candidateName", candidate != null ? candidate.getFullName() : "Unknown");
+            response.put("candidateEmail", candidate != null ? candidate.getEmail() : "Unknown");
             
-            return ResponseEntity.ok(response);
-            
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "Failed to get results: " + e.getMessage()));
-        }
-    }
-
-    @GetMapping("/test/{testId}/results")
-    public ResponseEntity<Map<String, Object>> getDreamRoleTestResultsByTestId(@PathVariable Long testId) {
-        try {
-            Optional<DreamRoleTest> testOpt = dreamRoleTestRepository.findById(testId);
-            if (testOpt.isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "Test not found"));
-            }
-            
-            List<DreamRoleTestAssignment> assignments = assignmentRepository.findByDreamRoleTestId(testId);
-            
-            List<Map<String, Object>> results = assignments.stream()
-                .map(assignment -> {
-                    Map<String, Object> result = new HashMap<>();
-                    result.put("assignmentId", assignment.getId());
-                    result.put("testId", assignment.getDreamRoleTest().getId());
-                    result.put("testName", assignment.getDreamRoleTest().getTestName());
-                    result.put("applicationId", assignment.getApplication().getId());
-                    result.put("candidateName", assignment.getApplication().getSafeApplicantName());
-                    result.put("candidateEmail", assignment.getApplication().getSafeApplicantEmail());
-                    result.put(STATUS_KEY, assignment.getStatus());
-                    result.put("score", assignment.getScore() != null ? assignment.getScore() : 0);
-                    result.put("correctAnswers", assignment.getCorrectAnswers() != null ? assignment.getCorrectAnswers() : 0);
-                    result.put("totalQuestions", assignment.getTotalQuestions() != null ? assignment.getTotalQuestions() : 0);
-                    result.put("passed", assignment.getPassed() != null ? assignment.getPassed() : false);
-                    result.put("percentage", assignment.getPercentage());
-                    result.put("passingScore", assignment.getDreamRoleTest().getPassingScore());
-                    result.put("startedAt", assignment.getStartedAt());
-                    result.put("completedAt", assignment.getCompletedAt());
-                    return result;
-                })
-                .collect(Collectors.toList());
-            
-            return ResponseEntity.ok(Map.of(
-                "testId", testId,
-                "testName", testOpt.get().getTestName(),
-                "results", results
-            ));
-            
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "Failed to get results: " + e.getMessage()));
-        }
-    }
-
-    @GetMapping("/test/{testId}/results/unscheduled")
-    public ResponseEntity<Map<String, Object>> getUnscheduledDreamRoleTestResults(@PathVariable Long testId) {
-        try {
-            Optional<DreamRoleTest> testOpt = dreamRoleTestRepository.findById(testId);
-            if (testOpt.isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "Test not found"));
-            }
-            
-            List<DreamRoleTestAssignment> assignments = assignmentRepository.findByDreamRoleTestId(testId);
-            
-            List<Map<String, Object>> results = new ArrayList<>();
-            int scheduledCount = 0;
-            
-            for (DreamRoleTestAssignment assignment : assignments) {
-                Application application = assignment.getApplication();
-                // Only include candidates who have NOT been scheduled for interview
-                if (application != null && !INTERVIEW_SCHEDULED_STATUS.equals(application.getStatus())) {
-                    Map<String, Object> result = new HashMap<>();
-                    result.put("assignmentId", assignment.getId());
-                    result.put("testId", assignment.getDreamRoleTest().getId());
-                    result.put("testName", assignment.getDreamRoleTest().getTestName());
-                    result.put("applicationId", application.getId());
-                    result.put("candidateName", application.getSafeApplicantName());
-                    result.put("candidateEmail", application.getSafeApplicantEmail());
-                    result.put(STATUS_KEY, assignment.getStatus());
-                    result.put("score", assignment.getScore() != null ? assignment.getScore() : 0);
-                    result.put("correctAnswers", assignment.getCorrectAnswers() != null ? assignment.getCorrectAnswers() : 0);
-                    result.put("totalQuestions", assignment.getTotalQuestions() != null ? assignment.getTotalQuestions() : 0);
-                    result.put("passed", assignment.getPassed() != null ? assignment.getPassed() : false);
-                    result.put("percentage", assignment.getPercentage());
-                    result.put("passingScore", assignment.getDreamRoleTest().getPassingScore());
-                    result.put("startedAt", assignment.getStartedAt());
-                    result.put("completedAt", assignment.getCompletedAt());
-                    results.add(result);
-                } else {
-                    scheduledCount++;
+            String jobTitle = "Unknown Job";
+            if (application != null) {
+                if (application.getJobPosting() != null) {
+                    jobTitle = application.getJobPosting().getTitle();
+                } else if (application.getCoverLetter() != null && application.getCoverLetter().contains("External Job:")) {
+                    String match = application.getCoverLetter().replaceFirst(".*External Job:\\s*([^\\n]+).*", "$1");
+                    if (!match.equals(application.getCoverLetter())) {
+                        String[] parts = match.split(" at ");
+                        jobTitle = parts.length >= 2 ? parts[0].trim() : match;
+                    }
                 }
             }
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("testId", testId);
-            response.put("testName", testOpt.get().getTestName());
-            response.put("totalAssignments", assignments.size());
-            response.put("scheduledCount", scheduledCount);
-            response.put("unscheduledCount", results.size());
-            response.put("results", results);
+            response.put("jobTitle", jobTitle);
             
             return ResponseEntity.ok(response);
             
         } catch (Exception e) {
-            e.printStackTrace();
             return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "Failed to get results: " + e.getMessage()));
         }
     }
@@ -638,6 +586,41 @@ public class DreamRoleTestController {
         response.put("passed", assignment.getPassed() != null ? assignment.getPassed() : false);
         response.put("percentage", assignment.getPercentage());
         response.put("passingScore", assignment.getDreamRoleTest().getPassingScore());
+        
+        // FIXED: Get job info from application
+        String jobTitle = "";
+        String companyName = "";
+        
+        Application app = assignment.getApplication();
+        if (app != null) {
+            if (app.getJobPosting() != null) {
+                jobTitle = app.getJobPosting().getTitle();
+                companyName = app.getJobPosting().getCompany();
+            }
+            else if (app.getCoverLetter() != null && app.getCoverLetter().contains("External Job:")) {
+                String coverLetter = app.getCoverLetter();
+                String match = coverLetter.replaceFirst(".*External Job:\\s*([^\\n]+).*", "$1");
+                if (!match.equals(coverLetter)) {
+                    String[] parts = match.split(" at ");
+                    if (parts.length >= 2) {
+                        jobTitle = parts[0].trim();
+                        companyName = parts[1].trim();
+                    } else {
+                        jobTitle = match;
+                        companyName = "External Recruiter";
+                    }
+                } else {
+                    jobTitle = "External Job Opportunity";
+                    companyName = "External Recruiter";
+                }
+            }
+            
+            response.put("jobTitle", jobTitle);
+            response.put("companyName", companyName);
+            response.put("applicantName", app.getSafeApplicantName());
+            response.put("applicantEmail", app.getSafeApplicantEmail());
+        }
+        
         return response;
     }
 }

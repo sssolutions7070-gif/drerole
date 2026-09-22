@@ -1,5 +1,7 @@
 package com.jobera.service;
 
+import org.slf4j.LoggerFactory;
+import org.slf4j.Logger;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -20,6 +22,8 @@ import com.jobera.repository.UserRepository;
 
 @Service
 public class JobPostingService {
+    private static final Logger log = LoggerFactory.getLogger(JobPostingService.class);
+
     
     private final JobPostingRepository jobPostingRepository;
     private final ApplicationRepository applicationRepository;
@@ -54,23 +58,23 @@ public class JobPostingService {
     public void applyForJob(Long userId, Long jobId, String coverLetter, 
                            String applicantSkills, Integer applicantExperience, 
                            String applicantEducation) {
-        System.out.println("=== JOB POSTING SERVICE - APPLY FOR JOB ===");
-        System.out.println("User ID: " + userId);
-        System.out.println("Job ID: " + jobId);
-        System.out.println("Cover Letter: " + (coverLetter != null ? coverLetter.substring(0, Math.min(50, coverLetter.length())) + "..." : "null"));
-        System.out.println("Skills: " + applicantSkills);
-        System.out.println("Experience: " + applicantExperience);
-        System.out.println("Education: " + applicantEducation);
+        log.debug("=== JOB POSTING SERVICE - APPLY FOR JOB ===");
+        log.debug("User ID: " + userId);
+        log.debug("Job ID: " + jobId);
+        log.debug("Cover Letter: " + (coverLetter != null ? coverLetter.substring(0, Math.min(50, coverLetter.length())) + "..." : "null"));
+        log.debug("Skills: " + applicantSkills);
+        log.debug("Experience: " + applicantExperience);
+        log.debug("Education: " + applicantEducation);
         
         Optional<User> user = userRepository.findById(userId);
         Optional<JobPosting> job = jobPostingRepository.findById(jobId);
         
-        System.out.println("User found: " + user.isPresent());
-        System.out.println("Job found: " + job.isPresent());
+        log.debug("User found: " + user.isPresent());
+        log.debug("Job found: " + job.isPresent());
         
         if (user.isPresent() && job.isPresent()) {
             try {
-                System.out.println("Creating Application entity...");
+                log.debug("Creating Application entity...");
                 Application application = new Application(
                     user.get(), 
                     job.get(), 
@@ -80,27 +84,27 @@ public class JobPostingService {
                     applicantEducation
                 );
                 
-                System.out.println("Application entity created, saving to database...");
+                log.debug("Application entity created, saving to database...");
                 Application savedApplication = applicationRepository.save(application);
-                System.out.println("✅ Application saved successfully with ID: " + savedApplication.getId());
-                System.out.println("✅ Applicant Name: " + savedApplication.getApplicantName());
-                System.out.println("✅ Applicant Email: " + savedApplication.getApplicantEmail());
-                System.out.println("✅ Application Date: " + savedApplication.getApplicationDate());
-                System.out.println("✅ Status: " + savedApplication.getStatus());
+                log.debug("✅ Application saved successfully with ID: " + savedApplication.getId());
+                log.debug("✅ Applicant Name: " + savedApplication.getApplicantName());
+                log.debug("✅ Applicant Email: " + savedApplication.getApplicantEmail());
+                log.debug("✅ Application Date: " + savedApplication.getApplicationDate());
+                log.debug("✅ Status: " + savedApplication.getStatus());
                 
             } catch (Exception e) {
-                System.out.println("❌ Error saving application: " + e.getMessage());
-                e.printStackTrace();
+                log.error("❌ Error saving application: " + e.getMessage());
+                log.error("Unexpected error", e);
                 throw new JobApplicationException("Failed to save application: " + e.getMessage());
             }
         } else {
             String errorMsg = "User or Job not found with ID: User=" + userId + ", Job=" + jobId;
-            System.out.println("❌ " + errorMsg);
+            log.error("❌ " + errorMsg);
             if (user.isEmpty()) {
-                System.out.println("❌ User not found in database");
+                log.error("❌ User not found in database");
             }
             if (job.isEmpty()) {
-                System.out.println("❌ Job not found in database");
+                log.error("❌ Job not found in database");
             }
             throw new JobApplicationException(errorMsg);
         }
@@ -111,20 +115,20 @@ public class JobPostingService {
                                             String applicantSkills, Integer applicantExperience, 
                                             String applicantEducation, String resumeFilePath, 
                                             String resumeParsedText) {
-        System.out.println("=== JOB POSTING SERVICE - APPLY FOR JOB WITH RESUME ===");
-        System.out.println("User ID: " + userId);
-        System.out.println("Job ID: " + jobId);
-        System.out.println("Resume File Path: " + resumeFilePath);
+        log.debug("=== JOB POSTING SERVICE - APPLY FOR JOB WITH RESUME ===");
+        log.debug("User ID: " + userId);
+        log.debug("Job ID: " + jobId);
+        log.debug("Resume File Path: " + resumeFilePath);
         
         Optional<User> user = userRepository.findById(userId);
         Optional<JobPosting> job = jobPostingRepository.findById(jobId);
         
-        System.out.println("User found: " + user.isPresent());
-        System.out.println("Job found: " + job.isPresent());
+        log.debug("User found: " + user.isPresent());
+        log.debug("Job found: " + job.isPresent());
         
         if (user.isPresent() && job.isPresent()) {
             try {
-                System.out.println("Creating Application entity with resume data...");
+                log.debug("Creating Application entity with resume data...");
                 Application application = new Application(
                     user.get(), 
                     job.get(), 
@@ -147,22 +151,22 @@ public class JobPostingService {
                 application.setMatchedSkills(objectMapper.writeValueAsString(skillsAnalysis.get("matchedSkills")));
                 application.setMissingSkills(objectMapper.writeValueAsString(skillsAnalysis.get("missingSkills")));
                 
-                System.out.println("Application entity created, saving to database...");
+                log.debug("Application entity created, saving to database...");
                 Application savedApplication = applicationRepository.save(application);
-                System.out.println("✅ Application saved successfully with ID: " + savedApplication.getId());
-                System.out.println("✅ Match Percentage: " + savedApplication.getMatchPercentage() + "%");
-                System.out.println("✅ Applicant Name: " + savedApplication.getApplicantName());
+                log.debug("✅ Application saved successfully with ID: " + savedApplication.getId());
+                log.debug("✅ Match Percentage: " + savedApplication.getMatchPercentage() + "%");
+                log.debug("✅ Applicant Name: " + savedApplication.getApplicantName());
                 
                 return savedApplication;
                 
             } catch (Exception e) {
-                System.out.println("❌ Error saving application: " + e.getMessage());
-                e.printStackTrace();
+                log.error("❌ Error saving application: " + e.getMessage());
+                log.error("Unexpected error", e);
                 throw new JobApplicationException("Failed to save application: " + e.getMessage());
             }
         } else {
             String errorMsg = "User or Job not found with ID: User=" + userId + ", Job=" + jobId;
-            System.out.println("❌ " + errorMsg);
+            log.error("❌ " + errorMsg);
             throw new JobApplicationException(errorMsg);
         }
     }
@@ -170,7 +174,7 @@ public class JobPostingService {
     // Calculate resume match percentage
     private double calculateResumeMatchPercentage(JobPosting job, String resumeText, String applicantSkillsJson) {
         try {
-            System.out.println("=== CALCULATING RESUME MATCH PERCENTAGE ===");
+            log.debug("=== CALCULATING RESUME MATCH PERCENTAGE ===");
             
             // Parse required skills from job
             Set<String> requiredSkills = parseSkillsFromJson(job.getRequiredSkills());
@@ -187,8 +191,8 @@ public class JobPostingService {
             allApplicantSkills.addAll(applicantSkills);
             allApplicantSkills.addAll(resumeSkills);
             
-            System.out.println("Required Skills: " + requiredSkills.size());
-            System.out.println("Applicant Skills: " + allApplicantSkills.size());
+            log.debug("Required Skills: " + requiredSkills.size());
+            log.debug("Applicant Skills: " + allApplicantSkills.size());
             
             if (requiredSkills.isEmpty()) {
                 return 50.0; // Default score if no required skills specified
@@ -208,15 +212,15 @@ public class JobPostingService {
             // Convert to percentage and cap at 100%
             double percentage = Math.min(totalScore * 100, 100.0);
             
-            System.out.println("Required Match: " + (requiredMatchScore * 100) + "%");
-            System.out.println("Preferred Match: " + (preferredMatchScore * 100) + "%");
-            System.out.println("Experience Bonus: " + (experienceBonus * 100) + "%");
-            System.out.println("Final Match Percentage: " + percentage + "%");
+            log.debug("Required Match: " + (requiredMatchScore * 100) + "%");
+            log.debug("Preferred Match: " + (preferredMatchScore * 100) + "%");
+            log.debug("Experience Bonus: " + (experienceBonus * 100) + "%");
+            log.debug("Final Match Percentage: " + percentage + "%");
             
             return percentage;
             
         } catch (Exception e) {
-            System.out.println("Error calculating match percentage: " + e.getMessage());
+            log.error("Error calculating match percentage: " + e.getMessage());
             return 0.0;
         }
     }
@@ -323,7 +327,7 @@ public class JobPostingService {
             analysis.put("applicantSkills", allApplicantSkills);
             
         } catch (Exception e) {
-            System.out.println("Error analyzing skills match: " + e.getMessage());
+            log.error("Error analyzing skills match: " + e.getMessage());
             analysis.put("matchedSkills", new HashSet<>());
             analysis.put("missingSkills", new HashSet<>());
             analysis.put("applicantSkills", new HashSet<>());
@@ -339,7 +343,7 @@ public class JobPostingService {
                 return objectMapper.readValue(skillsJson, new TypeReference<Set<String>>() {});
             }
         } catch (Exception e) {
-            System.out.println("Failed to parse skills JSON: " + skillsJson);
+            log.error("Failed to parse skills JSON: " + skillsJson);
         }
         return new HashSet<>();
     }
@@ -469,51 +473,51 @@ public class JobPostingService {
     
     // ENHANCED METHOD - FIXED VERSION
     public List<Application> getApplicationsForJob(Long jobId, Long recruiterId) {
-        System.out.println("=== GET APPLICATIONS FOR JOB - ENHANCED ===");
-        System.out.println("Job ID: " + jobId);
-        System.out.println("Recruiter ID: " + recruiterId);
+        log.debug("=== GET APPLICATIONS FOR JOB - ENHANCED ===");
+        log.debug("Job ID: " + jobId);
+        log.debug("Recruiter ID: " + recruiterId);
         
         Optional<JobPosting> jobOpt = jobPostingRepository.findById(jobId);
         if (jobOpt.isEmpty()) {
-            System.out.println("❌ Job posting not found with ID: " + jobId);
+            log.error("❌ Job posting not found with ID: " + jobId);
             throw new JobPostingException("Job posting not found with ID: " + jobId);
         }
         
         JobPosting jobPosting = jobOpt.get();
-        System.out.println("✅ Found job: " + jobPosting.getTitle() + " by " + jobPosting.getCompany());
+        log.debug("✅ Found job: " + jobPosting.getTitle() + " by " + jobPosting.getCompany());
         
         // Check if job has recruiter
         if (jobPosting.getRecruiter() == null) {
-            System.out.println("❌ Job has no recruiter assigned. Job ID: " + jobId);
-            System.out.println("⚠️  This might be a sample job created during initialization");
+            log.error("❌ Job has no recruiter assigned. Job ID: " + jobId);
+            log.warn("⚠️  This might be a sample job created during initialization");
             // Return empty list instead of throwing exception for sample jobs
             return List.of();
         }
         
-        System.out.println("Job Recruiter ID: " + jobPosting.getRecruiter().getId());
-        System.out.println("Requested Recruiter ID: " + recruiterId);
+        log.debug("Job Recruiter ID: " + jobPosting.getRecruiter().getId());
+        log.debug("Requested Recruiter ID: " + recruiterId);
         
         // Verify the recruiter owns this job posting
         if (!jobPosting.getRecruiter().getId().equals(recruiterId)) {
-            System.out.println("❌ Recruiter ID mismatch. Job belongs to recruiter: " + 
+            log.error("❌ Recruiter ID mismatch. Job belongs to recruiter: " + 
                 jobPosting.getRecruiter().getId() + ", but requested: " + recruiterId);
             throw new JobPostingException("You are not authorized to view applications for this job");
         }
         
-        System.out.println("✅ Recruiter verification passed");
+        log.debug("✅ Recruiter verification passed");
         
         // Get applications for this job
         List<Application> applications = applicationRepository.findByJobPostingId(jobId);
-        System.out.println("✅ Found " + applications.size() + " applications for job " + jobId);
+        log.debug("✅ Found " + applications.size() + " applications for job " + jobId);
         
         // Debug: Print application details
         for (Application app : applications) {
-            System.out.println("📄 Application ID: " + app.getId());
-            System.out.println("   Applicant: " + (app.getUser() != null ? app.getUser().getFullName() : "No user"));
-            System.out.println("   Application Date: " + app.getApplicationDate());
-            System.out.println("   Status: " + app.getStatus());
-            System.out.println("   Cover Letter Length: " + (app.getCoverLetter() != null ? app.getCoverLetter().length() : 0));
-            System.out.println("   ---");
+            log.debug("📄 Application ID: " + app.getId());
+            log.debug("   Applicant: " + (app.getUser() != null ? app.getUser().getFullName() : "No user"));
+            log.debug("   Application Date: " + app.getApplicationDate());
+            log.debug("   Status: " + app.getStatus());
+            log.debug("   Cover Letter Length: " + (app.getCoverLetter() != null ? app.getCoverLetter().length() : 0));
+            log.debug("   ---");
         }
         
         return applications;
@@ -522,17 +526,6 @@ public class JobPostingService {
     // Add this method to JobPostingService class
     public List<JobPosting> getActiveJobPostingsSortedByDate() {
         return jobPostingRepository.findByIsActiveTrueOrderByPostedDateDesc();
-    }
-    
-    // NEW METHOD: Get applications without recruiter verification (for debugging)
-    public List<Application> getApplicationsForJobDebug(Long jobId) {
-        System.out.println("=== DEBUG: GET APPLICATIONS WITHOUT RECRUITER VERIFICATION ===");
-        System.out.println("Job ID: " + jobId);
-        
-        List<Application> applications = applicationRepository.findByJobPostingId(jobId);
-        System.out.println("Found " + applications.size() + " applications for job " + jobId);
-        
-        return applications;
     }
     
     // Helper method to check if user is recruiter
@@ -548,7 +541,7 @@ public class JobPostingService {
 
     // Enhanced method to get applications with resume data
     public List<Application> getApplicationsWithResumeAnalysis(Long jobId, Long recruiterId) {
-        System.out.println("=== GET APPLICATIONS WITH RESUME ANALYSIS ===");
+        log.debug("=== GET APPLICATIONS WITH RESUME ANALYSIS ===");
         
         List<Application> applications = getApplicationsForJob(jobId, recruiterId);
         
@@ -599,7 +592,7 @@ public class JobPostingService {
                 application.setMatchPercentage(newMatchPercentage);
                 applicationRepository.save(application);
                 
-                System.out.println("Recalculated match for application " + application.getId() + 
+                log.debug("Recalculated match for application " + application.getId() + 
                                  ": " + newMatchPercentage + "%");
             }
         }

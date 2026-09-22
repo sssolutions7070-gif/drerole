@@ -6,7 +6,6 @@ import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -20,7 +19,6 @@ import com.jobera.service.JobRatingService;
 
 @RestController
 @RequestMapping("/api/jobs")
-@CrossOrigin(origins = "http://localhost:3000")
 public class JobRatingController {
     
     private final JobRatingService jobRatingService;

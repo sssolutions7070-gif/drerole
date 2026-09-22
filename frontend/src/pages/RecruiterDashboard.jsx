@@ -44,17 +44,13 @@ const RecruiterDashboard = () => {
   const fetchRecruiterJobs = async () => {
     try {
       setLoading(true);
-      console.log('Fetching recruiter jobs for user:', currentUser);
       
       const profileResponse = await api.get(`/recruiters/user/${currentUser.id}`);
-      console.log('Recruiter profile response:', profileResponse.data);
       
       if (profileResponse.data.recruiter) {
         const recruiterId = profileResponse.data.recruiter.id;
-        console.log('Using recruiter ID:', recruiterId);
         
         const jobsResponse = await api.get(`/recruiters/jobs/recruiter/${recruiterId}`);
-        console.log('Recruiter jobs response:', jobsResponse.data);
         setJobs(jobsResponse.data || []);
       } else {
         setError('Recruiter profile not found. Please complete your recruiter profile first.');
@@ -121,10 +117,8 @@ const RecruiterDashboard = () => {
         recruiterId: recruiterProfile.id
       };
 
-      console.log('Creating job with data:', requestData);
       
       const response = await api.post('/recruiters/jobs', requestData);
-      console.log('Job creation response:', response.data);
       
       setShowJobForm(false);
       fetchRecruiterJobs();
@@ -144,7 +138,6 @@ const RecruiterDashboard = () => {
       };
 
       const response = await api.put(`/recruiters/jobs/${editingJob.id}`, requestData);
-      console.log('Job update response:', response.data);
       
       setEditingJob(null);
       setShowJobForm(false);
@@ -170,7 +163,6 @@ const RecruiterDashboard = () => {
   };
 
   const viewApplications = (job) => {
-    console.log('Viewing applications for job:', job);
     setSelectedJob(job);
     setShowApplications(true);
   };

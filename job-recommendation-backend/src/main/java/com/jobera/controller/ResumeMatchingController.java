@@ -1,12 +1,13 @@
 package com.jobera.controller;
 
+import org.slf4j.LoggerFactory;
+import org.slf4j.Logger;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -18,8 +19,9 @@ import com.jobera.service.JobPostingService;
 
 @RestController
 @RequestMapping("/api/resume-matching")
-@CrossOrigin(origins = "http://localhost:3000")
 public class ResumeMatchingController {
+    private static final Logger log = LoggerFactory.getLogger(ResumeMatchingController.class);
+
     
     private final JobPostingService jobPostingService;
     
@@ -32,9 +34,9 @@ public class ResumeMatchingController {
             @PathVariable Long jobId,
             @RequestParam Long recruiterId) {
         try {
-            System.out.println("=== GET APPLICATIONS SORTED BY MATCH PERCENTAGE ===");
-            System.out.println("Job ID: " + jobId);
-            System.out.println("Recruiter ID: " + recruiterId);
+            log.debug("=== GET APPLICATIONS SORTED BY MATCH PERCENTAGE ===");
+            log.debug("Job ID: " + jobId);
+            log.debug("Recruiter ID: " + recruiterId);
             
             List<Application> applications = jobPostingService.getApplicationsForJob(jobId, recruiterId);
             
@@ -47,7 +49,7 @@ public class ResumeMatchingController {
                 })
                 .collect(Collectors.toList());
             
-            System.out.println("✅ Found " + sortedApplications.size() + " applications, sorted by match percentage");
+            log.debug("✅ Found " + sortedApplications.size() + " applications, sorted by match percentage");
             
             Map<String, Object> response = new HashMap<>();
             response.put("applications", sortedApplications.stream()
@@ -60,8 +62,8 @@ public class ResumeMatchingController {
             return ResponseEntity.ok(response);
             
         } catch (Exception e) {
-            System.out.println("❌ ERROR fetching sorted applications: " + e.getMessage());
-            e.printStackTrace();
+            log.error("❌ ERROR fetching sorted applications: " + e.getMessage());
+            log.error("Unexpected error", e);
             return ResponseEntity.badRequest()
                 .body(Map.of("error", "Failed to fetch applications: " + e.getMessage()));
         }

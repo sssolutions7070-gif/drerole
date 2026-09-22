@@ -1,40 +1,48 @@
-version: '3.8'
-
 services:
   mysql:
     image: mysql:8.0
     container_name: jobera-mysql
     environment:
-      MYSQL_ROOT_PASSWORD: SatEj@123
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
       MYSQL_DATABASE: JobEra09
     ports:
       - "3336:3306"
     volumes:
       - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     networks:
       - jobera-network
     restart: unless-stopped
 
   spring-backend:
-    build: ./backend
+    build: ./job-recommendation-backend
     container_name: jobera-backend
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
     environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/JobEra09
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: SatEj@123
+      DB_URL: jdbc:mysql://mysql:3306/JobEra09
+      DB_USERNAME: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
+      PROCTORING_API_KEY: ${PROCTORING_API_KEY:?Set PROCTORING_API_KEY in .env}
     ports:
-      - "8080:8080"
+      - "8081:8081"
+    volumes:
+      - ./job-recommendation-backend/uploads:/app/uploads
     networks:
       - jobera-network
-    volumes:
-      - ./backend/uploads:/app/uploads
     restart: unless-stopped
 
   proctoring-service:
     build: ./camera-proctoring
     container_name: jobera-proctoring
+    environment:
+      BACKEND_URL: http://spring-backend:8081/api
+      PROCTORING_API_KEY: ${PROCTORING_API_KEY:?Set PROCTORING_API_KEY in .env}
     ports:
       - "5001:5001"
     volumes:
@@ -46,13 +54,14 @@ services:
     restart: unless-stopped
 
   react-frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        VITE_BACKEND_URL: http://localhost:8081
+        VITE_PROCTORING_URL: http://localhost:5001
     container_name: jobera-frontend
     ports:
       - "3000:3000"
-    environment:
-      REACT_APP_API_URL: http://localhost:8080/api
-      REACT_APP_PROCTORING_URL: http://localhost:5001
     depends_on:
       - spring-backend
       - proctoring-service

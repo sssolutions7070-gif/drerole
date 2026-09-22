@@ -9,6 +9,8 @@ import com.jobera.repository.*;
 import com.jobera.util.PasswordEncoder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -20,6 +22,9 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 @Service
@@ -41,6 +46,53 @@ public class ExternalJobService {
     private final DreamRoleTestQuestionRepository dreamRoleTestQuestionRepository;
     private final ObjectMapper objectMapper;
     private final PasswordEncoder passwordEncoder;
+    
+    // Track upload progress for multiple jobs
+    private final Map<Long, UploadProgress> uploadProgressMap = new ConcurrentHashMap<>();
+
+    public static class UploadProgress {
+        private final int totalFiles;
+        private final AtomicInteger processedFiles = new AtomicInteger(0);
+        private final AtomicInteger successfulFiles = new AtomicInteger(0);
+        private final AtomicInteger failedFiles = new AtomicInteger(0);
+        private final AtomicInteger skippedFiles = new AtomicInteger(0);
+        private String status = "PROCESSING";
+        private final List<String> errors = Collections.synchronizedList(new ArrayList<>());
+        private final long startTime;
+        private final Map<String, String> currentFile = new ConcurrentHashMap<>();
+        
+        public UploadProgress(int totalFiles) {
+            this.totalFiles = totalFiles;
+            this.startTime = System.currentTimeMillis();
+        }
+        
+        public int getTotalFiles() { return totalFiles; }
+        public int getProcessedFiles() { return processedFiles.get(); }
+        public int getSuccessfulFiles() { return successfulFiles.get(); }
+        public int getFailedFiles() { return failedFiles.get(); }
+        public int getSkippedFiles() { return skippedFiles.get(); }
+        public String getStatus() { return status; }
+        public List<String> getErrors() { return new ArrayList<>(errors); }
+        public void setStatus(String status) { this.status = status; }
+        public void incrementProcessed() { processedFiles.incrementAndGet(); }
+        public void incrementSuccessful() { successfulFiles.incrementAndGet(); }
+        public void incrementFailed() { failedFiles.incrementAndGet(); }
+        public void incrementSkipped() { skippedFiles.incrementAndGet(); }
+        public void addError(String error) { errors.add(error); }
+        public void setCurrentFile(String fileName) { currentFile.put("file", fileName); }
+        public String getCurrentFile() { return currentFile.get("file"); }
+        public double getProgressPercentage() {
+            return totalFiles > 0 ? (processedFiles.get() * 100.0 / totalFiles) : 0;
+        }
+        public long getElapsedTimeSeconds() {
+            return (System.currentTimeMillis() - startTime) / 1000;
+        }
+        public long getEstimatedRemainingSeconds() {
+            if (processedFiles.get() == 0) return 0;
+            long elapsed = getElapsedTimeSeconds();
+            return (elapsed * (totalFiles - processedFiles.get())) / processedFiles.get();
+        }
+    }
 
     public ExternalJobService(
             ExternalJobPostingRepository jobPostingRepository,
@@ -134,6 +186,7 @@ public class ExternalJobService {
         return jobPostingRepository.findById(jobId);
     }
 
+    // Main upload method - processes unlimited files
     @Transactional
     public Map<String, Object> uploadAndAnalyzeResumes(Long jobId, List<MultipartFile> files) {
         Optional<ExternalJobPosting> jobOpt = jobPostingRepository.findById(jobId);
@@ -151,14 +204,26 @@ public class ExternalJobService {
             throw new RuntimeException("Failed to create upload directory: " + e.getMessage());
         }
 
+        // Initialize progress tracking
+        UploadProgress progress = new UploadProgress(files.size());
+        uploadProgressMap.put(jobId, progress);
+
         int successCount = 0;
         int failCount = 0;
         int skipCount = 0;
         List<String> errors = new ArrayList<>();
         List<Map<String, Object>> processedCandidates = new ArrayList<>();
 
-        for (MultipartFile file : files) {
+        logger.info("Starting upload of {} files for job {}", files.size(), jobId);
+
+        // Process files one by one with progress tracking
+        for (int i = 0; i < files.size(); i++) {
+            MultipartFile file = files.get(i);
             String fileName = file.getOriginalFilename();
+            
+            progress.setCurrentFile(fileName);
+            logger.info("Processing file {}/{}: {}", i + 1, files.size(), fileName);
+            
             try {
                 String savedFileName = System.currentTimeMillis() + "_" + (fileName != null ? fileName : "resume.pdf");
                 Path filePath = uploadDir.resolve(savedFileName);
@@ -174,21 +239,42 @@ public class ExternalJobService {
                     if ("success".equals(status)) {
                         successCount++;
                         processedCandidates.add(result);
+                        progress.incrementSuccessful();
                     } else if ("skipped".equals(status)) {
                         skipCount++;
-                        logger.info("Skipped (already applied to this job): {}", fileName);
+                        progress.incrementSkipped();
+                        logger.info("Skipped (already applied): {}", fileName);
                     } else {
                         failCount++;
-                        errors.add(fileName + ": " + result.get("error"));
+                        String errorMsg = fileName + ": " + result.get("error");
+                        errors.add(errorMsg);
+                        progress.addError(errorMsg);
+                        progress.incrementFailed();
+                        logger.error(errorMsg);
                     }
                 }
-
+                
+                progress.incrementProcessed();
+                
+                // Log progress every 10 files
+                if ((i + 1) % 10 == 0) {
+                    logger.info("Progress: {}/{} files processed. Success: {}, Fail: {}, Skip: {}, ETA: {} seconds", 
+                        i + 1, files.size(), successCount, failCount, skipCount, progress.getEstimatedRemainingSeconds());
+                }
+                
             } catch (Exception e) {
                 failCount++;
-                errors.add(fileName + ": " + e.getMessage());
+                String errorMsg = fileName + ": " + e.getMessage();
+                errors.add(errorMsg);
+                progress.addError(errorMsg);
+                progress.incrementFailed();
+                progress.incrementProcessed();
                 logger.error("Failed to process resume {}: {}", fileName, e.getMessage());
             }
         }
+
+        progress.setStatus("COMPLETED");
+        uploadProgressMap.remove(jobId);
 
         Map<String, Object> result = new HashMap<>();
         result.put("message", "Processing complete");
@@ -198,11 +284,35 @@ public class ExternalJobService {
         result.put("failedUploads", failCount);
         result.put("errors", errors);
         result.put("candidates", processedCandidates);
+        result.put("processingTimeSeconds", progress.getElapsedTimeSeconds());
 
-        logger.info("Upload complete for job {}: {} success, {} skip, {} fail",
-            jobId, successCount, skipCount, failCount);
+        logger.info("Upload complete for job {}: {} success, {} skip, {} fail in {} seconds",
+            jobId, successCount, skipCount, failCount, progress.getElapsedTimeSeconds());
 
         return result;
+    }
+
+    public Map<String, Object> getUploadStatus(Long jobId) {
+        UploadProgress progress = uploadProgressMap.get(jobId);
+        
+        if (progress == null) {
+            return Map.of("status", "NOT_FOUND", "message", "No active upload for this job");
+        }
+        
+        Map<String, Object> status = new HashMap<>();
+        status.put("status", progress.getStatus());
+        status.put("totalFiles", progress.getTotalFiles());
+        status.put("processedFiles", progress.getProcessedFiles());
+        status.put("successfulFiles", progress.getSuccessfulFiles());
+        status.put("failedFiles", progress.getFailedFiles());
+        status.put("skippedFiles", progress.getSkippedFiles());
+        status.put("progressPercentage", progress.getProgressPercentage());
+        status.put("elapsedTimeSeconds", progress.getElapsedTimeSeconds());
+        status.put("estimatedRemainingSeconds", progress.getEstimatedRemainingSeconds());
+        status.put("currentFile", progress.getCurrentFile());
+        status.put("errors", progress.getErrors().size());
+        
+        return status;
     }
 
     private Map<String, Object> processSingleCandidateFile(
@@ -263,7 +373,7 @@ public class ExternalJobService {
                 user = existingUserOpt.get();
                 isExistingUser = true;
                 generatedPassword = null;
-                logger.info("✅ EXISTING USER detected: {}", finalEmail);
+                logger.info("EXISTING USER detected: {}", finalEmail);
             } else {
                 generatedPassword = generateSecurePassword();
                 user = new User();
@@ -276,7 +386,7 @@ public class ExternalJobService {
 
                 try {
                     user = userRepository.save(user);
-                    logger.info("🆕 NEW USER created: {} with password: {}", finalEmail, generatedPassword);
+                    logger.info("NEW USER created: {}", finalEmail);
                 } catch (Exception e) {
                     Optional<User> retryUser = userRepository.findByEmailIgnoreCase(finalEmail);
                     if (retryUser.isPresent()) {
@@ -390,10 +500,9 @@ public class ExternalJobService {
         return candidateRepository.findByJobPostingId(jobId);
     }
 
-    // ========== FIXED: ASSIGN TEST TO EXTERNAL CANDIDATE ==========
     @Transactional
     public Map<String, Object> assignTestToExternalCandidate(Long candidateId, Long testId, Integer deadlineHours, boolean isDreamRoleTest) {
-        System.out.println("=== EXTERNAL JOB SERVICE - ASSIGN TEST TO EXTERNAL CANDIDATE ===");
+        logger.debug("=== ASSIGN TEST TO EXTERNAL CANDIDATE ===");
         
         Optional<ExternalCandidate> candidateOpt = candidateRepository.findById(candidateId);
         if (candidateOpt.isEmpty()) {
@@ -401,16 +510,19 @@ public class ExternalJobService {
         }
         
         ExternalCandidate candidate = candidateOpt.get();
+        ExternalJobPosting externalJob = candidate.getJobPosting();
+        
+        String jobTitle = externalJob != null ? externalJob.getTitle() : "External Job Opportunity";
+        String companyName = externalJob != null ? externalJob.getCompany() : "External Recruiter";
         
         if (candidate.getHasTestAssigned() != null && candidate.getHasTestAssigned()) {
             throw new RuntimeException("Test already assigned to this candidate");
         }
         
-        // CRITICAL FIX: Create Application WITHOUT JobPosting (set to null for external candidates)
         Application application = new Application();
         application.setUser(candidate.getUser());
-        application.setJobPosting(null);  // IMPORTANT: Set to null for external candidates
-        application.setCoverLetter("Applied via External Job: " + candidate.getJobPosting().getTitle());
+        application.setJobPosting(null);
+        application.setCoverLetter("Applied via External Job: " + jobTitle + " at " + companyName);
         application.setApplicantName(candidate.getFullName());
         application.setApplicantEmail(candidate.getEmail());
         application.setApplicantPhone(candidate.getPhone());
@@ -423,9 +535,8 @@ public class ExternalJobService {
         application.setResumeFilePath(candidate.getResumeFilePath());
         application.setStatus("TEST_ASSIGNED");
         
-        // Save application first
         Application savedApplication = applicationRepository.save(application);
-        System.out.println("✅ Created application for external candidate with ID: " + savedApplication.getId());
+        logger.debug("Created application with ID: " + savedApplication.getId());
         
         Long assignmentId = null;
         
@@ -437,16 +548,13 @@ public class ExternalJobService {
             
             DreamRoleTest test = testOpt.get();
             
-            // Get 40 aptitude questions from question bank
             List<QuestionBank> aptitudeQuestions = questionBankRepository.findRandomQuestionsByBranch(
                 test.getTargetBranch(), 
                 org.springframework.data.domain.PageRequest.of(0, 40)
             );
             
-            // Get technical questions
             List<DreamRoleTestQuestion> technicalQuestions = dreamRoleTestQuestionRepository.findByDreamRoleTestId(testId);
             
-            // Combine all questions
             List<Map<String, Object>> allQuestions = new ArrayList<>();
             int questionNumber = 1;
             
@@ -483,7 +591,6 @@ public class ExternalJobService {
                 allQuestions.add(questionMap);
             }
             
-            // Shuffle if needed
             if (test.getShuffleQuestions()) {
                 Collections.shuffle(allQuestions);
                 for (int i = 0; i < allQuestions.size(); i++) {
@@ -506,7 +613,6 @@ public class ExternalJobService {
             
             DreamRoleTestAssignment savedDreamAssignment = dreamRoleTestAssignmentRepository.save(dreamAssignment);
             assignmentId = savedDreamAssignment.getId();
-            System.out.println("✅ Created DreamRole test assignment with ID: " + assignmentId);
             
         } else {
             Optional<AptitudeTest> testOpt = aptitudeTestRepository.findById(testId);
@@ -523,13 +629,13 @@ public class ExternalJobService {
             assignment.setDeadline(LocalDateTime.now().plusHours(deadlineHours));
             assignment.setStatus("PENDING");
             assignment.setTotalQuestions(test.getTotalQuestions());
+            assignment.setExternalJobTitle(jobTitle);
+            assignment.setExternalCompanyName(companyName);
             
             TestAssignment savedAssignment = testAssignmentRepository.save(assignment);
             assignmentId = savedAssignment.getId();
-            System.out.println("✅ Created manual test assignment with ID: " + assignmentId);
         }
         
-        // Update candidate with test assignment info
         candidate.setHasTestAssigned(true);
         candidate.setTestAssignedAt(LocalDateTime.now());
         candidate.setTestId(testId);
@@ -538,44 +644,12 @@ public class ExternalJobService {
         candidateRepository.save(candidate);
         
         Map<String, Object> result = new HashMap<>();
-        result.put("message", "Test assigned successfully to external candidate");
+        result.put("message", "Test assigned successfully");
         result.put("applicationId", savedApplication.getId());
         result.put("candidateId", candidateId);
         result.put("assignmentId", assignmentId);
-        
-        System.out.println("✅ Test assigned successfully! Application ID: " + savedApplication.getId());
-        
-        return result;
-    }
-
-    public Map<String, Object> getShortlistedCandidatesForTestAssignment(Long jobId) {
-        List<ExternalCandidate> shortlisted = getShortlistedCandidates(jobId);
-        
-        List<Map<String, Object>> candidateDetails = shortlisted.stream()
-            .map(candidate -> {
-                Map<String, Object> detail = new HashMap<>();
-                detail.put("candidateId", candidate.getId());
-                detail.put("fullName", candidate.getFullName());
-                detail.put("email", candidate.getEmail());
-                detail.put("matchScore", candidate.getMatchPercentage());
-                detail.put("status", candidate.getStatus());
-                detail.put("shortlistedAt", candidate.getShortlistedAt());
-                detail.put("isExistingUser", candidate.isExistingUser());
-                detail.put("passwordStatus", candidate.getPasswordStatus());
-                detail.put("hasTestAssigned", candidate.getHasTestAssigned());
-                
-                if (candidate.getUser() != null) {
-                    detail.put("userId", candidate.getUser().getId());
-                }
-                
-                return detail;
-            })
-            .collect(Collectors.toList());
-        
-        Map<String, Object> result = new HashMap<>();
-        result.put("candidates", candidateDetails);
-        result.put("totalCandidates", candidateDetails.size());
-        result.put("jobId", jobId);
+        result.put("jobTitle", jobTitle);
+        result.put("companyName", companyName);
         
         return result;
     }
@@ -607,6 +681,8 @@ public class ExternalJobService {
                 jobInfo.put("title", candidate.getJobPosting().getTitle());
                 jobInfo.put("company", candidate.getJobPosting().getCompany());
                 candidateMap.put("job", jobInfo);
+                candidateMap.put("jobTitle", candidate.getJobPosting().getTitle());
+                candidateMap.put("companyName", candidate.getJobPosting().getCompany());
             }
             
             if (candidate.getExtractedSkills() != null && !candidate.getExtractedSkills().isEmpty()) {
@@ -621,7 +697,6 @@ public class ExternalJobService {
             result.add(candidateMap);
         }
         
-        logger.info("Found {} shortlisted external candidates for recruiter {}", result.size(), recruiterId);
         return result;
     }
 
@@ -696,6 +771,52 @@ public class ExternalJobService {
         return result;
     }
 
+    public Map<String, Object> getCandidateAnalysis(Long candidateId) {
+        Optional<ExternalCandidate> candidateOpt = candidateRepository.findById(candidateId);
+        if (candidateOpt.isEmpty()) {
+            throw new RuntimeException("Candidate not found: " + candidateId);
+        }
+        
+        ExternalCandidate candidate = candidateOpt.get();
+        Map<String, Object> analysis = new HashMap<>();
+        
+        analysis.put("candidateId", candidate.getId());
+        analysis.put("fullName", candidate.getFullName());
+        analysis.put("email", candidate.getEmail());
+        analysis.put("phone", candidate.getPhone());
+        analysis.put("matchPercentage", candidate.getMatchPercentage());
+        analysis.put("status", candidate.getStatus());
+        analysis.put("experienceYears", candidate.getExperienceYears());
+        analysis.put("educationLevel", candidate.getEducationLevel());
+        analysis.put("isExistingUser", candidate.isExistingUser());
+        analysis.put("passwordStatus", candidate.getPasswordStatus());
+        analysis.put("shortlistedAt", candidate.getShortlistedAt());
+        analysis.put("resumeFilePath", candidate.getResumeFilePath());
+        analysis.put("hasTestAssigned", candidate.getHasTestAssigned());
+        
+        analysis.put("extractedSkills", parseSkillsFromJson(candidate.getExtractedSkills()));
+        analysis.put("matchedSkills", parseSkillsFromJson(candidate.getMatchedSkills()));
+        analysis.put("missingSkills", parseSkillsFromJson(candidate.getMissingSkills()));
+        
+        if (candidate.getUser() != null) {
+            Map<String, Object> userInfo = new HashMap<>();
+            userInfo.put("id", candidate.getUser().getId());
+            userInfo.put("email", candidate.getUser().getEmail());
+            userInfo.put("fullName", candidate.getUser().getFullName());
+            analysis.put("user", userInfo);
+        }
+        
+        if (candidate.getJobPosting() != null) {
+            Map<String, Object> jobInfo = new HashMap<>();
+            jobInfo.put("id", candidate.getJobPosting().getId());
+            jobInfo.put("title", candidate.getJobPosting().getTitle());
+            jobInfo.put("company", candidate.getJobPosting().getCompany());
+            analysis.put("job", jobInfo);
+        }
+        
+        return analysis;
+    }
+
     public Map<String, Object> getExternalJobStats(Long jobId) {
         Optional<ExternalJobPosting> jobOpt = jobPostingRepository.findById(jobId);
         if (jobOpt.isEmpty()) {
@@ -759,52 +880,6 @@ public class ExternalJobService {
         }
         
         return result;
-    }
-
-    public Map<String, Object> getCandidateAnalysis(Long candidateId) {
-        Optional<ExternalCandidate> candidateOpt = candidateRepository.findById(candidateId);
-        if (candidateOpt.isEmpty()) {
-            throw new RuntimeException("Candidate not found: " + candidateId);
-        }
-        
-        ExternalCandidate candidate = candidateOpt.get();
-        Map<String, Object> analysis = new HashMap<>();
-        
-        analysis.put("candidateId", candidate.getId());
-        analysis.put("fullName", candidate.getFullName());
-        analysis.put("email", candidate.getEmail());
-        analysis.put("phone", candidate.getPhone());
-        analysis.put("matchPercentage", candidate.getMatchPercentage());
-        analysis.put("status", candidate.getStatus());
-        analysis.put("experienceYears", candidate.getExperienceYears());
-        analysis.put("educationLevel", candidate.getEducationLevel());
-        analysis.put("isExistingUser", candidate.isExistingUser());
-        analysis.put("passwordStatus", candidate.getPasswordStatus());
-        analysis.put("shortlistedAt", candidate.getShortlistedAt());
-        analysis.put("resumeFilePath", candidate.getResumeFilePath());
-        analysis.put("hasTestAssigned", candidate.getHasTestAssigned());
-        
-        analysis.put("extractedSkills", parseSkillsFromJson(candidate.getExtractedSkills()));
-        analysis.put("matchedSkills", parseSkillsFromJson(candidate.getMatchedSkills()));
-        analysis.put("missingSkills", parseSkillsFromJson(candidate.getMissingSkills()));
-        
-        if (candidate.getUser() != null) {
-            Map<String, Object> userInfo = new HashMap<>();
-            userInfo.put("id", candidate.getUser().getId());
-            userInfo.put("email", candidate.getUser().getEmail());
-            userInfo.put("fullName", candidate.getUser().getFullName());
-            analysis.put("user", userInfo);
-        }
-        
-        if (candidate.getJobPosting() != null) {
-            Map<String, Object> jobInfo = new HashMap<>();
-            jobInfo.put("id", candidate.getJobPosting().getId());
-            jobInfo.put("title", candidate.getJobPosting().getTitle());
-            jobInfo.put("company", candidate.getJobPosting().getCompany());
-            analysis.put("job", jobInfo);
-        }
-        
-        return analysis;
     }
 
     @Transactional
@@ -887,7 +962,7 @@ public class ExternalJobService {
             csv.append("# Existing Users: ").append(existingUsersCount).append("\n");
 
             Files.writeString(filePath, csv.toString());
-            return "/uploads/external_resumes/" + fileName;
+            return "/external-jobs/download-credentials/" + fileName;
 
         } catch (IOException e) {
             logger.error("Failed to generate credentials CSV: {}", e.getMessage());
@@ -905,9 +980,9 @@ public class ExternalJobService {
 
     private String generateSecurePassword() {
         String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789@#$";
-        Random random = new Random();
+        java.security.SecureRandom random = new java.security.SecureRandom();
         StringBuilder password = new StringBuilder();
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < 12; i++) {
             password.append(chars.charAt(random.nextInt(chars.length())));
         }
         return password.toString();

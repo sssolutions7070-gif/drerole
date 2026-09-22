@@ -4,7 +4,7 @@ import {
   Plus, Upload, Users, Download, Loader, Mail, Phone, 
   Briefcase, MapPin, DollarSign, X, Eye, ChevronDown, ChevronUp,
   CheckCircle, XCircle, Search, GraduationCap, Code, FileText, Trash2, Key, UserCheck,
-  BarChart3
+  BarChart3, AlertCircle
 } from 'lucide-react';
 import api from '../services/api';
 import ExternalJobResults from './ExternalJobResults';
@@ -34,6 +34,12 @@ const ExternalJobManagement = ({ recruiterId }) => {
   const [expandedCandidate, setExpandedCandidate] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState('pending');
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState(null);
+  const [uploadMessage, setUploadMessage] = useState('');
+  const [currentChunk, setCurrentChunk] = useState(0);
+  const [totalChunks, setTotalChunks] = useState(0);
+  const [chunkResults, setChunkResults] = useState([]);
   
   const [formData, setFormData] = useState({
     title: '',
@@ -51,6 +57,9 @@ const ExternalJobManagement = ({ recruiterId }) => {
   const jobTypes = ['Full-time', 'Part-time', 'Contract', 'Remote', 'Internship'];
   const experienceLevels = ['Entry', 'Junior', 'Mid-level', 'Senior', 'Lead'];
   
+  // Chunk size - process 10 files at a time
+  const CHUNK_SIZE = 10;
+  
   useEffect(() => {
     if (recruiterId) {
       fetchExternalJobs();
@@ -64,6 +73,7 @@ const ExternalJobManagement = ({ recruiterId }) => {
       setJobs(response.data || []);
     } catch (error) {
       console.error('Error fetching external jobs:', error);
+      alert('Failed to load external jobs. Please refresh the page.');
     } finally {
       setLoading(false);
     }
@@ -167,35 +177,163 @@ const ExternalJobManagement = ({ recruiterId }) => {
     }
   };
   
+  // NEW: Upload files in chunks
+  const uploadFilesInChunks = async (files, jobId) => {
+    const chunks = [];
+    for (let i = 0; i < files.length; i += CHUNK_SIZE) {
+      chunks.push(files.slice(i, i + CHUNK_SIZE));
+    }
+    
+    setTotalChunks(chunks.length);
+    setCurrentChunk(0);
+    setChunkResults([]);
+    
+    let totalSuccess = 0;
+    let totalFail = 0;
+    let totalSkip = 0;
+    const allErrors = [];
+    const allCandidates = [];
+    
+    for (let i = 0; i < chunks.length; i++) {
+      setCurrentChunk(i + 1);
+      setUploadProgress(((i) / chunks.length) * 100);
+      setUploadMessage(`Uploading chunk ${i + 1} of ${chunks.length} (${chunks[i].length} files)...`);
+      
+      const formData = new FormData();
+      chunks[i].forEach(file => {
+        formData.append('files', file);
+      });
+      
+      try {
+        
+        const response = await api.post(`/external-jobs/${jobId}/upload-resumes`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: 300000 // 5 minutes per chunk
+        });
+        
+        const successCount = response.data.successfulUploads || 0;
+        const failCount = response.data.failedUploads || 0;
+        const skipCount = response.data.skipCount || 0;
+        
+        totalSuccess += successCount;
+        totalFail += failCount;
+        totalSkip += skipCount;
+        
+        if (response.data.errors) {
+          allErrors.push(...response.data.errors);
+        }
+        if (response.data.candidates) {
+          allCandidates.push(...response.data.candidates);
+        }
+        
+        setUploadProgress(((i + 1) / chunks.length) * 100);
+        
+      } catch (error) {
+        console.error(`Error uploading chunk ${i + 1}:`, error);
+        totalFail += chunks[i].length;
+        allErrors.push(`Chunk ${i + 1} failed: ${error.message}`);
+      }
+    }
+    
+    return {
+      successfulUploads: totalSuccess,
+      failedUploads: totalFail,
+      skipCount: totalSkip,
+      errors: allErrors,
+      candidates: allCandidates,
+      totalFiles: files.length,
+      chunksProcessed: chunks.length
+    };
+  };
+  
   const handleFileUpload = async () => {
     if (selectedFiles.length === 0) {
       alert('Please select files to upload');
       return;
     }
-    
+
     setUploading(true);
-    const formData = new FormData();
-    
-    selectedFiles.forEach(file => {
-      formData.append('files', file);
-    });
+    setUploadProgress(0);
+    setUploadStatus('uploading');
+    setCurrentChunk(0);
+    setTotalChunks(0);
+    setUploadMessage(`Preparing to upload ${selectedFiles.length} files in chunks of ${CHUNK_SIZE}...`);
     
     try {
-      const response = await api.post(`/external-jobs/${selectedJob.id}/upload-resumes`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        timeout: 300000
-      });
       
-      alert(`Upload complete! ${response.data.successfulUploads} new resumes, ${response.data.failedUploads} failed.`);
-      await fetchCandidates(selectedJob.id);
-      setShowUploadModal(false);
-      setSelectedFiles([]);
+      const result = await uploadFilesInChunks(selectedFiles, selectedJob.id);
+      
+      
+      const successCount = result.successfulUploads || 0;
+      const failCount = result.failedUploads || 0;
+      const skipCount = result.skipCount || 0;
+      
+      let message = `📊 UPLOAD COMPLETE!\n\n`;
+      message += `✅ Successful: ${successCount}\n`;
+      message += `⚠️ Already Applied (Skipped): ${skipCount}\n`;
+      message += `❌ Failed: ${failCount}\n`;
+      message += `📦 Processed in ${result.chunksProcessed} chunks\n\n`;
+      
+      if (successCount > 0) {
+        message += `✨ ${successCount} candidates have been added successfully!\n`;
+      }
+      if (skipCount > 0) {
+        message += `📌 ${skipCount} candidates already applied to this job.\n`;
+      }
+      if (failCount > 0) {
+        message += `⚠️ ${failCount} files failed to process.\n`;
+      }
+      
+      if (result.errors && result.errors.length > 0) {
+        message += `\nFirst few errors:\n${result.errors.slice(0, 5).join('\n')}`;
+      }
+      
+      alert(message);
+      
+      if (successCount > 0) {
+        await fetchCandidates(selectedJob.id);
+      }
+      
+      setUploadProgress(100);
+      setUploadStatus('completed');
+      
+      // Close modal after 3 seconds
+      setTimeout(() => {
+        setShowUploadModal(false);
+        setSelectedFiles([]);
+        setUploadStatus(null);
+        setUploadProgress(0);
+      }, 3000);
       
     } catch (error) {
       console.error('Upload error:', error);
-      alert('Failed to upload resumes: ' + (error.response?.data?.error || error.message));
+      
+      let errorMessage = '❌ Failed to upload resumes: ';
+      
+      if (error.code === 'ECONNABORTED') {
+        errorMessage += 'Request timed out. ';
+      } else if (error.response?.data?.error) {
+        errorMessage += error.response.data.error;
+      } else if (error.message) {
+        errorMessage += error.message;
+      } else {
+        errorMessage += 'Unknown error occurred.';
+      }
+      
+      errorMessage += '\n\nTry with fewer files per batch or check the server logs.';
+      
+      alert(errorMessage);
+      setUploadStatus('failed');
+      setUploadMessage('Upload failed. Please try again.');
+      setUploadProgress(0);
     } finally {
       setUploading(false);
+      setTimeout(() => {
+        setUploadStatus(null);
+        setUploadMessage('');
+        setCurrentChunk(0);
+        setTotalChunks(0);
+      }, 5000);
     }
   };
   
@@ -221,7 +359,7 @@ const ExternalJobManagement = ({ recruiterId }) => {
       setDownloadUrl(downloadUrlFromResponse);
       
       alert(
-        `${shortlistedData.length} candidates shortlisted successfully!\n\n` +
+        `✅ ${shortlistedData.length} candidates shortlisted successfully!\n\n` +
         `🆕 New Users: ${newUsersCount}\n` +
         `👤 Existing Users: ${existingUsersCount}\n\n` +
         `📧 Existing users can login with their DreamRole credentials\n` +
@@ -274,9 +412,20 @@ const ExternalJobManagement = ({ recruiterId }) => {
     setShowResultsModal(true);
   };
   
-  const downloadCredentials = () => {
-    if (downloadUrl) {
-      window.open(`http://localhost:8081${downloadUrl}`, '_blank');
+  const downloadCredentials = async () => {
+    if (!downloadUrl) return;
+    try {
+      const response = await api.get(downloadUrl, { responseType: 'blob' });
+      const blobUrl = window.URL.createObjectURL(response.data);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = downloadUrl.split('/').pop();
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      alert('Failed to download credentials file. Please try again.');
     }
   };
   
@@ -569,11 +718,80 @@ const ExternalJobManagement = ({ recruiterId }) => {
       {showUploadModal && selectedJob && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
           <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
-            <div className="flex justify-between items-center mb-6"><div><h2 className="text-2xl font-bold text-gray-900">Upload Resumes</h2><p className="text-gray-600">For: {selectedJob.title}</p></div><button onClick={() => setShowUploadModal(false)} className="text-gray-400 hover:text-gray-600"><X className="h-6 w-6" /></button></div>
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center"><input type="file" id="resume-upload" multiple accept=".pdf,.doc,.docx,.txt" onChange={(e) => setSelectedFiles(Array.from(e.target.files))} className="hidden" /><label htmlFor="resume-upload" className="cursor-pointer"><Upload className="h-12 w-12 text-gray-400 mx-auto mb-3" /><p className="text-lg font-semibold text-gray-700">Click to upload resumes</p><p className="text-sm text-gray-500">PDF, DOC, DOCX, TXT files (Max 10MB each)</p><p className="text-xs text-gray-400 mt-1">You can upload up to 10,000 resumes</p></label></div>
-            {selectedFiles.length > 0 && (<div className="mt-4 bg-gray-50 rounded-lg p-4 max-h-40 overflow-y-auto"><p className="font-medium mb-2">Selected files ({selectedFiles.length}):</p>{selectedFiles.map((file, idx) => (<div key={idx} className="text-sm text-gray-600">{file.name}</div>))}</div>)}
-            {uploading && (<div className="text-center py-4"><Loader className="h-8 w-8 animate-spin text-blue-600 mx-auto" /><p className="text-gray-600 mt-2">Processing resumes... This may take a few minutes.</p></div>)}
-            <div className="flex justify-end space-x-4 mt-6"><button onClick={() => setShowUploadModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg">Cancel</button><button onClick={handleFileUpload} disabled={uploading || selectedFiles.length === 0} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">{uploading ? 'Processing...' : 'Upload & Analyze'}</button></div>
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Upload Resumes</h2>
+                <p className="text-gray-600">For: {selectedJob.title}</p>
+                <p className="text-sm text-blue-600 mt-1">💡 Files will be uploaded in chunks of {CHUNK_SIZE} for better performance.</p>
+                <p className="text-xs text-green-600 mt-1">✅ Supports unlimited files! {CHUNK_SIZE} files per chunk.</p>
+              </div>
+              <button onClick={() => { setShowUploadModal(false); setSelectedFiles([]); setUploadStatus(null); setUploadProgress(0); }} className="text-gray-400 hover:text-gray-600">
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+              <input type="file" id="resume-upload" multiple accept=".pdf,.doc,.docx,.txt" onChange={(e) => setSelectedFiles(Array.from(e.target.files))} className="hidden" />
+              <label htmlFor="resume-upload" className="cursor-pointer">
+                <Upload className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                <p className="text-lg font-semibold text-gray-700">Click to upload resumes</p>
+                <p className="text-sm text-gray-500">PDF, DOC, DOCX, TXT files (Max 50MB each)</p>
+                <p className="text-xs text-gray-400 mt-1">Upload unlimited resumes - processed in chunks of {CHUNK_SIZE}</p>
+              </label>
+            </div>
+            
+            {selectedFiles.length > 0 && (
+              <div className="mt-4 bg-gray-50 rounded-lg p-4 max-h-40 overflow-y-auto">
+                <p className="font-medium mb-2">Selected files ({selectedFiles.length}):</p>
+                <div className="grid grid-cols-2 gap-1">
+                  {selectedFiles.slice(0, 10).map((file, idx) => (
+                    <div key={idx} className="text-sm text-gray-600 truncate">{file.name}</div>
+                  ))}
+                  {selectedFiles.length > 10 && (
+                    <div className="text-sm text-gray-500">... and {selectedFiles.length - 10} more files</div>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500 mt-2">Will be uploaded in {Math.ceil(selectedFiles.length / CHUNK_SIZE)} chunks</p>
+              </div>
+            )}
+            
+            {uploading && (
+              <div className="text-center py-4">
+                <Loader className="h-8 w-8 animate-spin text-blue-600 mx-auto" />
+                <p className="text-gray-600 mt-2">{uploadMessage || 'Processing resumes...'}</p>
+                {totalChunks > 0 && (
+                  <p className="text-sm text-gray-500">Chunk {currentChunk} of {totalChunks}</p>
+                )}
+                <p className="text-sm text-gray-500">Please don't close this window. Processing in progress...</p>
+                <div className="mt-3">
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="bg-blue-600 h-2 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
+                  </div>
+                  <p className="text-sm text-gray-500 mt-1">{Math.round(uploadProgress)}% completed</p>
+                </div>
+              </div>
+            )}
+            
+            {uploadStatus === 'completed' && (
+              <div className="mt-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded-lg flex items-center">
+                <CheckCircle className="h-5 w-5 mr-2" />
+                Upload completed successfully! Redirecting...
+              </div>
+            )}
+            
+            {uploadStatus === 'failed' && (
+              <div className="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg flex items-center">
+                <AlertCircle className="h-5 w-5 mr-2" />
+                Upload failed. Please check the console for details.
+              </div>
+            )}
+            
+            <div className="flex justify-end space-x-4 mt-6">
+              <button onClick={() => { setShowUploadModal(false); setSelectedFiles([]); setUploadStatus(null); setUploadProgress(0); }} className="px-4 py-2 border border-gray-300 rounded-lg">Cancel</button>
+              <button onClick={handleFileUpload} disabled={uploading || selectedFiles.length === 0} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                {uploading ? 'Processing...' : `Upload & Analyze (${selectedFiles.length} files in ${Math.ceil(selectedFiles.length / CHUNK_SIZE)} chunks)`}
+              </button>
+            </div>
           </div>
         </div>
       )}

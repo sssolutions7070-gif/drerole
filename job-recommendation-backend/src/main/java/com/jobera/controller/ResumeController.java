@@ -1,5 +1,7 @@
 package com.jobera.controller;
 
+import org.slf4j.LoggerFactory;
+import org.slf4j.Logger;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jobera.entity.Application;
@@ -27,8 +29,9 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/resumes")
-@CrossOrigin(origins = "http://localhost:3000")
 public class ResumeController {
+    private static final Logger log = LoggerFactory.getLogger(ResumeController.class);
+
     
     private final ResumeService resumeService;
     private final ApplicationRepository applicationRepository;
@@ -59,7 +62,7 @@ public class ResumeController {
         Map<String, Object> response = new HashMap<>();
         
         try {
-            System.out.println("=== RESUME UPLOAD FOR USER: " + userId + " ===");
+            log.debug("=== RESUME UPLOAD FOR USER: " + userId + " ===");
             
             if (file.isEmpty()) {
                 return ResponseEntity.badRequest()
@@ -71,11 +74,11 @@ public class ResumeController {
             
             // Process resume
             Resume resume = resumeService.processAndSaveResume(userId, file);
-            System.out.println("✅ Resume processed: ID=" + resume.getId());
+            log.debug("✅ Resume processed: ID=" + resume.getId());
             
             // Get parsed skills
             Set<String> extractedSkills = extractSkillsFromResume(resume);
-            System.out.println("📊 Extracted " + extractedSkills.size() + " skills: " + extractedSkills);
+            log.debug("📊 Extracted " + extractedSkills.size() + " skills: " + extractedSkills);
             
             response.put("resumeId", resume.getId());
             response.put("fileName", resume.getFileName());
@@ -91,12 +94,12 @@ public class ResumeController {
                 response.put("job_recommendations", jobRecommendations);
                 response.put("hasRecommendations", true);
                 response.put("recommendationMessage", "Found " + jobRecommendations.size() + " jobs matching your skills");
-                System.out.println("✅ Found " + jobRecommendations.size() + " job recommendations");
+                log.debug("✅ Found " + jobRecommendations.size() + " job recommendations");
             } else {
                 response.put("job_recommendations", new ArrayList<>());
                 response.put("hasRecommendations", false);
                 response.put("recommendationMessage", "No jobs match your skills (minimum " + MIN_MATCH_THRESHOLD + "% match required). Try uploading a resume with different skills.");
-                System.out.println("❌ No job recommendations found - skills don't match any job requirements above " + MIN_MATCH_THRESHOLD + "%");
+                log.error("❌ No job recommendations found - skills don't match any job requirements above " + MIN_MATCH_THRESHOLD + "%");
             }
             
             // Get internship recommendations (filtered by threshold)
@@ -105,7 +108,7 @@ public class ResumeController {
             if (!internshipRecommendations.isEmpty()) {
                 response.put("internship_recommendations", internshipRecommendations);
                 response.put("hasInternshipRecommendations", true);
-                System.out.println("✅ Found " + internshipRecommendations.size() + " internship recommendations");
+                log.debug("✅ Found " + internshipRecommendations.size() + " internship recommendations");
             } else {
                 response.put("internship_recommendations", new ArrayList<>());
                 response.put("hasInternshipRecommendations", false);
@@ -116,12 +119,12 @@ public class ResumeController {
             return ResponseEntity.ok(response);
             
         } catch (ResumeService.ResumeProcessingException e) {
-            System.err.println("❌ Resume processing error: " + e.getMessage());
+            log.error("❌ Resume processing error: " + e.getMessage());
             return ResponseEntity.badRequest()
                 .body(Map.of(ERROR_KEY, "Failed to upload resume: " + e.getMessage()));
         } catch (Exception e) {
-            System.err.println("❌ Unexpected error: " + e.getMessage());
-            e.printStackTrace();
+            log.error("❌ Unexpected error: " + e.getMessage());
+            log.error("Unexpected error", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(Map.of(ERROR_KEY, "Unexpected error: " + e.getMessage()));
         }
@@ -134,7 +137,7 @@ public class ResumeController {
         List<Map<String, Object>> recommendations = new ArrayList<>();
         
         if (userSkills.isEmpty()) {
-            System.out.println("No skills provided, returning empty recommendations");
+            log.debug("No skills provided, returning empty recommendations");
             return recommendations;
         }
         
@@ -145,7 +148,7 @@ public class ResumeController {
                    !"Internship".equalsIgnoreCase(job.getJobType()))
             .collect(Collectors.toList());
         
-        System.out.println("Checking " + onlyJobs.size() + " jobs against " + userSkills.size() + " skills");
+        log.debug("Checking " + onlyJobs.size() + " jobs against " + userSkills.size() + " skills");
         
         for (JobPosting job : onlyJobs) {
             Map<String, Object> matchAnalysis = analyzeJobMatch(job, userSkills);
@@ -168,9 +171,9 @@ public class ResumeController {
                 jobRecommendation.put("preferredSkills", parseSkillsFromJson(job.getPreferredSkills()));
                 
                 recommendations.add(jobRecommendation);
-                System.out.println("✓ Job '" + job.getTitle() + "' matched: " + matchScore + "%");
+                log.debug("✓ Job '" + job.getTitle() + "' matched: " + matchScore + "%");
             } else {
-                System.out.println("✗ Job '" + job.getTitle() + "' below threshold: " + matchScore + "% < " + MIN_MATCH_THRESHOLD + "%");
+                log.debug("✗ Job '" + job.getTitle() + "' below threshold: " + matchScore + "% < " + MIN_MATCH_THRESHOLD + "%");
             }
         }
         
@@ -198,7 +201,7 @@ public class ResumeController {
                    "Internship".equalsIgnoreCase(job.getJobType()))
             .collect(Collectors.toList());
         
-        System.out.println("Checking " + internships.size() + " internships against " + userSkills.size() + " skills");
+        log.debug("Checking " + internships.size() + " internships against " + userSkills.size() + " skills");
         
         for (JobPosting internship : internships) {
             Map<String, Object> matchAnalysis = analyzeJobMatch(internship, userSkills);
@@ -219,9 +222,9 @@ public class ResumeController {
                 internshipRecommendation.put("requiredSkills", matchAnalysis.get("requiredSkills"));
                 
                 recommendations.add(internshipRecommendation);
-                System.out.println("✓ Internship '" + internship.getTitle() + "' matched: " + matchScore + "%");
+                log.debug("✓ Internship '" + internship.getTitle() + "' matched: " + matchScore + "%");
             } else {
-                System.out.println("✗ Internship '" + internship.getTitle() + "' below threshold: " + matchScore + "% < " + MIN_MATCH_THRESHOLD + "%");
+                log.debug("✗ Internship '" + internship.getTitle() + "' below threshold: " + matchScore + "% < " + MIN_MATCH_THRESHOLD + "%");
             }
         }
         
@@ -332,7 +335,7 @@ public class ResumeController {
                 return result;
             }
         } catch (Exception e) {
-            System.out.println("Error parsing skills JSON: " + e.getMessage());
+            log.error("Error parsing skills JSON: " + e.getMessage());
             // Fallback: try to parse as comma-separated
             String cleaned = skillsJson.replace("[", "").replace("]", "").replace("\"", "");
             return new HashSet<>(Arrays.asList(cleaned.split("\\s*,\\s*")));
@@ -350,9 +353,9 @@ public class ResumeController {
             try {
                 Set<String> parsedSkills = parseSkillsFromJson(resume.getSkills());
                 skills.addAll(parsedSkills);
-                System.out.println("Extracted " + parsedSkills.size() + " skills from JSON");
+                log.debug("Extracted " + parsedSkills.size() + " skills from JSON");
             } catch (Exception e) {
-                System.out.println("Error parsing skills JSON: " + e.getMessage());
+                log.error("Error parsing skills JSON: " + e.getMessage());
             }
         }
         
@@ -364,7 +367,7 @@ public class ResumeController {
                     skills.add(commonSkill);
                 }
             }
-            System.out.println("Extracted " + skills.size() + " skills from text analysis");
+            log.debug("Extracted " + skills.size() + " skills from text analysis");
         }
         
         // Normalize skills
@@ -436,17 +439,17 @@ public class ResumeController {
     @GetMapping("/user/{userId}/latest")
     public ResponseEntity<?> getLatestResume(@PathVariable Long userId) {
         try {
-            System.out.println("=== GET LATEST RESUME FOR USER ===");
-            System.out.println("User ID: " + userId);
+            log.debug("=== GET LATEST RESUME FOR USER ===");
+            log.debug("User ID: " + userId);
             
             Optional<Resume> latestResume = resumeService.getLatestResumeByUserId(userId);
             
             if (latestResume.isPresent()) {
                 Resume resume = latestResume.get();
-                System.out.println("✅ Found latest resume with ID: " + resume.getId());
-                System.out.println("   Skills: " + resume.getSkills());
-                System.out.println("   Experience: " + resume.getExperienceYears());
-                System.out.println("   Education: " + resume.getEducationLevel());
+                log.debug("✅ Found latest resume with ID: " + resume.getId());
+                log.debug("   Skills: " + resume.getSkills());
+                log.debug("   Experience: " + resume.getExperienceYears());
+                log.debug("   Education: " + resume.getEducationLevel());
                 
                 Map<String, Object> safeResponse = new HashMap<>();
                 safeResponse.put("id", resume.getId());
@@ -459,7 +462,7 @@ public class ResumeController {
                 
                 return ResponseEntity.ok(safeResponse);
             } else {
-                System.out.println("❌ No resume found for user: " + userId);
+                log.error("❌ No resume found for user: " + userId);
                 Map<String, String> errorResponse = new HashMap<>();
                 errorResponse.put("message", "No resume found for user");
                 errorResponse.put("status", "NOT_FOUND");
@@ -467,8 +470,8 @@ public class ResumeController {
             }
             
         } catch (Exception e) {
-            System.out.println("❌ Error fetching latest resume: " + e.getMessage());
-            e.printStackTrace();
+            log.error("❌ Error fetching latest resume: " + e.getMessage());
+            log.error("Unexpected error", e);
             
             Map<String, String> errorResponse = new HashMap<>();
             errorResponse.put("error", "Failed to fetch resume: " + e.getMessage());
@@ -480,30 +483,30 @@ public class ResumeController {
     @GetMapping("/download/{applicationId}")
     public ResponseEntity<Resource> downloadResume(@PathVariable Long applicationId) {
         try {
-            System.out.println("=== DOWNLOAD RESUME REQUEST ===");
-            System.out.println("Application ID: " + applicationId);
+            log.debug("=== DOWNLOAD RESUME REQUEST ===");
+            log.debug("Application ID: " + applicationId);
             
             Optional<Application> applicationOpt = applicationRepository.findById(applicationId);
             if (applicationOpt.isEmpty()) {
-                System.out.println("❌ Application not found with ID: " + applicationId);
+                log.error("❌ Application not found with ID: " + applicationId);
                 return ResponseEntity.notFound().build();
             }
             
             Application application = applicationOpt.get();
             String resumeFilePath = application.getResumeFilePath();
             
-            System.out.println("Resume File Path from DB: " + resumeFilePath);
-            System.out.println("Applicant: " + application.getSafeApplicantName());
+            log.debug("Resume File Path from DB: " + resumeFilePath);
+            log.debug("Applicant: " + application.getSafeApplicantName());
             
             if (resumeFilePath == null || resumeFilePath.isEmpty()) {
-                System.out.println("⚠️ No resume file path in application");
+                log.warn("⚠️ No resume file path in application");
                 return generateResumeFromApplicationData(application);
             }
             
             Path filePath = findResumeFile(resumeFilePath);
             
             if (filePath != null && Files.exists(filePath)) {
-                System.out.println("✅ Found file at: " + filePath.toAbsolutePath());
+                log.debug("✅ Found file at: " + filePath.toAbsolutePath());
                 
                 Resource resource = new UrlResource(filePath.toUri());
                 
@@ -524,12 +527,12 @@ public class ResumeController {
                 }
             }
             
-            System.out.println("❌ Resume file not found, generating from application data...");
+            log.error("❌ Resume file not found, generating from application data...");
             return generateResumeFromApplicationData(application);
             
         } catch (Exception e) {
-            System.out.println("❌ ERROR downloading resume: " + e.getMessage());
-            e.printStackTrace();
+            log.error("❌ ERROR downloading resume: " + e.getMessage());
+            log.error("Unexpected error", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
@@ -542,10 +545,10 @@ public class ResumeController {
             Path uploadsDir = Paths.get(UPLOADS_DIR);
             if (!Files.exists(uploadsDir)) {
                 Files.createDirectories(uploadsDir);
-                System.out.println("✅ Created uploads directory: " + uploadsDir.toAbsolutePath());
+                log.debug("✅ Created uploads directory: " + uploadsDir.toAbsolutePath());
             }
         } catch (IOException e) {
-            System.out.println("❌ Failed to create uploads directory: " + e.getMessage());
+            log.error("❌ Failed to create uploads directory: " + e.getMessage());
         }
     }
     
@@ -599,7 +602,7 @@ public class ResumeController {
                 .body(resource);
                 
         } catch (Exception e) {
-            System.out.println("❌ Failed to generate resume: " + e.getMessage());
+            log.error("❌ Failed to generate resume: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }

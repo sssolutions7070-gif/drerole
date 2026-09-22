@@ -1,5 +1,5 @@
 // src/App.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Login from './components/Login';
@@ -7,23 +7,24 @@ import Register from './components/Register';
 import ProtectedRoute from './components/ProtectedRoute';
 import VoiceAssistant from './components/VoiceAssistant';
 import authService from './services/auth';
-import AdminDashboard from "./pages/AdminDashboard";
-import InterviewPage from './pages/InterviewPage';
-import CandidateTest from './components/CandidateTest';
-import TestResults from './pages/TestResults';
-import ProctoringTest from './components/ProctoringTest';
-import UserProfile from './pages/UserProfile';
-import Internships from './pages/Internships';
 
 // Your existing components
-import Home from './pages/Home';
-import Dashboard from './pages/Dashboard';
-import Jobs from './pages/Jobs';
-import ResumeUpload from './pages/ResumeUpload';
 
 // New recruiter components
-import RecruiterRegister from './pages/RecruiterRegister';
-import RecruiterDashboard from './pages/RecruiterDashboard';
+
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const InterviewPage = lazy(() => import('./pages/InterviewPage'));
+const CandidateTest = lazy(() => import('./components/CandidateTest'));
+const TestResults = lazy(() => import('./pages/TestResults'));
+const ProctoringTest = lazy(() => import('./components/ProctoringTest'));
+const UserProfile = lazy(() => import('./pages/UserProfile'));
+const Internships = lazy(() => import('./pages/Internships'));
+const Home = lazy(() => import('./pages/Home'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Jobs = lazy(() => import('./pages/Jobs'));
+const ResumeUpload = lazy(() => import('./pages/ResumeUpload'));
+const RecruiterRegister = lazy(() => import('./pages/RecruiterRegister'));
+const RecruiterDashboard = lazy(() => import('./pages/RecruiterDashboard'));
 
 function App() {
   const [user, setUser] = useState(null);
@@ -76,6 +77,11 @@ function App() {
       <div className="min-h-screen bg-gray-50">
         <Navbar onAuthChange={handleAuthChange} />
         <main>
+          <Suspense fallback={
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        }>
           <Routes>
             {/* Public routes - accessible without authentication */}
             <Route path="/login" element={
@@ -165,6 +171,7 @@ function App() {
             {/* Redirect unknown routes to home */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </Suspense>
         </main>
         <VoiceAssistant />
       </div>

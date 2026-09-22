@@ -20,11 +20,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Create directories for models and violations
-RUN mkdir -p models/face_detection_model models/mobile_detection_model violations violations/images violations/logs
-
-# Download models
-RUN python download_models.py
+# Create directory for violation output
+RUN mkdir -p violations
 
 # Expose port
 EXPOSE 5001

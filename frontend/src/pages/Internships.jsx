@@ -41,7 +41,6 @@ const Internships = () => {
     fetchStats();
 
     const handleSkillsUpdate = (event) => {
-      console.log('🎯 Skills updated event received in Internships page:', event.detail);
       if (event.detail && event.detail.skills) {
         setUserSkills(event.detail.skills);
         setRefreshKey(prev => prev + 1);

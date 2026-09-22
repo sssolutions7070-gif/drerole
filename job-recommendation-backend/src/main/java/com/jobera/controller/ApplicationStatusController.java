@@ -1,6 +1,8 @@
 // File: src/main/java/com/jobera/controller/ApplicationStatusController.java
 package com.jobera.controller;
 
+import org.slf4j.LoggerFactory;
+import org.slf4j.Logger;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -8,7 +10,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -24,8 +25,9 @@ import com.jobera.service.JobPostingService;
 
 @RestController
 @RequestMapping("/api/applications")
-@CrossOrigin(origins = "http://localhost:3000")
 public class ApplicationStatusController {
+    private static final Logger log = LoggerFactory.getLogger(ApplicationStatusController.class);
+
     
     private final ApplicationStatusService applicationStatusService;
     private final JobPostingService jobPostingService;
@@ -329,11 +331,11 @@ public class ApplicationStatusController {
             String interviewLocation = (String) request.get("interviewLocation");
             String notes = (String) request.get("notes");
             
-            System.out.println("=== SCHEDULE INTERVIEW REQUEST ===");
-            System.out.println("Application ID: " + applicationId);
-            System.out.println("Recruiter ID: " + recruiterId);
-            System.out.println("Interview Date: " + interviewDateStr);
-            System.out.println("Interview Location: " + interviewLocation);
+            log.debug("=== SCHEDULE INTERVIEW REQUEST ===");
+            log.debug("Application ID: " + applicationId);
+            log.debug("Recruiter ID: " + recruiterId);
+            log.debug("Interview Date: " + interviewDateStr);
+            log.debug("Interview Location: " + interviewLocation);
             
             LocalDateTime interviewDate;
             if (interviewDateStr != null) {
@@ -357,7 +359,7 @@ public class ApplicationStatusController {
             Application application = applicationStatusService.scheduleInterview(
                 applicationId, interviewDate, interviewLocation.trim(), notes);
             
-            System.out.println("✅ Application status updated to: " + application.getStatus());
+            log.debug("✅ Application status updated to: " + application.getStatus());
             
             Map<String, Object> response = new HashMap<>();
             response.put(RESPONSE_KEY_MESSAGE, "Interview scheduled successfully");
@@ -366,8 +368,8 @@ public class ApplicationStatusController {
             return ResponseEntity.ok(response);
             
         } catch (Exception e) {
-            System.out.println("❌ ERROR scheduling interview: " + e.getMessage());
-            e.printStackTrace();
+            log.error("❌ ERROR scheduling interview: " + e.getMessage());
+            log.error("Unexpected error", e);
             return ResponseEntity.badRequest().body(Map.of(RESPONSE_KEY_ERROR, "Failed to schedule interview: " + e.getMessage()));
         }
     }

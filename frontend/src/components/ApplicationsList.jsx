@@ -59,7 +59,6 @@ const ApplicationsList = ({ job, onClose }) => {
       }
       
       setRecruiterId(rId);
-      console.log('Recruiter ID set to:', rId);
     } catch (error) {
       console.error('Error getting recruiter ID:', error);
     }
@@ -70,9 +69,6 @@ const ApplicationsList = ({ job, onClose }) => {
       setLoading(true);
       setError('');
       
-      console.log('=== FETCHING APPLICATIONS ===');
-      console.log('Job:', job);
-      console.log('Job ID:', job.id);
 
       const currentUser = JSON.parse(localStorage.getItem('user'));
       let rId = job.recruiter?.id;
@@ -92,18 +88,16 @@ const ApplicationsList = ({ job, onClose }) => {
         }
       }
 
-      let endpoint;
-      if (rId) {
-        endpoint = `/resume-matching/job/${job.id}/applications/sorted?recruiterId=${rId}`;
-      } else {
-        endpoint = `/recruiters/jobs/${job.id}/applications/debug`;
+      if (!rId) {
+        setError('Recruiter profile not found. Please complete your recruiter registration.');
+        setApplications([]);
+        return;
       }
 
-      const response = await api.get(endpoint);
+      const response = await api.get(`/resume-matching/job/${job.id}/applications/sorted?recruiterId=${rId}`);
       
       if (response.data && response.data.applications) {
         setApplications(response.data.applications);
-        console.log('✅ Applications loaded');
       } else {
         setApplications([]);
       }
@@ -119,13 +113,10 @@ const ApplicationsList = ({ job, onClose }) => {
   const fetchTests = async () => {
     try {
       if (!recruiterId) {
-        console.log('No recruiter ID available to fetch tests');
         return;
       }
       
-      console.log('Fetching tests for recruiter:', recruiterId);
       const response = await api.get(`/aptitude-tests/recruiter/${recruiterId}`);
-      console.log('Tests fetched:', response.data);
       setTests(response.data || []);
     } catch (error) {
       console.error('Error fetching tests:', error);

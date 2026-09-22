@@ -1,5 +1,7 @@
 package com.jobera.service;
 
+import org.slf4j.LoggerFactory;
+import org.slf4j.Logger;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -23,6 +25,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
 public class ResumeProcessingService {
+    private static final Logger log = LoggerFactory.getLogger(ResumeProcessingService.class);
+
     
     // COMPREHENSIVE MULTI-DOMAIN SKILLS DATABASE - FULLY RESTORED
     private static final Map<String, Set<String>> TECHNICAL_SKILLS_BY_CATEGORY = new HashMap<>();
@@ -264,22 +268,22 @@ public class ResumeProcessingService {
         result.put("job_recommendations", jobRecommendations);
         
         // Debug output
-        System.out.println("=== RESUME PARSING DEBUG ===");
-        System.out.println("Extracted experience: " + experienceYears + " years");
-        System.out.println("Extracted education: " + educationLevel);
-        System.out.println("Raw skills count: " + rawSkills.size());
-        System.out.println("Validated skills count: " + validatedSkills.size());
-        System.out.println("Primary domain: " + primaryDomain);
-        System.out.println("Domain breakdown: " + domainBreakdown);
-        System.out.println("Skill categories found: " + categorizedSkills.keySet());
-        System.out.println("Job recommendations generated: " + jobRecommendations.size());
+        log.debug("=== RESUME PARSING DEBUG ===");
+        log.debug("Extracted experience: " + experienceYears + " years");
+        log.debug("Extracted education: " + educationLevel);
+        log.debug("Raw skills count: " + rawSkills.size());
+        log.debug("Validated skills count: " + validatedSkills.size());
+        log.debug("Primary domain: " + primaryDomain);
+        log.debug("Domain breakdown: " + domainBreakdown);
+        log.debug("Skill categories found: " + categorizedSkills.keySet());
+        log.debug("Job recommendations generated: " + jobRecommendations.size());
         
         return result;
     }
     
     // FINAL FIXED EDUCATION EXTRACTION METHOD
     private String extractEducationLevelFinal(String content) {
-        System.out.println("=== FINAL EDUCATION EXTRACTION DEBUG ===");
+        log.debug("=== FINAL EDUCATION EXTRACTION DEBUG ===");
         String lowerContent = content.toLowerCase();
         
         // Create education level scores
@@ -336,8 +340,8 @@ public class ResumeProcessingService {
         // Find the highest education level with the highest score
         String highestEducation = findHighestEducation(educationScores);
         
-        System.out.println("Education Scores: " + educationScores);
-        System.out.println("Final Education Level: " + highestEducation);
+        log.debug("Education Scores: " + educationScores);
+        log.debug("Final Education Level: " + highestEducation);
         
         return highestEducation;
     }
@@ -352,7 +356,7 @@ public class ResumeProcessingService {
             int count = 0;
             while (matcher.find()) {
                 count++;
-                System.out.println("✓ Found '" + pattern + "' for " + level + " at position " + matcher.start());
+                log.debug("✓ Found '" + pattern + "' for " + level + " at position " + matcher.start());
             }
             
             if (count > 0) {
@@ -369,7 +373,7 @@ public class ResumeProcessingService {
         );
         Matcher institutionMatcher = institutionPattern.matcher(content);
         if (institutionMatcher.find()) {
-            System.out.println("✓ Found educational institution");
+            log.debug("✓ Found educational institution");
             // If we found an institution but no specific degree, assume at least Bachelor's
             if (scores.get("Bachelor's") == 0 && scores.get("Master's") == 0 && scores.get("PhD") == 0) {
                 scores.put("Bachelor's", 1);
@@ -383,7 +387,7 @@ public class ResumeProcessingService {
         );
         Matcher graduationMatcher = graduationPattern.matcher(content);
         if (graduationMatcher.find()) {
-            System.out.println("✓ Found graduation pattern with year");
+            log.debug("✓ Found graduation pattern with year");
             if (scores.get("Bachelor's") == 0 && scores.get("Master's") == 0 && scores.get("PhD") == 0) {
                 scores.put("Bachelor's", 1);
             }
@@ -396,7 +400,7 @@ public class ResumeProcessingService {
         );
         Matcher fieldMatcher = degreeFieldPattern.matcher(content);
         if (fieldMatcher.find()) {
-            System.out.println("✓ Found degree field: " + fieldMatcher.group(1));
+            log.debug("✓ Found degree field: " + fieldMatcher.group(1));
             if (scores.get("Bachelor's") == 0 && scores.get("Master's") == 0 && scores.get("PhD") == 0) {
                 scores.put("Bachelor's", 1);
             }
@@ -474,17 +478,17 @@ public class ResumeProcessingService {
     }
     
     private void debugSkillExtraction(String content, Set<String> rawSkills, Set<String> validatedSkills) {
-        System.out.println("=== SKILL EXTRACTION DEBUG ===");
-        System.out.println("Content sample: " + content.substring(0, Math.min(200, content.length())) + "...");
-        System.out.println("Raw skills found (" + rawSkills.size() + "): " + rawSkills);
-        System.out.println("Validated skills (" + validatedSkills.size() + "): " + validatedSkills);
+        log.debug("=== SKILL EXTRACTION DEBUG ===");
+        log.debug("Content sample: " + content.substring(0, Math.min(200, content.length())) + "...");
+        log.debug("Raw skills found (" + rawSkills.size() + "): " + rawSkills);
+        log.debug("Validated skills (" + validatedSkills.size() + "): " + validatedSkills);
         
         Set<String> falsePositives = rawSkills.stream()
             .filter(skill -> !validatedSkills.contains(skill))
             .collect(Collectors.toSet());
             
         if (!falsePositives.isEmpty()) {
-            System.out.println("False positives removed: " + falsePositives);
+            log.debug("False positives removed: " + falsePositives);
         }
         
         for (String skill : validatedSkills) {
@@ -499,7 +503,7 @@ public class ResumeProcessingService {
             Matcher matcher = pattern.matcher(content.toLowerCase());
             
             if (matcher.find()) {
-                System.out.println("✓ Valid: " + skill + " at position " + matcher.start());
+                log.debug("✓ Valid: " + skill + " at position " + matcher.start());
             }
         }
     }
@@ -694,22 +698,22 @@ public class ResumeProcessingService {
     
     // EXISTING EXPERIENCE EXTRACTION METHODS (keep your current implementation)
     private int extractExperienceYears(String content) {
-        System.out.println("=== EXPERIENCE EXTRACTION DEBUG ===");
+        log.debug("=== EXPERIENCE EXTRACTION DEBUG ===");
         
         int explicitExperience = extractExplicitExperience(content);
         
         if (explicitExperience > 0) {
-            System.out.println("Found explicit experience: " + explicitExperience + " years");
+            log.debug("Found explicit experience: " + explicitExperience + " years");
             return explicitExperience;
         }
         
         int enhancedExperience = extractEnhancedExperience(content);
         if (enhancedExperience > 0) {
-            System.out.println("Found enhanced experience: " + enhancedExperience + " years");
+            log.debug("Found enhanced experience: " + enhancedExperience + " years");
             return enhancedExperience;
         }
         
-        System.out.println("No explicit experience found. Returning 0 years.");
+        log.debug("No explicit experience found. Returning 0 years.");
         return 0;
     }
     

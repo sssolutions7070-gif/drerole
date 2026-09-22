@@ -1,6 +1,8 @@
 // src/main/java/com/jobera/controller/InternshipController.java - Rate Internship Section
 package com.jobera.controller;
 
+import org.slf4j.LoggerFactory;
+import org.slf4j.Logger;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -23,8 +25,9 @@ import com.jobera.repository.UserRepository;
 
 @RestController
 @RequestMapping("/api/internships")
-@CrossOrigin(origins = "http://localhost:3000")
 public class InternshipController {
+    private static final Logger log = LoggerFactory.getLogger(InternshipController.class);
+
 
     private static final String INTERNSHIP_TYPE = "Internship";
 
@@ -185,35 +188,35 @@ public class InternshipController {
             @PathVariable Long userId,
             @RequestBody Map<String, Object> ratingData) {
         try {
-            System.out.println("=== RATING INTERNSHIP ===");
-            System.out.println("Internship ID: " + internshipId);
-            System.out.println("User ID: " + userId);
-            System.out.println("Rating Data: " + ratingData);
+            log.debug("=== RATING INTERNSHIP ===");
+            log.debug("Internship ID: " + internshipId);
+            log.debug("User ID: " + userId);
+            log.debug("Rating Data: " + ratingData);
             
             Optional<User> userOpt = userRepository.findById(userId);
             if (userOpt.isEmpty()) {
-                System.out.println("❌ User not found: " + userId);
+                log.error("❌ User not found: " + userId);
                 return ResponseEntity.badRequest().body(Map.of("error", "User not found"));
             }
             
             Optional<JobPosting> internshipOpt = jobPostingRepository.findById(internshipId);
             if (internshipOpt.isEmpty()) {
-                System.out.println("❌ Internship not found: " + internshipId);
+                log.error("❌ Internship not found: " + internshipId);
                 return ResponseEntity.badRequest().body(Map.of("error", "Internship not found"));
             }
             
             Integer rating = (Integer) ratingData.get("rating");
             if (rating == null || rating < 1 || rating > 5) {
-                System.out.println("❌ Invalid rating: " + rating);
+                log.error("❌ Invalid rating: " + rating);
                 return ResponseEntity.badRequest().body(Map.of("error", "Rating must be between 1 and 5"));
             }
             
             String comment = (String) ratingData.getOrDefault("comment", "");
             
-            System.out.println("User: " + userOpt.get().getFullName());
-            System.out.println("Internship: " + internshipOpt.get().getTitle());
-            System.out.println("Rating: " + rating);
-            System.out.println("Comment: " + comment);
+            log.debug("User: " + userOpt.get().getFullName());
+            log.debug("Internship: " + internshipOpt.get().getTitle());
+            log.debug("Rating: " + rating);
+            log.debug("Comment: " + comment);
             
             // FIXED: Check using jobPostingId instead of internshipId
             Optional<InternshipRating> existingRating = ratingRepository.findByUserIdAndJobPostingId(userId, internshipId);
@@ -223,7 +226,7 @@ public class InternshipController {
                 internshipRating = existingRating.get();
                 internshipRating.setRating(rating);
                 internshipRating.setComment(comment);
-                System.out.println("✅ Updating existing rating");
+                log.debug("✅ Updating existing rating");
             } else {
                 internshipRating = new InternshipRating();
                 internshipRating.setUser(userOpt.get());
@@ -232,18 +235,18 @@ public class InternshipController {
                 internshipRating.setInternshipCompany(internshipOpt.get().getCompany());
                 internshipRating.setRating(rating);
                 internshipRating.setComment(comment);
-                System.out.println("✅ Creating new rating");
+                log.debug("✅ Creating new rating");
             }
             
             InternshipRating savedRating = ratingRepository.save(internshipRating);
-            System.out.println("✅ Rating saved with ID: " + savedRating.getId());
+            log.debug("✅ Rating saved with ID: " + savedRating.getId());
             
             // Update the job posting's average rating
             Double avgRating = ratingRepository.findAverageRatingByJobPostingId(internshipId);
             Long totalRatings = ratingRepository.countRatingsByJobPostingId(internshipId);
             
-            System.out.println("Average rating: " + avgRating);
-            System.out.println("Total ratings: " + totalRatings);
+            log.debug("Average rating: " + avgRating);
+            log.debug("Total ratings: " + totalRatings);
             
             JobPosting internship = internshipOpt.get();
             internship.setAverageRating(avgRating != null ? Math.round(avgRating * 100.0) / 100.0 : 0.0);
@@ -257,8 +260,8 @@ public class InternshipController {
             ));
             
         } catch (Exception e) {
-            System.out.println("❌ Error rating internship: " + e.getMessage());
-            e.printStackTrace();
+            log.error("❌ Error rating internship: " + e.getMessage());
+            log.error("Unexpected error", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(Map.of("error", "Failed to submit rating: " + e.getMessage()));
         }
@@ -270,25 +273,25 @@ public class InternshipController {
             @PathVariable Long internshipId,
             @PathVariable Long userId) {
         try {
-            System.out.println("=== GET USER RATING ===");
-            System.out.println("Internship ID: " + internshipId);
-            System.out.println("User ID: " + userId);
+            log.debug("=== GET USER RATING ===");
+            log.debug("Internship ID: " + internshipId);
+            log.debug("User ID: " + userId);
             
             // FIXED: Use jobPostingId
             Optional<InternshipRating> rating = ratingRepository.findByUserIdAndJobPostingId(userId, internshipId);
             
             if (rating.isPresent()) {
-                System.out.println("✅ Found rating: " + rating.get().getRating());
+                log.debug("✅ Found rating: " + rating.get().getRating());
                 return ResponseEntity.ok(Map.of(
                     "hasRated", true,
                     "rating", rating.get().getRating(),
                     "comment", rating.get().getComment()
                 ));
             }
-            System.out.println("No rating found");
+            log.debug("No rating found");
             return ResponseEntity.ok(Map.of("hasRated", false));
         } catch (Exception e) {
-            System.out.println("❌ Error getting user rating: " + e.getMessage());
+            log.error("❌ Error getting user rating: " + e.getMessage());
             return ResponseEntity.ok(Map.of("hasRated", false));
         }
     }
@@ -318,7 +321,7 @@ public class InternshipController {
                 }
             }
         } catch (Exception e) {
-            System.err.println("Error extracting user skills: " + e.getMessage());
+            log.error("Error extracting user skills: " + e.getMessage());
         }
         return skills;
     }

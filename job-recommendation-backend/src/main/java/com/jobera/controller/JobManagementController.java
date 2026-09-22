@@ -1,5 +1,7 @@
 package com.jobera.controller;
 
+import org.slf4j.LoggerFactory;
+import org.slf4j.Logger;
 import com.jobera.entity.Application;
 import com.jobera.entity.JobPosting;
 import com.jobera.service.JobPostingService;
@@ -13,8 +15,9 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/recruiters/jobs")
-@CrossOrigin(origins = "http://localhost:3000")
 public class JobManagementController {
+    private static final Logger log = LoggerFactory.getLogger(JobManagementController.class);
+
     
     private final JobPostingService jobPostingService;
     private final RecruiterService recruiterService;
@@ -27,8 +30,8 @@ public class JobManagementController {
     @PostMapping
     public ResponseEntity<Map<String, Object>> createJob(@RequestBody Map<String, Object> request) {
         try {
-            System.out.println("=== CREATE JOB REQUEST ===");
-            System.out.println("Request data: " + request);
+            log.debug("=== CREATE JOB REQUEST ===");
+            log.debug("Request data: " + request);
             
             Long recruiterId = Long.valueOf(request.get("recruiterId").toString());
             String title = (String) request.get("title");
@@ -41,9 +44,9 @@ public class JobManagementController {
             String jobType = (String) request.get("jobType");
             String experienceLevel = (String) request.get("experienceLevel");
             
-            System.out.println("Recruiter ID: " + recruiterId);
-            System.out.println("Title: " + title);
-            System.out.println("Company: " + company);
+            log.debug("Recruiter ID: " + recruiterId);
+            log.debug("Title: " + title);
+            log.debug("Company: " + company);
             
             JobPosting job = jobPostingService.createJobPosting(
                 recruiterId, title, company, description, requiredSkills, 
@@ -54,13 +57,13 @@ public class JobManagementController {
             response.put("message", "Job posted successfully");
             response.put("job", createJobResponse(job));
             
-            System.out.println("✅ Job created successfully with ID: " + job.getId());
+            log.debug("✅ Job created successfully with ID: " + job.getId());
             
             return ResponseEntity.ok(response);
             
         } catch (Exception e) {
-            System.out.println("❌ ERROR creating job: " + e.getMessage());
-            e.printStackTrace();
+            log.error("❌ ERROR creating job: " + e.getMessage());
+            log.error("Unexpected error", e);
             return ResponseEntity.badRequest().body(Map.of("error", "Failed to create job: " + e.getMessage()));
         }
     }
@@ -112,17 +115,17 @@ public class JobManagementController {
     @GetMapping("/recruiter/{recruiterId}")
     public ResponseEntity<List<JobPosting>> getRecruiterJobs(@PathVariable Long recruiterId) {
         try {
-            System.out.println("=== GET RECRUITER JOBS ===");
-            System.out.println("Recruiter ID: " + recruiterId);
+            log.debug("=== GET RECRUITER JOBS ===");
+            log.debug("Recruiter ID: " + recruiterId);
             
             List<JobPosting> jobs = jobPostingService.getJobsByRecruiter(recruiterId);
             
-            System.out.println("✅ Found " + jobs.size() + " jobs for recruiter " + recruiterId);
+            log.debug("✅ Found " + jobs.size() + " jobs for recruiter " + recruiterId);
             
             return ResponseEntity.ok(jobs);
         } catch (Exception e) {
-            System.out.println("❌ ERROR fetching recruiter jobs: " + e.getMessage());
-            e.printStackTrace();
+            log.error("❌ ERROR fetching recruiter jobs: " + e.getMessage());
+            log.error("Unexpected error", e);
             return ResponseEntity.ok(List.of());
         }
     }
@@ -133,13 +136,13 @@ public class JobManagementController {
             @PathVariable Long jobId, 
             @RequestParam Long recruiterId) {
         try {
-            System.out.println("=== GET JOB APPLICATIONS - ENHANCED ===");
-            System.out.println("Job ID: " + jobId);
-            System.out.println("Recruiter ID: " + recruiterId);
+            log.debug("=== GET JOB APPLICATIONS - ENHANCED ===");
+            log.debug("Job ID: " + jobId);
+            log.debug("Recruiter ID: " + recruiterId);
             
             List<Application> applications = jobPostingService.getApplicationsForJob(jobId, recruiterId);
             
-            System.out.println("✅ Final applications count: " + applications.size());
+            log.debug("✅ Final applications count: " + applications.size());
             
             Map<String, Object> response = new HashMap<>();
             response.put("applications", applications.stream().map(this::createEnhancedApplicationResponse).toList());
@@ -149,32 +152,9 @@ public class JobManagementController {
             
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            System.out.println("❌ ERROR fetching applications: " + e.getMessage());
-            e.printStackTrace();
+            log.error("❌ ERROR fetching applications: " + e.getMessage());
+            log.error("Unexpected error", e);
             return ResponseEntity.badRequest().body(Map.of("error", "Failed to fetch applications: " + e.getMessage()));
-        }
-    }
-    
-    // NEW DEBUG ENDPOINT - Get applications without recruiter verification
-    @GetMapping("/{jobId}/applications/debug")
-    public ResponseEntity<Map<String, Object>> getJobApplicationsDebug(@PathVariable Long jobId) {
-        try {
-            System.out.println("=== DEBUG: GET APPLICATIONS WITHOUT RECRUITER VERIFICATION ===");
-            System.out.println("Job ID: " + jobId);
-            
-            List<Application> applications = jobPostingService.getApplicationsForJobDebug(jobId);
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("applications", applications.stream().map(this::createEnhancedApplicationResponse).toList());
-            response.put("totalApplications", applications.size());
-            response.put("jobId", jobId);
-            response.put("message", "Debug mode - no recruiter verification");
-            
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            System.out.println("❌ ERROR in debug endpoint: " + e.getMessage());
-            e.printStackTrace();
-            return ResponseEntity.badRequest().body(Map.of("error", "Debug failed: " + e.getMessage()));
         }
     }
     

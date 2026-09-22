@@ -80,7 +80,6 @@ const InterviewPage = () => {
             allApps = [...allApps, ...appsWithJob];
           }
         } catch (error) {
-          console.log(`No applications for job ${job.id}`);
         }
       }
       

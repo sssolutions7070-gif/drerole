@@ -23,7 +23,6 @@ const JobApplicationModal = ({ job, onClose, onSuccess }) => {
   const currentUser = JSON.parse(localStorage.getItem('user'));
 
   useEffect(() => {
-    console.log('Job object received:', job);
     const possibleJobId = job?.id || job?.jobId || job?.ID;
     if (possibleJobId) {
       setJobId(possibleJobId);
@@ -58,7 +57,6 @@ const JobApplicationModal = ({ job, onClose, onSuccess }) => {
 
   const fetchUserLatestResume = async () => {
     if (!currentUser || !currentUser.id) {
-      console.log('No current user found');
       setIsLoadingResume(false);
       setFetchAttempted(true);
       return;
@@ -66,20 +64,16 @@ const JobApplicationModal = ({ job, onClose, onSuccess }) => {
 
     try {
       setIsLoadingResume(true);
-      console.log('Fetching latest resume for user:', currentUser.id);
 
       const response = await api.get(`/resumes/user/${currentUser.id}/latest`);
-      console.log('Resume API response:', response);
 
       if (response.data && response.data.id) {
         const resumeData = response.data;
-        console.log('✅ Resume data received:', resumeData);
 
         setUploadedResumeId(resumeData.id);
         setUploadedResumePath(resumeData.filePath || '');
 
         const parsedSkills = parseSkills(resumeData.skills);
-        console.log(`✅ Found ${parsedSkills.length} skills from resume:`, parsedSkills);
 
         let experienceValue = resumeData.experienceYears ?? 0;
         let educationValue  = resumeData.educationLevel  || "Bachelor's Degree";
@@ -92,9 +86,7 @@ const JobApplicationModal = ({ job, onClose, onSuccess }) => {
         }));
 
         setHasResume(parsedSkills.length > 0);
-        console.log('✅ Form populated with resume data successfully');
       } else {
-        console.log('No resume data found, using defaults');
         setDefaultFormData();
       }
     } catch (error) {
@@ -152,7 +144,6 @@ const JobApplicationModal = ({ job, onClose, onSuccess }) => {
 
     try {
       setIsLoadingResume(true);
-      console.log('Uploading new resume:', file.name);
 
       const uploadFormData = new FormData();
       uploadFormData.append('file', file);
@@ -162,8 +153,6 @@ const JobApplicationModal = ({ job, onClose, onSuccess }) => {
         uploadFormData,
         { headers: { 'Content-Type': 'multipart/form-data' } }
       );
-
-      console.log('Upload response:', uploadResponse);
 
       if (uploadResponse.data && uploadResponse.data.id) {
         // ✅ Save resume id & path from upload response
@@ -177,7 +166,6 @@ const JobApplicationModal = ({ job, onClose, onSuccess }) => {
       setTimeout(async () => {
         try {
           const resumeResponse = await api.get(`/resumes/user/${currentUser.id}/latest`);
-          console.log('Updated resume data:', resumeResponse);
 
           if (resumeResponse.data && resumeResponse.data.id) {
             const resumeData = resumeResponse.data;
@@ -240,13 +228,6 @@ const JobApplicationModal = ({ job, onClose, onSuccess }) => {
     setError('');
 
     try {
-      console.log('=== SUBMITTING APPLICATION ===');
-      console.log('Job ID:', jobId);
-      console.log('User ID:', currentUser?.id);
-      console.log('Skills:', formData.skills);
-      console.log('Experience:', formData.experience);
-      console.log('Education:', formData.education);
-      console.log('Resume ID:', uploadedResumeId);
 
       const applicationData = {
         coverLetter:         formData.coverLetter,
@@ -262,8 +243,6 @@ const JobApplicationModal = ({ job, onClose, onSuccess }) => {
         `/jobs/${jobId}/apply-with-resume/${currentUser.id}`,
         applicationData
       );
-
-      console.log('✅ Application successful!', response.data);
 
       if (onSuccess) onSuccess();
       onClose();

@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Camera, VideoOff, Loader, CheckCircle, XCircle } from 'lucide-react';
 import axios from 'axios';
+import { PROCTORING_URL } from '../config';
 
 const CameraPermission = ({ onPermissionGranted, onPermissionDenied }) => {
   const [checking, setChecking] = useState(false);
@@ -9,12 +10,10 @@ const CameraPermission = ({ onPermissionGranted, onPermissionDenied }) => {
   const [error, setError] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
   
-  const PROCTORING_URL = 'http://localhost:5001';
 
   const checkProctoringService = async () => {
     try {
       const response = await axios.get(`${PROCTORING_URL}/health`);
-      console.log('Proctoring service health:', response.data);
       return response.status === 200;
     } catch (error) {
       console.error('Proctoring service health check failed:', error);
@@ -35,7 +34,6 @@ const CameraPermission = ({ onPermissionGranted, onPermissionDenied }) => {
       }
       
       // Step 2: Check browser camera permission with timeout
-      console.log("Requesting camera permission...");
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { 
           width: { ideal: 640 },
@@ -50,14 +48,10 @@ const CameraPermission = ({ onPermissionGranted, onPermissionDenied }) => {
       // Got permission, stop the stream
       stream.getTracks().forEach(track => {
         track.stop();
-        console.log('Camera track stopped');
       });
-      console.log("✅ Camera permission granted");
       
       // Step 3: Check proctoring service camera check
-      console.log("Checking proctoring service camera...");
       const response = await axios.post(`${PROCTORING_URL}/check-camera`);
-      console.log('Proctoring camera check response:', response.data);
       
       if (response.data.available) {
         setStatus('success');

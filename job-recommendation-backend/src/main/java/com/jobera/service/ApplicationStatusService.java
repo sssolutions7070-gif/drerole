@@ -1,5 +1,7 @@
 package com.jobera.service;
 
+import org.slf4j.LoggerFactory;
+import org.slf4j.Logger;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -11,6 +13,8 @@ import com.jobera.repository.ApplicationRepository;
 
 @Service
 public class ApplicationStatusService {
+    private static final Logger log = LoggerFactory.getLogger(ApplicationStatusService.class);
+
     
     private final ApplicationRepository applicationRepository;
     
@@ -99,22 +103,22 @@ public class ApplicationStatusService {
     
     public List<Application> getUserApplications(Long userId) {
         try {
-            System.out.println("=== GETTING APPLICATIONS FOR USER: " + userId + " ===");
+            log.debug("=== GETTING APPLICATIONS FOR USER: " + userId + " ===");
             List<Application> applications = applicationRepository.findByUserId(userId);
-            System.out.println("✅ Found " + applications.size() + " applications");
+            log.debug("✅ Found " + applications.size() + " applications");
             
             // Debug: Print each application
             for (Application app : applications) {
-                System.out.println("📄 Application ID: " + app.getId());
-                System.out.println("   Job: " + (app.getJobPosting() != null ? app.getJobPosting().getTitle() : "No job"));
-                System.out.println("   Status: " + app.getStatus());
-                System.out.println("   Applicant: " + app.getSafeApplicantName());
+                log.debug("📄 Application ID: " + app.getId());
+                log.debug("   Job: " + (app.getJobPosting() != null ? app.getJobPosting().getTitle() : "No job"));
+                log.debug("   Status: " + app.getStatus());
+                log.debug("   Applicant: " + app.getSafeApplicantName());
             }
             
             return applications;
         } catch (Exception e) {
-            System.out.println("❌ ERROR in getUserApplications: " + e.getMessage());
-            e.printStackTrace();
+            log.error("❌ ERROR in getUserApplications: " + e.getMessage());
+            log.error("Unexpected error", e);
             throw new ApplicationStatusException("Failed to get user applications: " + e.getMessage());
         }
     }

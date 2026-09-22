@@ -1,3 +1,4 @@
+// File: src/main/java/com/jobera/entity/TestAssignment.java
 package com.jobera.entity;
 
 import java.time.LocalDateTime;
@@ -18,6 +19,7 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 
 @Entity
 @Table(name = "test_assignments")
@@ -57,7 +59,7 @@ public class TestAssignment {
     
     private Boolean passed = false;
     
-    // ========== NEW PROCTORING FIELDS ==========
+    // ========== PROCTORING FIELDS ==========
     
     @Column(name = "proctoring_active")
     private Boolean proctoringActive = false;
@@ -88,6 +90,13 @@ public class TestAssignment {
     
     @Column(name = "proctoring_ended_at")
     private LocalDateTime proctoringEndedAt;
+    
+    // ========== TRANSIENT FIELDS FOR EXTERNAL JOBS (NOT STORED IN DB) ==========
+    @Transient
+    private String externalJobTitle;
+    
+    @Transient
+    private String externalCompanyName;
     
     // ========== RELATIONSHIPS ==========
     
@@ -200,6 +209,13 @@ public class TestAssignment {
     public List<ProctoringViolation> getProctoringViolations() { return proctoringViolations; }
     public void setProctoringViolations(List<ProctoringViolation> proctoringViolations) { this.proctoringViolations = proctoringViolations; }
     
+    // ========== TRANSIENT GETTERS AND SETTERS FOR EXTERNAL JOBS ==========
+    public String getExternalJobTitle() { return externalJobTitle; }
+    public void setExternalJobTitle(String externalJobTitle) { this.externalJobTitle = externalJobTitle; }
+    
+    public String getExternalCompanyName() { return externalCompanyName; }
+    public void setExternalCompanyName(String externalCompanyName) { this.externalCompanyName = externalCompanyName; }
+    
     // ========== HELPER METHODS ==========
     
     public Integer getPercentage() {
@@ -232,6 +248,8 @@ public class TestAssignment {
                 if (this.lookingAwayViolations == null) this.lookingAwayViolations = 0;
                 this.lookingAwayViolations++;
                 break;
+            default:
+                break;
         }
     }
     
@@ -257,16 +275,19 @@ public class TestAssignment {
     }
     
     public boolean hasProctoringViolations() {
-        return (noFaceViolations != null && noFaceViolations > 0) ||
-               (multipleFacesViolations != null && multipleFacesViolations > 0) ||
-               (mobileDetectedViolations != null && mobileDetectedViolations > 0) ||
-               (lookingAwayViolations != null && lookingAwayViolations > 0);
+        boolean hasNoFace = noFaceViolations != null && noFaceViolations > 0;
+        boolean hasMultipleFaces = multipleFacesViolations != null && multipleFacesViolations > 0;
+        boolean hasMobileDetected = mobileDetectedViolations != null && mobileDetectedViolations > 0;
+        boolean hasLookingAway = lookingAwayViolations != null && lookingAwayViolations > 0;
+        return hasNoFace || hasMultipleFaces || hasMobileDetected || hasLookingAway;
     }
     
     public int getTotalViolations() {
-        return (noFaceViolations != null ? noFaceViolations : 0) +
-               (multipleFacesViolations != null ? multipleFacesViolations : 0) +
-               (mobileDetectedViolations != null ? mobileDetectedViolations : 0) +
-               (lookingAwayViolations != null ? lookingAwayViolations : 0);
+        int total = 0;
+        if (noFaceViolations != null) total += noFaceViolations;
+        if (multipleFacesViolations != null) total += multipleFacesViolations;
+        if (mobileDetectedViolations != null) total += mobileDetectedViolations;
+        if (lookingAwayViolations != null) total += lookingAwayViolations;
+        return total;
     }
 }

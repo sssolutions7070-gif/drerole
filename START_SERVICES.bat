@@ -32,7 +32,7 @@ start "Proctoring Service" cmd /k "cd /d C:\Users\satej\job-recommendation-syste
 timeout /t 3
 
 echo.
-echo [2/3] Starting Backend (Port 8080)
+echo [2/3] Starting Backend (Port 8081)
 echo ========================================
 start "Backend Service" cmd /k "cd /d C:\Users\satej\job-recommendation-system007\job-recommendation-backend && .\mvnw.cmd spring-boot:run"
 
@@ -49,7 +49,7 @@ echo ALL SERVICES STARTED!
 echo ========================================
 echo.
 echo Proctoring: http://localhost:5001
-echo Backend:    http://localhost:8080
+echo Backend:    http://localhost:8081
 echo Frontend:   http://localhost:3000
 echo.
 echo Open http://localhost:3000 in your browser

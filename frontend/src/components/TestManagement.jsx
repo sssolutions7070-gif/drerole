@@ -69,13 +69,10 @@ const TestManagement = ({ recruiterId }) => {
   const fetchTests = async () => {
     try {
       setLoading(true);
-      console.log('Fetching manual tests for recruiter:', recruiterId);
       const response = await api.get(`/aptitude-tests/recruiter/${recruiterId}`);
-      console.log('Manual tests fetched:', response.data);
       
       const manualTests = response.data || [];
       setTests(manualTests);
-      console.log('Manual tests set to state:', manualTests.length);
       
     } catch (error) {
       console.error('Error fetching manual tests:', error);
@@ -87,9 +84,7 @@ const TestManagement = ({ recruiterId }) => {
 
   const fetchDreamRoleTests = async () => {
     try {
-      console.log('Fetching DreamRole tests for recruiter:', recruiterId);
       const response = await api.get(`/dream-role-tests/recruiter/${recruiterId}`);
-      console.log('DreamRole tests fetched:', response.data);
       setDreamRoleTests(response.data || []);
     } catch (error) {
       console.error('Error fetching DreamRole tests:', error);
@@ -121,9 +116,7 @@ const TestManagement = ({ recruiterId }) => {
 
   const fetchExternalShortlistedCandidates = async () => {
     try {
-      console.log('Fetching external shortlisted candidates for recruiter:', recruiterId);
       const response = await api.get(`/external-jobs/recruiter/${recruiterId}/shortlisted-candidates-for-test`);
-      console.log('External candidates response:', response.data);
       
       const transformedCandidates = (response.data || []).map(candidate => ({
         id: candidate.id,
@@ -147,7 +140,6 @@ const TestManagement = ({ recruiterId }) => {
       }));
       
       setExternalCandidates(transformedCandidates);
-      console.log('Transformed external candidates:', transformedCandidates.length);
     } catch (error) {
       console.error('Error fetching external shortlisted candidates:', error);
       setExternalCandidates([]);
@@ -157,19 +149,16 @@ const TestManagement = ({ recruiterId }) => {
   const fetchTestResults = async (testId, isDreamRole = false) => {
     try {
       setLoading(true);
-      console.log('Fetching results for test:', testId, 'isDreamRole:', isDreamRole);
       
       if (isDreamRole) {
         const test = dreamRoleTests.find(t => t.id === testId);
         setSelectedTestForResults(test);
         const response = await api.get(`/dream-role-tests/test/${testId}/results/unscheduled`);
-        console.log('DreamRole test results:', response.data);
         setTestResults(response.data.results || []);
       } else {
         const test = tests.find(t => t.id === testId);
         setSelectedTestForResults(test);
         const response = await api.get(`/aptitude-tests/test/${testId}/results/unscheduled`);
-        console.log('Manual test results:', response.data);
         setTestResults(response.data.results || []);
       }
       
@@ -257,24 +246,11 @@ const TestManagement = ({ recruiterId }) => {
   // FIXED: handleAssignTest for external candidates
   const handleAssignTest = async (candidateId, testId, isDreamRole = false, isExternalCandidate = false) => {
     try {
-      console.log("=== ASSIGN TEST CALLED ===");
-      console.log("Candidate ID:", candidateId);
-      console.log("Test ID:", testId);
-      console.log("Is DreamRole:", isDreamRole);
-      console.log("Is External Candidate:", isExternalCandidate);
-      console.log("Deadline Hours:", deadlineHours);
       
       let response;
       
       if (isExternalCandidate) {
         // Special endpoint for external candidates - FIXED endpoint path
-        console.log("Calling external candidate test assignment endpoint...");
-        console.log("Request payload:", {
-          candidateId: candidateId,
-          testId: testId,
-          deadlineHours: deadlineHours,
-          isDreamRoleTest: isDreamRole
-        });
         
         response = await api.post('/external-jobs/assign-test', {
           candidateId: candidateId,
@@ -282,16 +258,13 @@ const TestManagement = ({ recruiterId }) => {
           deadlineHours: deadlineHours,
           isDreamRoleTest: isDreamRole
         });
-        console.log("External test assignment response:", response.data);
       } else if (isDreamRole) {
-        console.log("Calling DreamRole test assignment...");
         response = await api.post('/dream-role-tests/assign', {
           testId,
           applicationId: candidateId,
           deadlineHours
         });
       } else {
-        console.log("Calling manual test assignment...");
         response = await api.post('/aptitude-tests/assign', {
           testId,
           applicationId: candidateId,

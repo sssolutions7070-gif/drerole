@@ -8,6 +8,7 @@ import time
 import logging
 import platform
 import requests
+import os
 import re
 from datetime import datetime
 
@@ -19,7 +20,7 @@ app = Flask(__name__)
 CORS(app, origins=["http://localhost:3000", "http://127.0.0.1:3000"])
 
 # Backend URL for sending violations
-BACKEND_URL = 'http://localhost:8080/api'
+BACKEND_URL = os.environ.get('BACKEND_URL', 'http://localhost:8081/api')
 
 # Active test sessions
 active_sessions = {}
@@ -274,9 +275,15 @@ class Proctor:
                 'completed_at': datetime.now().isoformat()
             }
             
+            headers = {}
+            api_key = os.environ.get('PROCTORING_API_KEY')
+            if api_key:
+                headers['X-Proctoring-Key'] = api_key
+            
             response = requests.post(
                 f"{BACKEND_URL}/aptitude-tests/{numeric_id}/violations",
                 json=violation_data,
+                headers=headers,
                 timeout=3
             )
             
@@ -423,4 +430,4 @@ if __name__ == '__main__':
     logger.info("Tab switch: Instant termination")
     logger.info("Key combinations: Instant termination")
     logger.info("=" * 50)
-    app.run(host='0.0.0.0', port=5001, debug=True, threaded=True)
+    app.run(host='0.0.0.0', port=5001, debug=False, threaded=True)

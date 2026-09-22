@@ -58,7 +58,6 @@ const InternshipEligibilityCheck = ({ internship, onEligibilityPassed, onClose }
       const response = await api.get(`/users/${currentUser.id}/profile`);
       const userData = response.data;
       
-      console.log('Full profile data:', userData);
       
       // Calculate age
       let age = null;
@@ -76,7 +75,6 @@ const InternshipEligibilityCheck = ({ internship, onEligibilityPassed, onClose }
       
       // Get education from userData.education array
       if (userData.education && Array.isArray(userData.education) && userData.education.length > 0) {
-        console.log('Education array found:', userData.education);
         
         // Sort education by year (most recent first)
         const sortedEducation = [...userData.education].sort((a, b) => {
@@ -119,7 +117,6 @@ const InternshipEligibilityCheck = ({ internship, onEligibilityPassed, onClose }
         educationLevel = highestDegree || (userData.education[0]?.degree || '');
         if (!institutionName) institutionName = userData.education[0]?.institution || '';
         
-        console.log('Extracted education:', { educationLevel, institutionName, highestDegreeLevel });
       }
       
       // If no education found, try other fields
@@ -175,13 +172,6 @@ const InternshipEligibilityCheck = ({ internship, onEligibilityPassed, onClose }
       const institutionLower = institutionName.toLowerCase();
       const isFromPremium = premiumInstitutions.some(inst => institutionLower.includes(inst));
       
-      console.log('========== EDUCATION DEBUG ==========');
-      console.log('Raw education value:', educationLevel);
-      console.log('Institution name:', institutionName);
-      console.log('Has higher degree:', hasHigherDegree);
-      console.log('Education eligible:', educationEligible);
-      console.log('Is from premium:', isFromPremium);
-      console.log('=====================================');
       
       setUserProfile({
         fullName: userData.fullName || currentUser?.fullName,

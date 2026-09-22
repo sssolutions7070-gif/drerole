@@ -21,7 +21,6 @@ const TestResults = () => {
 
   useEffect(() => {
     if (assignmentId) {
-      console.log('Fetching results for assignment:', assignmentId, 'type:', urlTestType);
       fetchResults();
     } else {
       setError('Invalid test ID');
@@ -36,9 +35,7 @@ const TestResults = () => {
       // If we have the test type from URL, use it directly
       if (urlTestType === 'dreamrole') {
         try {
-          console.log('Fetching DreamRole test results for ID:', assignmentId);
           const response = await api.get(`/dream-role-tests/results/${assignmentId}`);
-          console.log('DreamRole test results:', response.data);
           setResults(response.data);
           setTestType('dreamrole');
           setTerminationReason(response.data.assignment?.terminationReason || '');
@@ -49,9 +46,7 @@ const TestResults = () => {
         }
       } else if (urlTestType === 'manual') {
         try {
-          console.log('Fetching manual test results for ID:', assignmentId);
           const response = await api.get(`/aptitude-tests/results/${assignmentId}`);
-          console.log('Manual test results:', response.data);
           setResults(response.data);
           setTestType('manual');
           setTerminationReason(response.data.assignment?.terminationReason || '');
@@ -63,32 +58,27 @@ const TestResults = () => {
       }
       
       // If URL doesn't have type or the specific type failed, try both
-      console.log('No type specified or fetch failed, trying both endpoints...');
       
       // Try DreamRole test first
       try {
         const dreamRoleResponse = await api.get(`/dream-role-tests/results/${assignmentId}`);
-        console.log('DreamRole test results found:', dreamRoleResponse.data);
         setResults(dreamRoleResponse.data);
         setTestType('dreamrole');
         setTerminationReason(dreamRoleResponse.data.assignment?.terminationReason || '');
         setLoading(false);
         return;
       } catch (dreamRoleError) {
-        console.log('Not a DreamRole test');
       }
       
       // Try manual test
       try {
         const manualResponse = await api.get(`/aptitude-tests/results/${assignmentId}`);
-        console.log('Manual test results found:', manualResponse.data);
         setResults(manualResponse.data);
         setTestType('manual');
         setTerminationReason(manualResponse.data.assignment?.terminationReason || '');
         setLoading(false);
         return;
       } catch (manualError) {
-        console.log('Not a manual test');
       }
       
       // If we get here, no results found
@@ -199,16 +189,6 @@ Passing Score: ${assignment?.passingScore || 60}%
   const percentage = assignment?.percentage || 0;
   const passed = assignment?.passed || false;
   const passingScore = assignment?.passingScore || 60;
-
-  console.log('Rendering results:', {
-    testType,
-    testName: assignment?.testName,
-    score,
-    totalQuestions,
-    percentage,
-    passed,
-    passingScore
-  });
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">

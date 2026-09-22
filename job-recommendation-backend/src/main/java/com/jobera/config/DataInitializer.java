@@ -8,6 +8,7 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
@@ -27,17 +28,21 @@ public class DataInitializer implements CommandLineRunner {
     private static final Logger logger = LoggerFactory.getLogger(DataInitializer.class);
     
     private static final String JOB_TYPE_FULL_TIME = "Full-time";
-    private static final String DEMO_EMAIL = "user@example.com";
-    private static final String DEMO_PASSWORD = "password123";
-    
+
     private final UserRepository userRepository;
     private final JobPostingRepository jobPostingRepository;
     private final QuestionBankRepository questionBankRepository;
     private final PasswordEncoder passwordEncoder;
+    private final String demoEmail;
+    private final String demoPassword;
 
     public DataInitializer(UserRepository userRepository, 
                           JobPostingRepository jobPostingRepository,
-                          QuestionBankRepository questionBankRepository) {
+                          QuestionBankRepository questionBankRepository,
+                          @Value("${app.demo-user.email:}") String demoEmail,
+                          @Value("${app.demo-user.password:}") String demoPassword) {
+        this.demoEmail = demoEmail;
+        this.demoPassword = demoPassword;
         this.userRepository = userRepository;
         this.jobPostingRepository = jobPostingRepository;
         this.questionBankRepository = questionBankRepository;
@@ -50,24 +55,21 @@ public class DataInitializer implements CommandLineRunner {
         createSampleUser();
         createSampleJobs();
         
-        // IMPORTANT: Delete ALL existing questions and add real ones
-        long existingCount = questionBankRepository.count();
-        if (existingCount > 0) {
-            logger.info("Deleting all {} existing questions from database...", existingCount);
-            questionBankRepository.deleteAll();
-            // Flush to ensure deletion is complete
-            questionBankRepository.flush();
-            logger.info("All existing questions deleted successfully.");
+        if (questionBankRepository.count() == 0) {
+            initializeQuestionBank();
+        } else {
+            logger.info("Question bank already populated; skipping seed.");
         }
-        
-        initializeQuestionBank();
     }
     
     private void createSampleUser() {
-        if (userRepository.findByEmail(DEMO_EMAIL).isEmpty()) {
+        if (demoEmail.isBlank() || demoPassword.isBlank()) {
+            return;
+        }
+        if (userRepository.findByEmail(demoEmail).isEmpty()) {
             User user = new User();
-            user.setEmail(DEMO_EMAIL);
-            user.setPassword(passwordEncoder.encode(DEMO_PASSWORD));
+            user.setEmail(demoEmail);
+            user.setPassword(passwordEncoder.encode(demoPassword));
             user.setFullName("Demo User");
             user.setPhone("1234567890");
             user.setIsActive(true);
@@ -794,7 +796,7 @@ public class DataInitializer implements CommandLineRunner {
             
         } catch (Exception e) {
             logger.error("❌ ERROR: Could not initialize question bank: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Unexpected error", e);
         }
     }
     

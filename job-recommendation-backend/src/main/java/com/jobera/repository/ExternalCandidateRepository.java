@@ -48,6 +48,7 @@ public interface ExternalCandidateRepository extends JpaRepository<ExternalCandi
     List<ExternalCandidate> findAllShortlistedCandidates();
     
     Optional<ExternalCandidate> findByUserId(Long userId);
+    List<ExternalCandidate> findAllByUserId(Long userId);
     
     @Query("SELECT c FROM ExternalCandidate c WHERE c.user.id = :userId AND c.hasTestAssigned = true")
     Optional<ExternalCandidate> findExternalCandidateWithTestByUserId(@Param("userId") Long userId);

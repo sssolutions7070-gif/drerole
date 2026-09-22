@@ -1,11 +1,12 @@
 package com.jobera.controller;
 
+import org.slf4j.LoggerFactory;
+import org.slf4j.Logger;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -19,8 +20,9 @@ import com.jobera.service.RecruiterService;
 
 @RestController
 @RequestMapping("/api/recruiters")
-@CrossOrigin(origins = "http://localhost:3000")
 public class RecruiterController {
+    private static final Logger log = LoggerFactory.getLogger(RecruiterController.class);
+
     
     private final RecruiterService recruiterService;
     
@@ -65,7 +67,7 @@ public class RecruiterController {
         } catch (RecruiterService.RecruiterException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
-            e.printStackTrace(); // Add logging for debugging
+            log.error("Unexpected error", e); // Add logging for debugging
             return ResponseEntity.badRequest().body(Map.of("error", "Registration failed: " + e.getMessage()));
         }
     }
@@ -82,7 +84,7 @@ public class RecruiterController {
                 return ResponseEntity.ok(Map.of("recruiter", null, "message", "No recruiter profile found"));
             }
         } catch (Exception e) {
-            e.printStackTrace(); // Add logging for debugging
+            log.error("Unexpected error", e); // Add logging for debugging
             return ResponseEntity.badRequest().body(Map.of("error", "Failed to fetch recruiter profile: " + e.getMessage()));
         }
     }
@@ -111,7 +113,7 @@ public class RecruiterController {
         } catch (RecruiterService.RecruiterException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
-            e.printStackTrace(); // Add logging for debugging
+            log.error("Unexpected error", e); // Add logging for debugging
             return ResponseEntity.badRequest().body(Map.of("error", "Profile update failed: " + e.getMessage()));
         }
     }

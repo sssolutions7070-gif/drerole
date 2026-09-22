@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Upload, FileText, CheckCircle, AlertCircle, Loader, TrendingUp, Target, XCircle } from 'lucide-react';
 import api from '../services/api';
+import { BACKEND_ORIGIN } from '../config';
 
 const ResumeUpload = () => {
   const [file, setFile] = useState(null);
@@ -52,7 +53,6 @@ const ResumeUpload = () => {
     formData.append('file', file);
 
     try {
-      console.log('Starting upload process...');
       const currentUser = JSON.parse(localStorage.getItem('user'));
       
       if (!currentUser || !currentUser.id) {
@@ -67,7 +67,6 @@ const ResumeUpload = () => {
         timeout: 60000,
       });
 
-      console.log('Backend upload response:', uploadResponse.data);
       
       if (uploadResponse.data) {
         setUploadStatus('success');
@@ -77,10 +76,8 @@ const ResumeUpload = () => {
         // Store extracted skills in localStorage
         if (analysisData.skills && analysisData.skills.length > 0) {
           localStorage.setItem('userSkills', JSON.stringify(analysisData.skills));
-          console.log('✅ Skills saved to localStorage:', analysisData.skills);
         } else {
           localStorage.removeItem('userSkills');
-          console.log('⚠️ No skills found, cleared localStorage');
         }
         
         // Store experience and education
@@ -108,11 +105,9 @@ const ResumeUpload = () => {
           }
         });
         window.dispatchEvent(skillsUpdateEvent);
-        console.log('✅ Dispatched userSkillsUpdated event with', analysisData.skills?.length || 0, 'skills');
         
         // Show appropriate message
         if (!hasJobRecs && !hasInternshipRecs) {
-          console.log('⚠️ No matching jobs or internships found for your skills');
         }
       } else {
         throw new Error('Invalid response from server');
@@ -123,7 +118,7 @@ const ResumeUpload = () => {
       let errorMessage = 'Upload failed. ';
       
       if (error.code === 'ECONNREFUSED') {
-        errorMessage = 'Cannot connect to backend server. Please make sure the backend is running on http://localhost:8080';
+        errorMessage = 'Cannot connect to backend server. Please make sure the backend is running on ' + BACKEND_ORIGIN;
       } else if (error.response) {
         errorMessage += `Server error: ${error.response.status} - ${error.response.data?.error || 'Unknown error'}`;
       } else if (error.request) {

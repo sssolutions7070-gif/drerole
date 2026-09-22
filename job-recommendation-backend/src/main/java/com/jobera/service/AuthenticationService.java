@@ -1,8 +1,13 @@
 package com.jobera.service;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.util.Base64;
+import java.util.HexFormat;
 import java.util.Optional;
-import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 
@@ -14,6 +19,9 @@ import com.jobera.util.PasswordEncoder;
 
 @Service
 public class AuthenticationService {
+    
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final long TOKEN_VALIDITY_DAYS = 7;
     
     private final UserRepository userRepository;
     private final AuthTokenRepository authTokenRepository;
@@ -62,6 +70,10 @@ public class AuthenticationService {
             throw new AuthenticationException("Invalid email or password");
         }
         
+        if (passwordEncoder.needsUpgrade(user.getPassword())) {
+            user.setPassword(passwordEncoder.encode(password));
+        }
+        
         // Update last login
         user.setLastLogin(LocalDateTime.now());
         userRepository.save(user);
@@ -70,17 +82,29 @@ public class AuthenticationService {
     }
     
     public String generateAuthToken(User user) {
-        String token = UUID.randomUUID().toString();
-        LocalDateTime expiryDate = LocalDateTime.now().plusDays(30); // 30 days expiry
+        byte[] bytes = new byte[32];
+        SECURE_RANDOM.nextBytes(bytes);
+        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        LocalDateTime expiryDate = LocalDateTime.now().plusDays(TOKEN_VALIDITY_DAYS);
         
-        AuthToken authToken = new AuthToken(user, token, expiryDate);
+        AuthToken authToken = new AuthToken(user, hashToken(token), expiryDate);
         authTokenRepository.save(authToken);
         
         return token;
     }
     
+    /** Tokens are stored as SHA-256 hex digests so a database leak does not expose usable sessions. */
+    static String hashToken(String token) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is not available", e);
+        }
+    }
+    
     public Optional<User> validateToken(String token) {
-        Optional<AuthToken> authTokenOptional = authTokenRepository.findByToken(token);
+        Optional<AuthToken> authTokenOptional = authTokenRepository.findByToken(hashToken(token));
         
         if (authTokenOptional.isEmpty()) {
             return Optional.empty();
@@ -97,7 +121,7 @@ public class AuthenticationService {
     }
     
     public void logout(String token) {
-        authTokenRepository.deleteByToken(token);
+        authTokenRepository.deleteByToken(hashToken(token));
     }
     
     public void logoutAllUserSessions(Long userId) {

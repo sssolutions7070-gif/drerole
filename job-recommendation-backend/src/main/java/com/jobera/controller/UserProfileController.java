@@ -1,6 +1,8 @@
 // src/main/java/com/jobera/controller/UserProfileController.java
 package com.jobera.controller;
 
+import org.slf4j.LoggerFactory;
+import org.slf4j.Logger;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -37,8 +39,9 @@ import com.jobera.repository.UserSkillRepository;
 
 @RestController
 @RequestMapping("/api/users")
-@CrossOrigin(origins = "http://localhost:3000")
 public class UserProfileController {
+    private static final Logger log = LoggerFactory.getLogger(UserProfileController.class);
+
     
     private static final String FIELD_FULL_NAME = "fullName";
     private static final String FIELD_PHONE = "phone";
@@ -120,8 +123,8 @@ public class UserProfileController {
     @GetMapping("/{userId}/complete-profile")
     public ResponseEntity<Map<String, Object>> getCompleteUserProfile(@PathVariable Long userId) {
         try {
-            System.out.println("=== GET COMPLETE USER PROFILE ===");
-            System.out.println("User ID: " + userId);
+            log.debug("=== GET COMPLETE USER PROFILE ===");
+            log.debug("User ID: " + userId);
             
             Optional<User> userOpt = userRepository.findById(userId);
             if (userOpt.isEmpty()) {
@@ -181,17 +184,17 @@ public class UserProfileController {
                 completeProfile.put("ageEligible", false);
             }
             
-            System.out.println("✅ Complete profile fetched for user: " + user.getFullName());
-            System.out.println("   Age: " + completeProfile.get("age"));
-            System.out.println("   Education: " + completeProfile.get("educationLevel"));
-            System.out.println("   Experience: " + completeProfile.get("experienceYears") + " years");
-            System.out.println("   Skills: " + skillNames.size());
+            log.debug("✅ Complete profile fetched for user: " + user.getFullName());
+            log.debug("   Age: " + completeProfile.get("age"));
+            log.debug("   Education: " + completeProfile.get("educationLevel"));
+            log.debug("   Experience: " + completeProfile.get("experienceYears") + " years");
+            log.debug("   Skills: " + skillNames.size());
             
             return ResponseEntity.ok(completeProfile);
             
         } catch (Exception e) {
-            System.err.println("❌ Error fetching complete profile: " + e.getMessage());
-            e.printStackTrace();
+            log.error("❌ Error fetching complete profile: " + e.getMessage());
+            log.error("Unexpected error", e);
             return ResponseEntity.badRequest().body(Map.of("error", "Failed to fetch profile: " + e.getMessage()));
         }
     }
@@ -313,7 +316,7 @@ public class UserProfileController {
             
             if (!Files.exists(uploadPath)) {
                 Files.createDirectories(uploadPath);
-                System.out.println("Created upload directory: " + uploadPath);
+                log.debug("Created upload directory: " + uploadPath);
             }
             
             // Generate unique filename
@@ -327,7 +330,7 @@ public class UserProfileController {
             
             // Save file
             Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
-            System.out.println("File saved to: " + filePath);
+            log.debug("File saved to: " + filePath);
             
             // Store relative path (for web access)
             String fileUrl = "/uploads/profiles/" + fileName;
@@ -337,7 +340,7 @@ public class UserProfileController {
             user.setProfilePicture(fileUrl);
             userRepository.save(user);
             
-            System.out.println("Profile picture updated for user " + userId + ": " + fileUrl);
+            log.debug("Profile picture updated for user " + userId + ": " + fileUrl);
             
             Map<String, String> response = new HashMap<>();
             response.put(MESSAGE_KEY, "Profile picture uploaded successfully");
@@ -346,33 +349,9 @@ public class UserProfileController {
             return ResponseEntity.ok(response);
             
         } catch (IOException e) {
-            System.err.println("Error uploading profile picture: " + e.getMessage());
-            e.printStackTrace();
+            log.error("Error uploading profile picture: " + e.getMessage());
+            log.error("Unexpected error", e);
             return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "Failed to upload image: " + e.getMessage()));
-        }
-    }
-    
-    @GetMapping("/check-uploads")
-    public ResponseEntity<Map<String, Object>> checkUploads() {
-        try {
-            Map<String, Object> result = new HashMap<>();
-            
-            Path uploadPath = Paths.get("uploads/profiles/").toAbsolutePath().normalize();
-            result.put("uploadPath", uploadPath.toString());
-            result.put("uploadPathExists", Files.exists(uploadPath));
-            
-            if (Files.exists(uploadPath)) {
-                List<String> files = Files.list(uploadPath)
-                        .map(path -> path.getFileName().toString())
-                        .collect(Collectors.toList());
-                result.put("files", files);
-                result.put("fileCount", files.size());
-            }
-            
-            return ResponseEntity.ok(result);
-            
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, e.getMessage()));
         }
     }
     
@@ -573,7 +552,7 @@ public class UserProfileController {
                 return result;
             }
         } catch (Exception e) {
-            System.err.println("Error parsing skills JSON: " + e.getMessage());
+            log.error("Error parsing skills JSON: " + e.getMessage());
             return new ArrayList<>();
         }
     }

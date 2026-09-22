@@ -55,6 +55,29 @@ const Dashboard = () => {
           const testResponse = await api.get(`/aptitude-tests/application/${app.id}`);
           if (testResponse.data.hasTest) {
             const testData = testResponse.data.assignment;
+            
+            // Extract job title from application
+            let jobTitle = '';
+            let companyName = '';
+            
+            if (app.jobPosting) {
+              jobTitle = app.jobPosting.title;
+              companyName = app.jobPosting.company;
+            } else if (app.coverLetter && app.coverLetter.includes('External Job:')) {
+              const match = app.coverLetter.replace(/.*External Job:\s*([^\n]+).*/, '$1');
+              if (match !== app.coverLetter) {
+                const parts = match.split(' at ');
+                jobTitle = parts.length >= 2 ? parts[0].trim() : match;
+                companyName = parts.length >= 2 ? parts[1].trim() : '';
+              } else {
+                jobTitle = 'External Job Opportunity';
+                companyName = 'External Recruiter';
+              }
+            } else if (app.job && app.job.title) {
+              jobTitle = app.job.title;
+              companyName = app.job.company;
+            }
+            
             testsWithDetails.push({
               id: testData.id,
               testId: testData.testId,
@@ -69,12 +92,13 @@ const Dashboard = () => {
               totalQuestions: testData.totalQuestions,
               passed: testData.passed,
               percentage: testData.percentage,
-              jobTitle: app.job?.title,
-              company: app.job?.company,
+              jobTitle: jobTitle,
+              company: companyName,
               applicationId: app.id,
               applicationStatus: app.status,
               testType: 'manual',
-              test: testData.test
+              test: testData.test,
+              application: app
             });
             
             if (testData.status === 'PENDING' || testData.status === 'IN_PROGRESS') {
@@ -87,7 +111,6 @@ const Dashboard = () => {
             }
           }
         } catch (error) {
-          console.log(`No manual test for application ${app.id}`);
         }
         
         // Check for DreamRole tests
@@ -95,6 +118,29 @@ const Dashboard = () => {
           const dreamRoleResponse = await api.get(`/dream-role-tests/application/${app.id}`);
           if (dreamRoleResponse.data.hasTest) {
             const testData = dreamRoleResponse.data.assignment;
+            
+            // Extract job title from application
+            let jobTitle = '';
+            let companyName = '';
+            
+            if (app.jobPosting) {
+              jobTitle = app.jobPosting.title;
+              companyName = app.jobPosting.company;
+            } else if (app.coverLetter && app.coverLetter.includes('External Job:')) {
+              const match = app.coverLetter.replace(/.*External Job:\s*([^\n]+).*/, '$1');
+              if (match !== app.coverLetter) {
+                const parts = match.split(' at ');
+                jobTitle = parts.length >= 2 ? parts[0].trim() : match;
+                companyName = parts.length >= 2 ? parts[1].trim() : '';
+              } else {
+                jobTitle = 'External Job Opportunity';
+                companyName = 'External Recruiter';
+              }
+            } else if (app.job && app.job.title) {
+              jobTitle = app.job.title;
+              companyName = app.job.company;
+            }
+            
             testsWithDetails.push({
               id: testData.id,
               testId: testData.testId,
@@ -109,12 +155,13 @@ const Dashboard = () => {
               totalQuestions: testData.totalQuestions,
               passed: testData.passed,
               percentage: testData.percentage,
-              jobTitle: app.job?.title,
-              company: app.job?.company,
+              jobTitle: jobTitle,
+              company: companyName,
               applicationId: app.id,
               applicationStatus: app.status,
               testType: 'dreamrole',
-              test: testData.test
+              test: testData.test,
+              application: app
             });
             
             if (testData.status === 'PENDING' || testData.status === 'IN_PROGRESS') {
@@ -127,7 +174,6 @@ const Dashboard = () => {
             }
           }
         } catch (error) {
-          console.log(`No DreamRole test for application ${app.id}`);
         }
       }
       
@@ -358,9 +404,9 @@ const Dashboard = () => {
                 <h3 className="text-xl font-semibold">Profile</h3>
               </div>
               <p className="text-gray-600 mb-4">Complete your profile for better job matches</p>
-              <button className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition-colors">
+              <Link to="/profile" className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition-colors inline-block">
                 Update Profile
-              </button>
+              </Link>
             </div>
 
             <div className="bg-white p-6 rounded-lg shadow-lg border border-gray-200 hover:shadow-xl transition-shadow">
@@ -401,8 +447,8 @@ const Dashboard = () => {
                     <div key={`interview-${app.id}-${index}`} className="border-l-4 border-purple-500 bg-purple-50 p-4 rounded-r-lg">
                       <div className="flex justify-between items-start">
                         <div>
-                          <h3 className="font-semibold text-gray-800">{app.job?.title}</h3>
-                          <p className="text-sm text-gray-600">{app.job?.company}</p>
+                          <h3 className="font-semibold text-gray-800">{app.job?.title || app.jobTitle || 'Interview'}</h3>
+                          <p className="text-sm text-gray-600">{app.job?.company || app.companyName || ''}</p>
                           <div className="mt-2 space-y-1">
                             <div className="flex items-center text-sm text-gray-700">
                               <Calendar className="h-4 w-4 mr-2 text-purple-600" />
@@ -447,61 +493,90 @@ const Dashboard = () => {
               </div>
               
               <div className="space-y-4">
-                {assignedTests.slice(0, 3).map((test, index) => (
-                  <div key={`test-${test.id}-${index}`} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-2">
-                          <h3 className="font-semibold text-gray-800">{test.testName}</h3>
-                          {test.testType === 'dreamrole' && (
-                            <span className="px-2 py-0.5 bg-purple-100 text-purple-800 rounded-full text-xs">
-                              DreamRole
+                {assignedTests.slice(0, 3).map((test, index) => {
+                  // Get job title from test data
+                  let displayJobTitle = test.jobTitle || '';
+                  let displayCompanyName = test.company || '';
+                  
+                  // If still empty, try to get from application
+                  if (!displayJobTitle && test.application) {
+                    if (test.application.jobPosting) {
+                      displayJobTitle = test.application.jobPosting.title;
+                      displayCompanyName = test.application.jobPosting.company;
+                    } else if (test.application.coverLetter && test.application.coverLetter.includes('External Job:')) {
+                      const match = test.application.coverLetter.replace(/.*External Job:\s*([^\n]+).*/, '$1');
+                      if (match !== test.application.coverLetter) {
+                        const parts = match.split(' at ');
+                        displayJobTitle = parts.length >= 2 ? parts[0].trim() : match;
+                        displayCompanyName = parts.length >= 2 ? parts[1].trim() : '';
+                      } else {
+                        displayJobTitle = 'External Job Opportunity';
+                      }
+                    } else if (test.application.job && test.application.job.title) {
+                      displayJobTitle = test.application.job.title;
+                      displayCompanyName = test.application.job.company;
+                    }
+                  }
+                  
+                  return (
+                    <div key={`test-${test.id}-${index}`} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2">
+                            <h3 className="font-semibold text-gray-800">{test.testName}</h3>
+                            {test.testType === 'dreamrole' && (
+                              <span className="px-2 py-0.5 bg-purple-100 text-purple-800 rounded-full text-xs">
+                                DreamRole
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-600 mt-1">
+                            For: {displayJobTitle && displayJobTitle !== 'null' && displayJobTitle !== 'undefined' ? displayJobTitle : 'Job Opportunity'}
+                            {displayCompanyName && displayCompanyName !== 'null' && displayCompanyName !== 'undefined' ? ` at ${displayCompanyName}` : ''}
+                          </p>
+                          <div className="flex items-center space-x-4 mt-2 text-xs">
+                            <span className="flex items-center">
+                              <Clock className="h-3 w-3 mr-1 text-gray-400" />
+                              Deadline: {formatDate(test.deadline)}
                             </span>
+                            {getStatusBadge(test.status)}
+                          </div>
+                          {test.status === 'COMPLETED' && test.score !== null && (
+                            <div className="mt-2">
+                              <span className={`text-sm font-medium ${test.passed ? 'text-green-600' : 'text-red-600'}`}>
+                                Score: {test.score}/{test.totalQuestions} ({test.percentage}%) - {test.passed ? 'PASSED' : 'FAILED'}
+                              </span>
+                            </div>
                           )}
                         </div>
-                        <p className="text-sm text-gray-600">For: {test.jobTitle} at {test.company}</p>
-                        <div className="flex items-center space-x-4 mt-2 text-xs">
-                          <span className="flex items-center">
-                            <Clock className="h-3 w-3 mr-1 text-gray-400" />
-                            Deadline: {formatDate(test.deadline)}
-                          </span>
-                          {getStatusBadge(test.status)}
-                        </div>
-                        {test.status === 'COMPLETED' && test.score !== null && (
-                          <div className="mt-2">
-                            <span className={`text-sm font-medium ${test.passed ? 'text-green-600' : 'text-red-600'}`}>
-                              Score: {test.score}/{test.totalQuestions} ({test.percentage}%) - {test.passed ? 'PASSED' : 'FAILED'}
-                            </span>
-                          </div>
+                        {test.status === 'PENDING' && (
+                          <Link
+                            to={`/test/${test.id}`}
+                            className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700"
+                          >
+                            Start Test
+                          </Link>
+                        )}
+                        {test.status === 'IN_PROGRESS' && (
+                          <Link
+                            to={`/test/${test.id}`}
+                            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700"
+                          >
+                            Resume Test
+                          </Link>
+                        )}
+                        {test.status === 'COMPLETED' && (
+                          <Link
+                            to={`/test-results/${test.id}?type=${test.testType}`}
+                            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                          >
+                            View Results
+                          </Link>
                         )}
                       </div>
-                      {test.status === 'PENDING' && (
-                        <Link
-                          to={`/test/${test.id}`}
-                          className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700"
-                        >
-                          Start Test
-                        </Link>
-                      )}
-                      {test.status === 'IN_PROGRESS' && (
-                        <Link
-                          to={`/test/${test.id}`}
-                          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700"
-                        >
-                          Resume Test
-                        </Link>
-                      )}
-                      {test.status === 'COMPLETED' && (
-                        <Link
-                          to={`/test-results/${test.id}?type=${test.testType}`}
-                          className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                        >
-                          View Results
-                        </Link>
-                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -524,8 +599,8 @@ const Dashboard = () => {
                   <div key={`app-${app.id}-${index}`} className="border border-gray-200 rounded-lg p-4">
                     <div className="flex justify-between items-start">
                       <div>
-                        <h3 className="font-semibold text-gray-800">{app.job?.title}</h3>
-                        <p className="text-sm text-gray-600">{app.job?.company}</p>
+                        <h3 className="font-semibold text-gray-800">{app.job?.title || app.jobTitle || 'Application'}</h3>
+                        <p className="text-sm text-gray-600">{app.job?.company || app.companyName || ''}</p>
                         <div className="flex items-center space-x-3 mt-2">
                           {getApplicationStatusBadge(app.status)}
                           <span className="text-xs text-gray-500">
@@ -561,98 +636,133 @@ const Dashboard = () => {
             </div>
           ) : (
             <div className="space-y-4">
-              {assignedTests.map((test, index) => (
-                <div key={`test-full-${test.id}-${index}`} className="border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-2">
-                        <h3 className="text-xl font-semibold text-gray-900">{test.testName}</h3>
-                        {test.testType === 'dreamrole' && (
-                          <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium">
-                            DreamRole
-                          </span>
-                        )}
-                        {getStatusBadge(test.status)}
-                      </div>
-                      
-                      <p className="text-gray-600 mb-2">
-                        For: {test.jobTitle} at {test.company}
-                      </p>
-                      
-                      <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
-                        <div>
-                          <p className="text-gray-500">Assigned:</p>
-                          <p className="font-medium">{formatDate(test.assignedAt)}</p>
+              {assignedTests.map((test, index) => {
+                // Get job title from test data
+                let displayJobTitle = test.jobTitle || '';
+                let displayCompanyName = test.company || '';
+                
+                // If still empty, try to get from application
+                if (!displayJobTitle && test.application) {
+                  if (test.application.jobPosting) {
+                    displayJobTitle = test.application.jobPosting.title;
+                    displayCompanyName = test.application.jobPosting.company;
+                  } else if (test.application.coverLetter && test.application.coverLetter.includes('External Job:')) {
+                    const match = test.application.coverLetter.replace(/.*External Job:\s*([^\n]+).*/, '$1');
+                    if (match !== test.application.coverLetter) {
+                      const parts = match.split(' at ');
+                      displayJobTitle = parts.length >= 2 ? parts[0].trim() : match;
+                      displayCompanyName = parts.length >= 2 ? parts[1].trim() : '';
+                    } else {
+                      displayJobTitle = 'External Job Opportunity';
+                    }
+                  } else if (test.application.job && test.application.job.title) {
+                    displayJobTitle = test.application.job.title;
+                    displayCompanyName = test.application.job.company;
+                  }
+                }
+                
+                // Fallback to test data
+                if (!displayJobTitle && test.test && test.test.jobTitle) {
+                  displayJobTitle = test.test.jobTitle;
+                }
+                if (!displayCompanyName && test.test && test.test.companyName) {
+                  displayCompanyName = test.test.companyName;
+                }
+                
+                return (
+                  <div key={`test-full-${test.id}-${index}`} className="border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-3 mb-2 flex-wrap gap-2">
+                          <h3 className="text-xl font-semibold text-gray-900">{test.testName}</h3>
+                          {test.testType === 'dreamrole' && (
+                            <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs font-medium">
+                              DreamRole
+                            </span>
+                          )}
+                          {getStatusBadge(test.status)}
                         </div>
-                        <div>
-                          <p className="text-gray-500">Deadline:</p>
-                          <p className={`font-medium ${isDeadlineNear(test.deadline) ? 'text-red-600' : ''}`}>
-                            {formatDate(test.deadline)}
-                            {isDeadlineNear(test.deadline) && test.status === 'PENDING' && 
-                              ' (Less than 24 hours left!)'}
-                          </p>
-                        </div>
-                      </div>
-
-                      {test.status === 'COMPLETED' && test.score !== null && (
-                        <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-sm text-gray-600">Your Score</p>
-                              <p className="text-2xl font-bold text-blue-600">
-                                {test.score}/{test.totalQuestions}
-                              </p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-sm text-gray-600">Percentage</p>
-                              <p className={`text-2xl font-bold ${test.passed ? 'text-green-600' : 'text-red-600'}`}>
-                                {test.percentage}%
-                              </p>
-                            </div>
-                            <div>
-                              <span className={`px-3 py-1 rounded-full text-sm ${
-                                test.passed ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                              }`}>
-                                {test.passed ? 'PASSED' : 'FAILED'}
-                              </span>
-                            </div>
+                        
+                        {/* FIXED: Display job info for both internal and external jobs */}
+                        <p className="text-gray-600 mb-2">
+                          For: {displayJobTitle && displayJobTitle !== 'null' && displayJobTitle !== 'undefined' ? displayJobTitle : 'Job Opportunity'}
+                          {displayCompanyName && displayCompanyName !== 'null' && displayCompanyName !== 'undefined' ? ` at ${displayCompanyName}` : ''}
+                        </p>
+                        
+                        <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
+                          <div>
+                            <p className="text-gray-500">Assigned:</p>
+                            <p className="font-medium">{formatDate(test.assignedAt)}</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-500">Deadline:</p>
+                            <p className={`font-medium ${isDeadlineNear(test.deadline) ? 'text-red-600' : ''}`}>
+                              {formatDate(test.deadline)}
+                              {isDeadlineNear(test.deadline) && test.status === 'PENDING' && ' (Less than 24 hours left!)'}
+                            </p>
                           </div>
                         </div>
-                      )}
-                    </div>
-                    
-                    <div className="ml-6">
-                      {test.status === 'PENDING' && (
-                        <Link
-                          to={`/test/${test.id}`}
-                          className="bg-green-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-green-700 flex items-center"
-                        >
-                          <Clock className="h-5 w-5 mr-2" />
-                          Start Test
-                        </Link>
-                      )}
-                      {test.status === 'IN_PROGRESS' && (
-                        <Link
-                          to={`/test/${test.id}`}
-                          className="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 flex items-center"
-                        >
-                          <BookOpen className="h-5 w-5 mr-2" />
-                          Resume Test
-                        </Link>
-                      )}
-                      {test.status === 'COMPLETED' && (
-                        <Link
-                          to={`/test-results/${test.id}?type=${test.testType}`}
-                          className="bg-purple-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-purple-700 flex items-center"
-                        >
-                          <Award className="h-5 w-5 mr-2" />
-                          View Results
-                        </Link>
-                      )}
+
+                        {test.status === 'COMPLETED' && test.score !== null && (
+                          <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-sm text-gray-600">Your Score</p>
+                                <p className="text-2xl font-bold text-blue-600">
+                                  {test.score}/{test.totalQuestions}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-sm text-gray-600">Percentage</p>
+                                <p className={`text-2xl font-bold ${test.passed ? 'text-green-600' : 'text-red-600'}`}>
+                                  {test.percentage}%
+                                </p>
+                              </div>
+                              <div>
+                                <span className={`px-3 py-1 rounded-full text-sm ${
+                                  test.passed ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                }`}>
+                                  {test.passed ? 'PASSED' : 'FAILED'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="ml-6">
+                        {test.status === 'PENDING' && (
+                          <Link
+                            to={`/test/${test.id}`}
+                            className="bg-green-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-green-700 flex items-center"
+                          >
+                            <Clock className="h-5 w-5 mr-2" />
+                            Start Test
+                          </Link>
+                        )}
+                        {test.status === 'IN_PROGRESS' && (
+                          <Link
+                            to={`/test/${test.id}`}
+                            className="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 flex items-center"
+                          >
+                            <BookOpen className="h-5 w-5 mr-2" />
+                            Resume Test
+                          </Link>
+                        )}
+                        {test.status === 'COMPLETED' && (
+                          <Link
+                            to={`/test-results/${test.id}?type=${test.testType}`}
+                            className="bg-purple-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-purple-700 flex items-center"
+                          >
+                            <Award className="h-5 w-5 mr-2" />
+                            View Results
+                          </Link>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -685,13 +795,13 @@ const Dashboard = () => {
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
                         <div className="flex items-center justify-between mb-3">
-                          <h3 className="text-xl font-semibold text-gray-900">{app.job?.title}</h3>
+                          <h3 className="text-xl font-semibold text-gray-900">{app.job?.title || app.jobTitle || 'Interview'}</h3>
                           <span className="px-3 py-1 bg-purple-200 text-purple-800 rounded-full text-xs font-medium">
                             Scheduled
                           </span>
                         </div>
                         
-                        <p className="text-gray-700 mb-4">at {app.job?.company}</p>
+                        <p className="text-gray-700 mb-4">at {app.job?.company || app.companyName || ''}</p>
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="bg-white p-4 rounded-lg">
@@ -711,6 +821,15 @@ const Dashboard = () => {
                                   <p className="font-medium">{formatTimeOnly(app.interviewDate)}</p>
                                 </div>
                               </div>
+                              {app.interviewLocation && (
+                                <div className="flex items-start">
+                                  <MapPin className="h-4 w-4 text-gray-400 mr-2 mt-0.5" />
+                                  <div>
+                                    <p className="text-sm text-gray-500">Location</p>
+                                    <p className="font-medium">{app.interviewLocation}</p>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>

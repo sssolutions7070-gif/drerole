@@ -25,10 +25,8 @@ const UserApplications = () => {
         return;
       }
 
-      console.log('Fetching applications for user:', currentUser.id);
       
       const response = await api.get(`/applications/user/${currentUser.id}`);
-      console.log('Applications response:', response.data);
       
       if (response.data && response.data.applications) {
         setApplications(response.data.applications);
