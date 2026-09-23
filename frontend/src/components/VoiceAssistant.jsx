@@ -4,6 +4,7 @@ import { Mic, MicOff, X, Volume2, VolumeX, HelpCircle, Search, Briefcase, MapPin
 import api from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import JobApplicationModal from './JobApplicationModal';
+import { extractStarRating, resolveJobFromCommand } from '../utils/voiceCommandParsing';
 
 // Language configuration for 3 languages
 const LANGUAGES = {
@@ -89,6 +90,10 @@ const ALL_COMMANDS = {
       { text: '• "application status" - View applied jobs', action: 'my applications' },
       { text: '• "my jobs" - See your job applications', action: 'my applications' }
     ]},
+    { category: '🎯 Job Actions (after a search)', commands: [
+      { text: '• "apply to job 1" / "apply to the first job" - Apply to a listed job', action: 'apply_to_job' },
+      { text: '• "rate job 1 five stars" - Rate a listed job', action: 'rate_job' }
+    ]},
     { category: '🧭 Navigation', commands: [
       { text: '• "go to dashboard" - Open your dashboard', action: 'go to dashboard' },
       { text: '• "upload resume" - Go to resume upload page', action: 'upload resume' },
@@ -119,6 +124,10 @@ const ALL_COMMANDS = {
       { text: '• "आवेदन स्थिति" - अप्लाइड जॉब्स देखें', action: 'my applications' },
       { text: '• "मेरी नौकरियां" - आपके नौकरी आवेदन देखें', action: 'my applications' }
     ]},
+    { category: '🎯 नौकरी क्रियाएं (खोज के बाद)', commands: [
+      { text: '• "apply to job 1" - सूची से किसी नौकरी के लिए आवेदन करें', action: 'apply_to_job' },
+      { text: '• "rate job 1 five stars" - सूची से किसी नौकरी को रेट करें', action: 'rate_job' }
+    ]},
     { category: '🧭 नेविगेशन', commands: [
       { text: '• "डैशबोर्ड खोलें" - अपना डैशबोर्ड खोलें', action: 'go to dashboard' },
       { text: '• "रिज्यूमे अपलोड करें" - रिज्यूमे अपलोड पेज पर जाएं', action: 'upload resume' },
@@ -148,6 +157,10 @@ const ALL_COMMANDS = {
       { text: '• "माझे अर्ज" - तुमच्या अर्जांची स्थिती तपासा', action: 'my applications' },
       { text: '• "अर्ज स्थिती" - अप्लाइड नोकऱ्या पहा', action: 'my applications' },
       { text: '• "माझ्या नोकऱ्या" - तुमचे नोकरी अर्ज पहा', action: 'my applications' }
+    ]},
+    { category: '🎯 नोकरी क्रिया (शोधल्यानंतर)', commands: [
+      { text: '• "apply to job 1" - यादीतील नोकरीसाठी अर्ज करा', action: 'apply_to_job' },
+      { text: '• "rate job 1 five stars" - यादीतील नोकरीला रेट करा', action: 'rate_job' }
     ]},
     { category: '🧭 नेव्हिगेशन', commands: [
       { text: '• "डॅशबोर्ड उघडा" - तुमचा डॅशबोर्ड उघडा', action: 'go to dashboard' },
@@ -507,6 +520,38 @@ const VoiceAssistant = () => {
     setIsOpen(false); // Close assistant while form is open
   };
 
+  // Rate a job by voice: the rating is already a single spoken value, so this submits
+  // directly instead of opening the ratings form (which is for adding a written comment).
+  const rateJobByVoice = async (job, rating) => {
+    if (!currentUser) {
+      const msg = getResponse('login_required', currentLanguage);
+      addMessage('assistant', msg, currentLanguage);
+      speakResponse(msg, currentLanguage);
+      return;
+    }
+
+    try {
+      await api.post(`/jobs/${job.id}/rate/${currentUser.id}`, { rating, comment: '' });
+      const templates = {
+        'en-US': `Rated "${job.title}" ${rating} star${rating > 1 ? 's' : ''}. Thanks for the feedback!`,
+        'hi-IN': `"${job.title}" को ${rating} स्टार दिया गया। प्रतिक्रिया के लिए धन्यवाद!`,
+        'mr-IN': `"${job.title}" ला ${rating} स्टार दिले. अभिप्रायाबद्दल धन्यवाद!`,
+      };
+      const msg = templates[currentLanguage] || templates['en-US'];
+      addMessage('assistant', msg, currentLanguage);
+      speakResponse(msg, currentLanguage);
+    } catch (error) {
+      const templates = {
+        'en-US': "Sorry, I couldn't submit that rating.",
+        'hi-IN': 'माफ़ करें, रेटिंग सबमिट नहीं हो सकी।',
+        'mr-IN': 'माफ करा, रेटिंग सबमिट करता आली नाही.',
+      };
+      const msg = templates[currentLanguage] || templates['en-US'];
+      addMessage('assistant', msg, currentLanguage);
+      speakResponse(msg, currentLanguage);
+    }
+  };
+
   // Handle application success
   const handleApplicationSuccess = () => {
     const successMessages = {
@@ -751,6 +796,14 @@ const VoiceAssistant = () => {
         addMessage('assistant', 'Please say the job title you want to search for, like "find data scientist jobs"', currentLanguage);
         speakResponse('Please say the job title you want to search for', currentLanguage);
         break;
+      case 'apply_to_job':
+        addMessage('assistant', 'Search for jobs first, then say something like "apply to job 1".', currentLanguage);
+        speakResponse('Search for jobs first, then say apply to job 1', currentLanguage);
+        break;
+      case 'rate_job':
+        addMessage('assistant', 'Search for jobs first, then say something like "rate job 1 five stars".', currentLanguage);
+        speakResponse('Search for jobs first, then say rate job 1 five stars', currentLanguage);
+        break;
       case 'my applications':
         fetchApplications();
         break;
@@ -848,6 +901,53 @@ const VoiceAssistant = () => {
       speakResponse(msg[language] || msg['en-US'], language);
     }
     
+    // APPLY TO A JOB - e.g. "apply to job 2", "apply to the first job", "apply to data scientist"
+    else if (lowerCommand.includes('apply') || lowerCommand.includes('अप्लाई') || lowerCommand.includes('अप्लाय')) {
+      const candidateJobs = searchResults.length > 0 ? searchResults : allJobs;
+      const job = resolveJobFromCommand(lowerCommand, candidateJobs, extractJobTitle);
+      if (job) {
+        openApplicationForm(job);
+      } else {
+        const templates = {
+          'en-US': 'I could not tell which job you mean. Try "search for jobs" first, then say "apply to job 1".',
+          'hi-IN': 'मुझे समझ नहीं आया कौन सी नौकरी। पहले "search jobs" कहें, फिर "apply to job 1" कहें।',
+          'mr-IN': 'मला कोणती नोकरी हे कळले नाही. आधी "search jobs" म्हणा, मग "apply to job 1" म्हणा.',
+        };
+        const msg = templates[currentLanguage] || templates['en-US'];
+        addMessage('assistant', msg, currentLanguage);
+        speakResponse(msg, currentLanguage);
+      }
+    }
+
+    // RATE A JOB - e.g. "rate job 1 five stars", "rate the second job 4 stars"
+    else if (lowerCommand.includes('rate ') || lowerCommand.includes('रेटिंग') || lowerCommand.includes('स्टार')) {
+      const candidateJobs = searchResults.length > 0 ? searchResults : allJobs;
+      const job = resolveJobFromCommand(lowerCommand, candidateJobs, extractJobTitle);
+      const rating = extractStarRating(lowerCommand);
+
+      if (!job) {
+        const templates = {
+          'en-US': 'I could not tell which job you mean. Try "search for jobs" first, then say "rate job 1 five stars".',
+          'hi-IN': 'मुझे समझ नहीं आया कौन सी नौकरी। पहले नौकरियां खोजें, फिर "rate job 1 five stars" कहें।',
+          'mr-IN': 'मला कोणती नोकरी हे कळले नाही. आधी नोकऱ्या शोधा, मग "rate job 1 five stars" म्हणा.',
+        };
+        const msg = templates[currentLanguage] || templates['en-US'];
+        addMessage('assistant', msg, currentLanguage);
+        speakResponse(msg, currentLanguage);
+      } else if (!rating) {
+        const templates = {
+          'en-US': `How many stars out of 5 for "${job.title}"? Say something like "5 stars".`,
+          'hi-IN': `"${job.title}" के लिए 5 में से कितने स्टार? "5 स्टार" जैसा कुछ कहें।`,
+          'mr-IN': `"${job.title}" साठी 5 पैकी किती स्टार? "5 स्टार" असे काहीतरी म्हणा.`,
+        };
+        const msg = templates[currentLanguage] || templates['en-US'];
+        addMessage('assistant', msg, currentLanguage);
+        speakResponse(msg, currentLanguage);
+      } else {
+        rateJobByVoice(job, rating);
+      }
+    }
+
     // SEARCH JOBS BY TITLE - This handles specific job title searches
     else if (
       // Check for search patterns
