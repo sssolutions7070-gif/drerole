@@ -35,7 +35,9 @@ class RouteCoverageTest {
     /** Routes handled by the interceptor itself (public or shared-secret) instead of the access policy. */
     private static final Set<String> HANDLED_BY_INTERCEPTOR = Set.of(
         "/", "/api", "/api/health", "/api/auth/login", "/api/auth/register", "/api/auth/logout",
-        "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/login/2fa");
+        "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/login/2fa",
+        "/api/auth/oauth/google", "/api/auth/oauth/google/callback",
+        "/api/auth/oauth/linkedin", "/api/auth/oauth/linkedin/callback");
 
     private AccessPolicy policy() {
         return new AccessPolicy(mock(RecruiterRepository.class), mock(JobPostingRepository.class),

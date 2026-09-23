@@ -30,6 +30,7 @@ const CompanyProfile = lazy(() => import('./pages/CompanyProfile'));
 const ResumeUpload = lazy(() => import('./pages/ResumeUpload'));
 const RecruiterRegister = lazy(() => import('./pages/RecruiterRegister'));
 const RecruiterDashboard = lazy(() => import('./pages/RecruiterDashboard'));
+const OAuthCallback = lazy(() => import('./pages/OAuthCallback'));
 
 function App() {
   const [user, setUser] = useState(null);
@@ -104,6 +105,7 @@ function App() {
             <Route path="/reset-password" element={
               user ? <Navigate to="/dashboard" replace /> : <ResetPassword />
             } />
+            <Route path="/oauth-callback" element={<OAuthCallback onAuthChange={handleAuthChange} />} />
 
             {/* Proctoring Test Route - For debugging */}
             <Route path="/proctoring-test" element={<ProctoringTest />} />

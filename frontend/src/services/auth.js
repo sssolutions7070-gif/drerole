@@ -42,6 +42,22 @@ class AuthService {
     }
   }
 
+  // The OAuth callback page lands here with only a token (it came back from a full-page redirect,
+  // not a fetch, so there's no user object yet) - fetch it the same way checkAuth() would, then
+  // store both like every other login path does.
+  async completeOAuthLogin(token) {
+    try {
+      const response = await api.get('/auth/me', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+      return response.data.user;
+    } catch (error) {
+      throw error.response?.data || { error: 'Sign-in failed' };
+    }
+  }
+
   async forgotPassword(email) {
     try {
       const response = await api.post('/auth/forgot-password', { email });

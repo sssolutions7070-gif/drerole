@@ -77,6 +77,25 @@ describe('Login', () => {
     expect(onAuthChange).toHaveBeenCalledWith({ id: 42, role: 'ROLE_USER' });
   });
 
+  it('links to the backend Google and LinkedIn sign-in routes', () => {
+    renderPage();
+
+    expect(screen.getByRole('link', { name: /google/i })).toHaveAttribute(
+      'href', 'http://localhost:8081/api/auth/oauth/google');
+    expect(screen.getByRole('link', { name: /linkedin/i })).toHaveAttribute(
+      'href', 'http://localhost:8081/api/auth/oauth/linkedin');
+  });
+
+  it('shows an oauthError from the URL as the page error', () => {
+    render(
+      <MemoryRouter initialEntries={['/login?oauthError=Google%20sign-in%20is%20not%20configured%20on%20this%20server']}>
+        <Login onAuthChange={() => {}} />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText('Google sign-in is not configured on this server')).toBeInTheDocument();
+  });
+
   it('shows an error and stays on the 2FA step when the code is wrong', async () => {
     authService.login.mockResolvedValue({ requiresTwoFactor: true, userId: 42 });
     authService.loginWithTwoFactor.mockRejectedValue({ error: 'Incorrect code' });

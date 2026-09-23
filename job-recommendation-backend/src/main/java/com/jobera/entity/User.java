@@ -90,6 +90,14 @@ public class User {
     @Column(name = "referral_code", unique = true, length = 12)
     private String referralCode;
 
+    // Null for a normal password-based account. Set the first time someone signs in with that
+    // provider; providerId is the provider's own stable user id (not email, which can change).
+    @Column(name = "oauth_provider", length = 20)
+    private String oauthProvider;
+
+    @Column(name = "oauth_provider_id")
+    private String oauthProviderId;
+
     @Column(name = "role_id")
     private Long roleId = 1L;
 
@@ -200,6 +208,10 @@ public class User {
     public void setTwoFactorBackupCodes(String twoFactorBackupCodes) { this.twoFactorBackupCodes = twoFactorBackupCodes; }
     public String getReferralCode() { return referralCode; }
     public void setReferralCode(String referralCode) { this.referralCode = referralCode; }
+    public String getOauthProvider() { return oauthProvider; }
+    public void setOauthProvider(String oauthProvider) { this.oauthProvider = oauthProvider; }
+    public String getOauthProviderId() { return oauthProviderId; }
+    public void setOauthProviderId(String oauthProviderId) { this.oauthProviderId = oauthProviderId; }
     public Long getRoleId() { return roleId; }
     public void setRoleId(Long roleId) { this.roleId = roleId; }
     public List<Resume> getResumes() { return resumes; }
