@@ -15,12 +15,18 @@ public interface JobPostingRepository extends JpaRepository<JobPosting, Long> {
     List<JobPosting> findByIsActiveTrue();
     List<JobPosting> findByIsActiveTrueOrderByPostedDateDesc();
     List<JobPosting> findByRecruiterIdAndIsActiveTrue(Long recruiterId);
-    
-    @Query("SELECT jp FROM JobPosting jp WHERE jp.isActive = true AND " +
+
+    // Candidate/public-facing job lists only ever show approved postings - a pending or
+    // rejected job is only visible to the recruiter who owns it (via findByRecruiterId*).
+    List<JobPosting> findByIsActiveTrueAndModerationStatusOrderByPostedDateDesc(String moderationStatus);
+
+    @Query("SELECT jp FROM JobPosting jp WHERE jp.isActive = true AND jp.moderationStatus = 'APPROVED' AND " +
            "(LOWER(jp.title) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
            "LOWER(jp.company) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
            "LOWER(jp.description) LIKE LOWER(CONCAT('%', :keyword, '%')))")
     List<JobPosting> searchActiveJobs(@Param("keyword") String keyword);
-    
+
     List<JobPosting> findByLocationContainingAndIsActiveTrue(String location);
+
+    List<JobPosting> findByModerationStatusOrderByPostedDateDesc(String moderationStatus);
 }

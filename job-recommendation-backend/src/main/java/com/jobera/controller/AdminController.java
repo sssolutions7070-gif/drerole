@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -27,6 +28,8 @@ import com.jobera.repository.RecruiterRepository;
 import com.jobera.repository.ResumeRepository;
 import com.jobera.repository.UserRepository;
 import com.jobera.service.AdminAuditService;
+import com.jobera.service.JobPostingService;
+import com.jobera.service.NotificationService;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -47,19 +50,25 @@ public class AdminController {
     private final ApplicationRepository applicationRepository;
     private final ResumeRepository resumeRepository;
     private final AdminAuditService adminAuditService;
+    private final JobPostingService jobPostingService;
+    private final NotificationService notificationService;
 
     public AdminController(UserRepository userRepository,
                          RecruiterRepository recruiterRepository,
                          JobPostingRepository jobPostingRepository,
                          ApplicationRepository applicationRepository,
                          ResumeRepository resumeRepository,
-                         AdminAuditService adminAuditService) {
+                         AdminAuditService adminAuditService,
+                         JobPostingService jobPostingService,
+                         NotificationService notificationService) {
         this.userRepository = userRepository;
         this.recruiterRepository = recruiterRepository;
         this.jobPostingRepository = jobPostingRepository;
         this.applicationRepository = applicationRepository;
         this.resumeRepository = resumeRepository;
         this.adminAuditService = adminAuditService;
+        this.jobPostingService = jobPostingService;
+        this.notificationService = notificationService;
     }
 
     private User actingAdmin(HttpServletRequest request) {
@@ -166,7 +175,9 @@ public class AdminController {
                 details.put("salaryRange", job.getSalaryRange());
                 details.put("postedDate", job.getPostedDate());
                 details.put(IS_ACTIVE_KEY, job.getIsActive());
-                
+                details.put("moderationStatus", job.getModerationStatus());
+                details.put("rejectionReason", job.getRejectionReason());
+
                 long applicationCount = applicationRepository.findByJobPostingId(job.getId()).size();
                 details.put("applicationCount", applicationCount);
                 
@@ -301,6 +312,50 @@ public class AdminController {
             ));
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of(ERROR_KEY, "Failed to update job status: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/jobs/pending")
+    public ResponseEntity<List<JobPosting>> getPendingJobs() {
+        return ResponseEntity.ok(jobPostingService.getPendingJobPostings());
+    }
+
+    @PutMapping("/jobs/{jobId}/approve")
+    public ResponseEntity<Map<String, Object>> approveJob(@PathVariable Long jobId, HttpServletRequest request) {
+        try {
+            JobPosting job = jobPostingService.approveJobPosting(jobId);
+            adminAuditService.record(actingAdmin(request), "JOB_APPROVED", "JOB", jobId, job.getTitle());
+            notifyRecruiterOfModeration(job, true, null);
+            return ResponseEntity.ok(Map.of(MESSAGE_KEY, "Job approved", "moderationStatus", job.getModerationStatus()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "Failed to approve job: " + e.getMessage()));
+        }
+    }
+
+    @PutMapping("/jobs/{jobId}/reject")
+    public ResponseEntity<Map<String, Object>> rejectJob(@PathVariable Long jobId,
+                                                          @RequestBody Map<String, String> payload,
+                                                          HttpServletRequest request) {
+        try {
+            String reason = payload.get("reason");
+            JobPosting job = jobPostingService.rejectJobPosting(jobId, reason);
+            adminAuditService.record(actingAdmin(request), "JOB_REJECTED", "JOB", jobId, job.getTitle());
+            notifyRecruiterOfModeration(job, false, reason);
+            return ResponseEntity.ok(Map.of(MESSAGE_KEY, "Job rejected", "moderationStatus", job.getModerationStatus()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "Failed to reject job: " + e.getMessage()));
+        }
+    }
+
+    private void notifyRecruiterOfModeration(JobPosting job, boolean approved, String reason) {
+        if (job.getRecruiter() == null || job.getRecruiter().getUser() == null) {
+            return;
+        }
+        User recruiterUser = job.getRecruiter().getUser();
+        if (approved) {
+            notificationService.sendJobPostingApproved(recruiterUser.getEmail(), recruiterUser.getFullName(), job.getTitle());
+        } else {
+            notificationService.sendJobPostingRejected(recruiterUser.getEmail(), recruiterUser.getFullName(), job.getTitle(), reason);
         }
     }
 

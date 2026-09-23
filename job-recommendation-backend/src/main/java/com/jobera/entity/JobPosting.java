@@ -21,6 +21,10 @@ import jakarta.persistence.Table;
 @Entity
 @Table(name = "job_postings")
 public class JobPosting {
+    public static final String MODERATION_PENDING = "PENDING";
+    public static final String MODERATION_APPROVED = "APPROVED";
+    public static final String MODERATION_REJECTED = "REJECTED";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -49,7 +53,16 @@ public class JobPosting {
     private LocalDateTime postedDate;
     
     private Boolean isActive;
-    
+
+    // Java default (PENDING) applies to postings created from here on; the SQL-level default
+    // (APPROVED) only matters for the one-time ALTER TABLE backfill of rows that existed before
+    // this column did, so moderation doesn't retroactively hide anything already live.
+    @Column(name = "moderation_status", columnDefinition = "VARCHAR(20) DEFAULT 'APPROVED'")
+    private String moderationStatus = "PENDING";
+
+    @Column(name = "rejection_reason")
+    private String rejectionReason;
+
     // Fixed: Remove precision and scale for MySQL compatibility
     @Column(name = "average_rating")
     private Double averageRating = 0.0;
@@ -118,6 +131,11 @@ public class JobPosting {
     public LocalDateTime getPostedDate() { return postedDate; }
     public void setPostedDate(LocalDateTime postedDate) { this.postedDate = postedDate; }
     public Boolean getIsActive() { return isActive; }
+    public String getModerationStatus() { return moderationStatus; }
+    public void setModerationStatus(String moderationStatus) { this.moderationStatus = moderationStatus; }
+    public String getRejectionReason() { return rejectionReason; }
+    public void setRejectionReason(String rejectionReason) { this.rejectionReason = rejectionReason; }
+    public boolean isApproved() { return MODERATION_APPROVED.equals(moderationStatus); }
     public void setIsActive(Boolean isActive) { this.isActive = isActive; }
     public Double getAverageRating() { return averageRating; }
     public void setAverageRating(Double averageRating) { this.averageRating = averageRating; }

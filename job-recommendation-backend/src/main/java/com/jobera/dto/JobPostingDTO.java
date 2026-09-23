@@ -17,6 +17,8 @@ public class JobPostingDTO {
     private Boolean isActive;
     private Double averageRating;
     private Integer totalRatings;
+    private String moderationStatus;
+    private String rejectionReason;
 
     // Constructor from Entity
     public JobPostingDTO(com.jobera.entity.JobPosting job) {
@@ -34,6 +36,8 @@ public class JobPostingDTO {
         this.isActive = job.getIsActive();
         this.averageRating = job.getAverageRating();
         this.totalRatings = job.getTotalRatings();
+        this.moderationStatus = job.getModerationStatus();
+        this.rejectionReason = job.getRejectionReason();
     }
 
     // Getters and setters
@@ -65,4 +69,8 @@ public class JobPostingDTO {
     public void setAverageRating(Double averageRating) { this.averageRating = averageRating; }
     public Integer getTotalRatings() { return totalRatings; }
     public void setTotalRatings(Integer totalRatings) { this.totalRatings = totalRatings; }
+    public String getModerationStatus() { return moderationStatus; }
+    public void setModerationStatus(String moderationStatus) { this.moderationStatus = moderationStatus; }
+    public String getRejectionReason() { return rejectionReason; }
+    public void setRejectionReason(String rejectionReason) { this.rejectionReason = rejectionReason; }
 }

@@ -47,4 +47,36 @@ class NotificationServiceTest {
         verify(emailService).send(eq("a@b.com"), org.mockito.ArgumentMatchers.anyString(), body.capture());
         assertTrue(body.getValue().contains("Hi there"));
     }
+
+    @Test
+    void jobPostingApprovedEmailNamesTheJob() {
+        NotificationService service = new NotificationService(emailService);
+
+        service.sendJobPostingApproved("recruiter@b.com", "Sam", "Backend Developer");
+
+        verify(emailService).send(eq("recruiter@b.com"), contains("Backend Developer"),
+            contains("approved"));
+    }
+
+    @Test
+    void jobPostingRejectedEmailIncludesTheReasonWhenGiven() {
+        NotificationService service = new NotificationService(emailService);
+        ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
+
+        service.sendJobPostingRejected("recruiter@b.com", "Sam", "Backend Developer", "Missing a real description");
+
+        verify(emailService).send(eq("recruiter@b.com"), contains("Backend Developer"), body.capture());
+        assertTrue(body.getValue().contains("Missing a real description"));
+    }
+
+    @Test
+    void jobPostingRejectedEmailOmitsTheReasonLineWhenNoneGiven() {
+        NotificationService service = new NotificationService(emailService);
+        ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
+
+        service.sendJobPostingRejected("recruiter@b.com", "Sam", "Backend Developer", null);
+
+        verify(emailService).send(eq("recruiter@b.com"), contains("Backend Developer"), body.capture());
+        assertTrue(!body.getValue().contains("Reason:"));
+    }
 }

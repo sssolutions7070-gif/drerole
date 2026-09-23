@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Building, Briefcase, FileText, Trash2, ToggleLeft, ToggleRight, BarChart3, ScrollText } from 'lucide-react';
+import { Users, Building, Briefcase, FileText, Trash2, ToggleLeft, ToggleRight, BarChart3, ScrollText, Clock, CheckCircle, XCircle } from 'lucide-react';
 import api from '../services/api';
 
 const AdminDashboard = () => {
@@ -8,18 +8,21 @@ const AdminDashboard = () => {
   const [users, setUsers] = useState([]);
   const [recruiters, setRecruiters] = useState([]);
   const [jobs, setJobs] = useState([]);
+  const [pendingJobs, setPendingJobs] = useState([]);
   const [applications, setApplications] = useState([]);
   const [auditLog, setAuditLog] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchDashboardStats();
+    fetchPendingJobs();
   }, []);
 
   useEffect(() => {
     if (activeTab === 'users') fetchUsers();
     if (activeTab === 'recruiters') fetchRecruiters();
     if (activeTab === 'jobs') fetchJobs();
+    if (activeTab === 'pending-jobs') fetchPendingJobs();
     if (activeTab === 'applications') fetchApplications();
     if (activeTab === 'audit-log') fetchAuditLog();
   }, [activeTab]);
@@ -138,6 +141,36 @@ const AdminDashboard = () => {
     }
   };
 
+  const fetchPendingJobs = async () => {
+    try {
+      const response = await api.get('/admin/jobs/pending');
+      setPendingJobs(response.data);
+    } catch (error) {
+      console.error('Error fetching pending jobs:', error);
+    }
+  };
+
+  const approveJob = async (jobId) => {
+    try {
+      await api.put(`/admin/jobs/${jobId}/approve`);
+      fetchPendingJobs();
+    } catch (error) {
+      alert('Failed to approve job: ' + (error.response?.data?.error || error.message));
+    }
+  };
+
+  const rejectJob = async (jobId) => {
+    const reason = window.prompt('Reason for rejecting this posting (shown to the recruiter):');
+    if (reason === null) return; // cancelled
+
+    try {
+      await api.put(`/admin/jobs/${jobId}/reject`, { reason });
+      fetchPendingJobs();
+    } catch (error) {
+      alert('Failed to reject job: ' + (error.response?.data?.error || error.message));
+    }
+  };
+
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto py-8 px-4">
@@ -168,6 +201,7 @@ const AdminDashboard = () => {
             { id: 'users', name: 'Users', icon: Users },
             { id: 'recruiters', name: 'Recruiters', icon: Building },
             { id: 'jobs', name: 'Jobs', icon: Briefcase },
+            { id: 'pending-jobs', name: `Pending Jobs${pendingJobs.length > 0 ? ` (${pendingJobs.length})` : ''}`, icon: Clock },
             { id: 'applications', name: 'Applications', icon: FileText },
             { id: 'audit-log', name: 'Audit Log', icon: ScrollText }
           ].map((tab) => {
@@ -426,6 +460,7 @@ const AdminDashboard = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Applications</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Moderation</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
@@ -450,6 +485,15 @@ const AdminDashboard = () => {
                         <span>{job.isActive ? 'Active' : 'Inactive'}</span>
                       </button>
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                        job.moderationStatus === 'APPROVED' ? 'bg-green-100 text-green-800' :
+                        job.moderationStatus === 'REJECTED' ? 'bg-red-100 text-red-800' :
+                        'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {job.moderationStatus || 'APPROVED'}
+                      </span>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                       <button
                         onClick={() => deleteJob(job.id)}
@@ -464,6 +508,52 @@ const AdminDashboard = () => {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* Pending Jobs Tab */}
+      {activeTab === 'pending-jobs' && (
+        <div className="bg-white rounded-lg shadow-lg border border-gray-200">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-800">Pending Job Postings ({pendingJobs.length})</h3>
+            <p className="text-sm text-gray-500 mt-1">New postings wait here until approved, so nothing unreviewed reaches public job listings.</p>
+          </div>
+          {pendingJobs.length === 0 ? (
+            <div className="text-center py-12 text-gray-500">
+              <Clock className="mx-auto h-12 w-12 text-gray-300 mb-3" />
+              Nothing waiting for review.
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-200">
+              {pendingJobs.map((job) => (
+                <div key={job.id} className="px-6 py-4 flex items-start justify-between">
+                  <div>
+                    <div className="text-sm font-medium text-gray-900">{job.title}</div>
+                    <div className="text-sm text-gray-500">
+                      {job.company} • {job.location || 'No location specified'} • {job.jobType}
+                    </div>
+                    <p className="text-sm text-gray-600 mt-2 max-w-xl line-clamp-2">{job.description}</p>
+                  </div>
+                  <div className="flex items-center space-x-3 flex-shrink-0 ml-4">
+                    <button
+                      onClick={() => approveJob(job.id)}
+                      className="inline-flex items-center px-3 py-2 border border-green-300 text-green-700 rounded-md text-sm font-medium hover:bg-green-50"
+                    >
+                      <CheckCircle className="h-4 w-4 mr-1" />
+                      Approve
+                    </button>
+                    <button
+                      onClick={() => rejectJob(job.id)}
+                      className="inline-flex items-center px-3 py-2 border border-red-300 text-red-700 rounded-md text-sm font-medium hover:bg-red-50"
+                    >
+                      <XCircle className="h-4 w-4 mr-1" />
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

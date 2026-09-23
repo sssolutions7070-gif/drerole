@@ -420,7 +420,28 @@ public class JobPostingService {
         jobPosting.setExperienceLevel(experienceLevel);
         jobPosting.setRecruiter(recruiter.get());
         jobPosting.setIsActive(true);
-        
+        jobPosting.setModerationStatus(JobPosting.MODERATION_PENDING);
+
+        return jobPostingRepository.save(jobPosting);
+    }
+
+    public List<JobPosting> getPendingJobPostings() {
+        return jobPostingRepository.findByModerationStatusOrderByPostedDateDesc(JobPosting.MODERATION_PENDING);
+    }
+
+    public JobPosting approveJobPosting(Long jobId) {
+        JobPosting jobPosting = jobPostingRepository.findById(jobId)
+            .orElseThrow(() -> new JobPostingException("Job posting not found with ID: " + jobId));
+        jobPosting.setModerationStatus(JobPosting.MODERATION_APPROVED);
+        jobPosting.setRejectionReason(null);
+        return jobPostingRepository.save(jobPosting);
+    }
+
+    public JobPosting rejectJobPosting(Long jobId, String reason) {
+        JobPosting jobPosting = jobPostingRepository.findById(jobId)
+            .orElseThrow(() -> new JobPostingException("Job posting not found with ID: " + jobId));
+        jobPosting.setModerationStatus(JobPosting.MODERATION_REJECTED);
+        jobPosting.setRejectionReason(reason);
         return jobPostingRepository.save(jobPosting);
     }
     
@@ -447,7 +468,15 @@ public class JobPostingService {
         jobPosting.setSalaryRange(salaryRange);
         jobPosting.setJobType(jobType);
         jobPosting.setExperienceLevel(experienceLevel);
-        
+
+        // A rejected posting goes back into the review queue once edited, so a recruiter can fix
+        // what was wrong and resubmit. An already-approved posting is left alone on edit - it
+        // shouldn't vanish from public listings just because the recruiter fixed a typo.
+        if (JobPosting.MODERATION_REJECTED.equals(jobPosting.getModerationStatus())) {
+            jobPosting.setModerationStatus(JobPosting.MODERATION_PENDING);
+            jobPosting.setRejectionReason(null);
+        }
+
         if (isActive != null) {
             jobPosting.setIsActive(isActive);
         }
@@ -530,7 +559,8 @@ public class JobPostingService {
     
     // Add this method to JobPostingService class
     public List<JobPosting> getActiveJobPostingsSortedByDate() {
-        return jobPostingRepository.findByIsActiveTrueOrderByPostedDateDesc();
+        return jobPostingRepository.findByIsActiveTrueAndModerationStatusOrderByPostedDateDesc(
+            JobPosting.MODERATION_APPROVED);
     }
     
     // Helper method to check if user is recruiter

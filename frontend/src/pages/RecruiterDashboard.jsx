@@ -416,9 +416,29 @@ const RecruiterDashboard = () => {
             <div key={job.id} className="bg-white rounded-lg shadow-lg border border-gray-200 p-6">
               <div className="flex justify-between items-start mb-4">
                 <div className="flex-1">
-                  <h3 className="text-xl font-semibold text-gray-800 mb-2">{job.title}</h3>
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <h3 className="text-xl font-semibold text-gray-800">{job.title}</h3>
+                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                      job.moderationStatus === 'APPROVED' || !job.moderationStatus ? 'bg-green-100 text-green-800' :
+                      job.moderationStatus === 'REJECTED' ? 'bg-red-100 text-red-800' :
+                      'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {job.moderationStatus === 'PENDING' ? 'Pending review' :
+                       job.moderationStatus === 'REJECTED' ? 'Not approved' : 'Live'}
+                    </span>
+                  </div>
+                  {job.moderationStatus === 'PENDING' && (
+                    <p className="text-sm text-yellow-700 bg-yellow-50 rounded px-3 py-1.5 mb-2 inline-block">
+                      Awaiting admin review - not visible to candidates yet.
+                    </p>
+                  )}
+                  {job.moderationStatus === 'REJECTED' && (
+                    <p className="text-sm text-red-700 bg-red-50 rounded px-3 py-1.5 mb-2">
+                      Not approved{job.rejectionReason ? `: ${job.rejectionReason}` : '.'} Edit and it will be re-reviewed.
+                    </p>
+                  )}
                   <p className="text-lg text-gray-600 mb-2">{job.company}</p>
-                  
+
                   <div className="flex flex-wrap gap-4 mb-3 text-sm text-gray-600">
                     <div className="flex items-center">
                       <MapPin className="h-4 w-4 mr-1" />

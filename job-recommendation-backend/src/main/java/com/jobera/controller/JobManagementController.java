@@ -172,7 +172,9 @@ public class JobManagementController {
         response.put("experienceLevel", job.getExperienceLevel());
         response.put("postedDate", job.getPostedDate());
         response.put("isActive", job.getIsActive());
-        
+        response.put("moderationStatus", job.getModerationStatus());
+        response.put("rejectionReason", job.getRejectionReason());
+
         if (job.getRecruiter() != null) {
             response.put("recruiterId", job.getRecruiter().getId());
             response.put("recruiterCompany", job.getRecruiter().getCompanyName());

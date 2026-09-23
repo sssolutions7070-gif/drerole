@@ -30,6 +30,8 @@ import com.jobera.repository.RecruiterRepository;
 import com.jobera.repository.ResumeRepository;
 import com.jobera.repository.UserRepository;
 import com.jobera.service.AdminAuditService;
+import com.jobera.service.JobPostingService;
+import com.jobera.service.NotificationService;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -42,6 +44,8 @@ class AdminControllerTest {
     @Mock ApplicationRepository applicationRepository;
     @Mock ResumeRepository resumeRepository;
     @Mock AdminAuditService adminAuditService;
+    @Mock JobPostingService jobPostingService;
+    @Mock NotificationService notificationService;
 
     AdminController controller;
     HttpServletRequest request;
@@ -50,7 +54,7 @@ class AdminControllerTest {
     @BeforeEach
     void setUp() {
         controller = new AdminController(userRepository, recruiterRepository, jobPostingRepository,
-            applicationRepository, resumeRepository, adminAuditService);
+            applicationRepository, resumeRepository, adminAuditService, jobPostingService, notificationService);
         admin = user(1L, "admin@example.com", 2L);
         request = mock(HttpServletRequest.class);
         lenient().when(request.getAttribute(AuthInterceptor.AUTHENTICATED_USER)).thenReturn(admin);

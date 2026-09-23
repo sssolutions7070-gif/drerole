@@ -56,6 +56,20 @@ public class NotificationService {
                 + "Log in to DreamRole for more details.");
     }
 
+    public void sendJobPostingApproved(String toEmail, String fullName, String jobTitle) {
+        emailService.send(toEmail, "Your job posting is now live: " + jobTitle,
+            "Hi " + safe(fullName) + ",\n\n"
+                + "\"" + jobTitle + "\" has been reviewed and approved. It's now visible to candidates on DreamRole.");
+    }
+
+    public void sendJobPostingRejected(String toEmail, String fullName, String jobTitle, String reason) {
+        emailService.send(toEmail, "Your job posting needs changes: " + jobTitle,
+            "Hi " + safe(fullName) + ",\n\n"
+                + "\"" + jobTitle + "\" was not approved and is not visible to candidates.\n"
+                + (reason != null && !reason.isBlank() ? "Reason: " + reason + "\n\n" : "\n")
+                + "Log in to DreamRole to update and resubmit it.");
+    }
+
     public void sendJobAlertDigest(String toEmail, String fullName, List<JobPosting> matchingJobs) {
         String jobList = matchingJobs.stream()
             .map(job -> "- " + job.getTitle() + " at " + job.getCompany()
