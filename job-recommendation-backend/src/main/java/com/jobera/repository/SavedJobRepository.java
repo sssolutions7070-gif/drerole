@@ -26,4 +26,7 @@ public interface SavedJobRepository extends JpaRepository<SavedJob, Long> {
 
     @Transactional
     void deleteByJobPostingId(@Param("jobPostingId") Long jobPostingId);
+
+    @Transactional
+    void deleteByUserId(@Param("userId") Long userId);
 }

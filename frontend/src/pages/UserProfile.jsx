@@ -1,14 +1,15 @@
 // src/pages/UserProfile.jsx
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  User, Mail, Phone, Briefcase, GraduationCap, 
-  Calendar, MapPin, Edit2, Save, X, Camera, 
-  Loader, CheckCircle, XCircle, Award, 
-  Linkedin, Github, Globe, 
-  Trash2, Code, Heart, Cake, Plus, ExternalLink
+import {
+  User, Mail, Phone, Briefcase, GraduationCap,
+  Calendar, MapPin, Edit2, Save, X, Camera,
+  Loader, CheckCircle, XCircle, Award,
+  Linkedin, Github, Globe,
+  Trash2, Code, Heart, Cake, Plus, ExternalLink, Download, ShieldAlert
 } from 'lucide-react';
-import api from '../services/api';
+import api, { accountAPI } from '../services/api';
 import { BACKEND_ORIGIN } from '../config';
+import DeleteAccountModal from '../components/DeleteAccountModal';
 
 const UserProfile = () => {
   const [profile, setProfile] = useState(null);
@@ -22,6 +23,8 @@ const UserProfile = () => {
   const [showExperienceForm, setShowExperienceForm] = useState(false);
   const [showSkillForm, setShowSkillForm] = useState(false);
   const [showCertificateForm, setShowCertificateForm] = useState(false);
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
+  const [exportingData, setExportingData] = useState(false);
   const [newSkill, setNewSkill] = useState('');
   const [newCertificate, setNewCertificate] = useState({
     name: '',
@@ -139,6 +142,27 @@ const UserProfile = () => {
       ...formData,
       [e.target.name]: e.target.value
     });
+  };
+
+  const handleDownloadMyData = async () => {
+    try {
+      setExportingData(true);
+      const response = await accountAPI.exportMyData(currentUser.id);
+      const blob = new Blob([JSON.stringify(response.data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `dreamrole-my-data-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error exporting data:', error);
+      setError('Failed to download your data. Please try again.');
+    } finally {
+      setExportingData(false);
+    }
   };
 
   const handleSaveProfile = async () => {
@@ -806,9 +830,44 @@ const UserProfile = () => {
                 </div>
               )}
             </div>
+
+            {/* Privacy & Data Section */}
+            <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-1 flex items-center">
+                <ShieldAlert className="h-5 w-5 text-gray-600 mr-2" />
+                Privacy & Data
+              </h3>
+              <p className="text-sm text-gray-500 mb-4">
+                Download everything DreamRole has on your account, or permanently delete it.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  onClick={handleDownloadMyData}
+                  disabled={exportingData}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  {exportingData ? 'Preparing download...' : 'Download My Data'}
+                </button>
+                <button
+                  onClick={() => setShowDeleteAccountModal(true)}
+                  className="inline-flex items-center px-4 py-2 border border-red-300 text-red-700 rounded-lg hover:bg-red-50"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete My Account
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
+
+      {showDeleteAccountModal && (
+        <DeleteAccountModal
+          userId={currentUser.id}
+          onClose={() => setShowDeleteAccountModal(false)}
+        />
+      )}
     </div>
   );
 };

@@ -16,6 +16,8 @@ import com.jobera.entity.Message;
 public interface MessageRepository extends JpaRepository<Message, Long> {
     List<Message> findByApplicationIdOrderBySentAtAsc(Long applicationId);
 
+    List<Message> findBySenderIdOrRecipientIdOrderBySentAtAsc(Long senderId, Long recipientId);
+
     long countByApplicationIdAndRecipientIdAndReadAtIsNull(Long applicationId, Long recipientId);
 
     long countByRecipientIdAndReadAtIsNull(Long recipientId);
@@ -27,4 +29,7 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
     int markThreadRead(@Param("applicationId") Long applicationId,
                         @Param("recipientId") Long recipientId,
                         @Param("now") LocalDateTime now);
+
+    @Transactional
+    void deleteBySenderIdOrRecipientId(@Param("senderId") Long senderId, @Param("recipientId") Long recipientId);
 }

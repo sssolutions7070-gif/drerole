@@ -5,15 +5,26 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.jobera.entity.DreamRoleTestAssignment;
 
 @Repository
 public interface DreamRoleTestAssignmentRepository extends JpaRepository<DreamRoleTestAssignment, Long> {
     List<DreamRoleTestAssignment> findByApplicationId(Long applicationId);
+
+    // Same dead face_verifications FK as TestAssignmentRepository - see its comment.
+    @Transactional
+    @Modifying
+    @Query(value = "DELETE FROM face_verifications WHERE dream_role_assignment_id = :assignmentId", nativeQuery = true)
+    void deleteFaceVerificationsByAssignmentId(@Param("assignmentId") Long assignmentId);
+
+    @Transactional
+    void deleteByApplicationId(Long applicationId);
     List<DreamRoleTestAssignment> findByDreamRoleTestId(Long dreamRoleTestId);
     Optional<DreamRoleTestAssignment> findByApplicationIdAndDreamRoleTestId(Long applicationId, Long dreamRoleTestId);
     

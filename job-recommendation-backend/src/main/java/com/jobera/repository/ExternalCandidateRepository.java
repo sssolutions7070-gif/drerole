@@ -59,4 +59,12 @@ public interface ExternalCandidateRepository extends JpaRepository<ExternalCandi
     @Transactional
     @Query("DELETE FROM ExternalCandidate c WHERE c.jobPosting.id = :jobPostingId")
     void deleteByJobPostingId(@Param("jobPostingId") Long jobPostingId);
+
+    // The user link is optional (a recruiter's own record of a bulk-uploaded candidate, only
+    // ever linked once that person registers). When that user deletes their account, the
+    // recruiter's record should survive - just disconnected - rather than being deleted itself.
+    @Modifying
+    @Transactional
+    @Query("UPDATE ExternalCandidate c SET c.user = NULL WHERE c.user.id = :userId")
+    void detachUser(@Param("userId") Long userId);
 }

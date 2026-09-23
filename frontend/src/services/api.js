@@ -63,6 +63,15 @@ export const jobRatingAPI = {
     api.delete(`/jobs/ratings/${ratingId}`),
 };
 
+// Self-service account data export / deletion
+export const accountAPI = {
+  exportMyData: (userId) =>
+    api.get(`/users/${userId}/data-export`),
+
+  deleteMyAccount: (userId, password) =>
+    api.delete(`/users/${userId}/account`, { data: { password } }),
+};
+
 // Saved Jobs API calls
 export const savedJobsAPI = {
   // List a user's saved jobs
