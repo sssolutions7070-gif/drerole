@@ -59,7 +59,6 @@ Write-Host "`n[7/7] Installing remaining packages..." -ForegroundColor Green
 python -m pip install Flask==2.3.3
 python -m pip install Flask-CORS==4.0.0
 python -m pip install requests==2.31.0
-python -m pip install Pillow==10.2.0
 Write-Host "✅ All packages installed" -ForegroundColor Green
 
 Write-Host "✅ Models downloaded" -ForegroundColor Green
