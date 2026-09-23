@@ -1,6 +1,6 @@
 // src/pages/Jobs.jsx
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Search, MapPin, DollarSign, Calendar, Star, TrendingUp, Clock, AlertCircle, Briefcase, Filter, X, Bookmark, BookmarkCheck } from 'lucide-react';
 import api, { savedJobsAPI } from '../services/api';
 import JobApplicationModal from '../components/JobApplicationModal';
@@ -34,6 +34,7 @@ const Jobs = () => {
   const [savedJobIds, setSavedJobIds] = useState(new Set());
   const [showSavedOnly, setShowSavedOnly] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const currentUser = JSON.parse(localStorage.getItem('user'));
 
@@ -42,6 +43,12 @@ const Jobs = () => {
     loadUserSkillsFromLocalStorage();
     fetchJobs();
     fetchSavedJobIds();
+
+    // Supports deep-linking from a company profile page, e.g. /jobs?search=Backend%20Engineer
+    const initialSearch = searchParams.get('search');
+    if (initialSearch) {
+      setSearchTerm(initialSearch);
+    }
 
     const handleSkillsUpdate = (event) => {
       if (event.detail && event.detail.skills) {
@@ -754,7 +761,17 @@ const Jobs = () => {
                         </span>
                       )}
                     </div>
-                    <p className="text-lg text-gray-600 mb-2">{job.company}</p>
+                    {job.recruiterId ? (
+                      <Link
+                        to={`/companies/${job.recruiterId}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-lg text-gray-600 mb-2 hover:text-blue-600 hover:underline inline-block"
+                      >
+                        {job.company}
+                      </Link>
+                    ) : (
+                      <p className="text-lg text-gray-600 mb-2">{job.company}</p>
+                    )}
                   </div>
                   {currentUser && (
                     <button

@@ -25,6 +25,8 @@ const Internships = lazy(() => import('./pages/Internships'));
 const Home = lazy(() => import('./pages/Home'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Jobs = lazy(() => import('./pages/Jobs'));
+const Companies = lazy(() => import('./pages/Companies'));
+const CompanyProfile = lazy(() => import('./pages/CompanyProfile'));
 const ResumeUpload = lazy(() => import('./pages/ResumeUpload'));
 const RecruiterRegister = lazy(() => import('./pages/RecruiterRegister'));
 const RecruiterDashboard = lazy(() => import('./pages/RecruiterDashboard'));
@@ -168,7 +170,11 @@ function App() {
             {/* Public: anyone can browse jobs without an account; applying/saving/rating
                 still require one, and those actions are gated inside the page itself. */}
             <Route path="/jobs" element={<Jobs />} />
-            
+
+            {/* Public: company profiles are just as browsable as job listings themselves. */}
+            <Route path="/companies" element={<Companies />} />
+            <Route path="/companies/:recruiterId" element={<CompanyProfile />} />
+
             <Route path="/upload" element={
               <ProtectedRoute user={user}>
                 <ResumeUpload />

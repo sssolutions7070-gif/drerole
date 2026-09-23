@@ -119,6 +119,11 @@ public class AccessPolicy {
         rule("GET", "/api/jobs/{jobId}/ratings", authenticated);
         rule("GET", "/api/jobs/{jobId}/rating/stats", authenticated);
         rule("DELETE", "/api/jobs/ratings/{ratingId}", this::ownsRating);
+
+        // Companies - public GETs, same as job browsing (see AuthInterceptor); this rule only
+        // matters if a token happens to be present, since the interceptor bypasses it otherwise.
+        rule("GET", "/api/companies", authenticated);
+        rule("GET", "/api/companies/{recruiterId}", authenticated);
         rule("GET", "/api/jobs/{jobId}", authenticated);
 
         // Internships

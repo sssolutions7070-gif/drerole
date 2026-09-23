@@ -27,6 +27,7 @@ const Navbar = ({ onAuthChange }) => {
     { path: '/', icon: Home, label: 'Home' },
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/jobs', icon: Briefcase, label: 'Jobs' },
+    { path: '/companies', icon: Building, label: 'Companies' },
     { path: '/internships', icon: GraduationCap, label: 'Internships' },
     { path: '/upload', icon: Upload, label: 'Upload Resume' },
   ];
@@ -43,6 +44,7 @@ const Navbar = ({ onAuthChange }) => {
     { path: '/recruiter/dashboard', icon: Building, label: 'Recruiter Dashboard' },
     { path: '/recruiter/interviews', icon: Calendar, label: 'Interview Management' },
     { path: '/jobs', icon: Briefcase, label: 'Jobs' },
+    { path: '/companies', icon: Building, label: 'Companies' },
     { path: '/internships', icon: GraduationCap, label: 'Internships' },
   ];
 
@@ -147,6 +149,14 @@ const Navbar = ({ onAuthChange }) => {
                       Jobs
                     </Link>
                     <Link
+                      to="/companies"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                      onClick={() => setShowProfileMenu(false)}
+                    >
+                      <Building className="h-4 w-4 mr-3 text-gray-500" />
+                      Companies
+                    </Link>
+                    <Link
                       to="/internships"
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
                       onClick={() => setShowProfileMenu(false)}
@@ -181,6 +191,18 @@ const Navbar = ({ onAuthChange }) => {
             </div>
           ) : (
             <div className="flex items-center space-x-4">
+              <Link
+                to="/jobs"
+                className="px-3 py-2 text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors"
+              >
+                Jobs
+              </Link>
+              <Link
+                to="/companies"
+                className="px-3 py-2 text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors"
+              >
+                Companies
+              </Link>
               <Link
                 to="/login"
                 className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors"

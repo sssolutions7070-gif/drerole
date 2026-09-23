@@ -19,6 +19,7 @@ public class JobPostingDTO {
     private Integer totalRatings;
     private String moderationStatus;
     private String rejectionReason;
+    private Long recruiterId;
 
     // Constructor from Entity
     public JobPostingDTO(com.jobera.entity.JobPosting job) {
@@ -38,6 +39,7 @@ public class JobPostingDTO {
         this.totalRatings = job.getTotalRatings();
         this.moderationStatus = job.getModerationStatus();
         this.rejectionReason = job.getRejectionReason();
+        this.recruiterId = job.getRecruiter() != null ? job.getRecruiter().getId() : null;
     }
 
     // Getters and setters
@@ -73,4 +75,6 @@ public class JobPostingDTO {
     public void setModerationStatus(String moderationStatus) { this.moderationStatus = moderationStatus; }
     public String getRejectionReason() { return rejectionReason; }
     public void setRejectionReason(String rejectionReason) { this.rejectionReason = rejectionReason; }
+    public Long getRecruiterId() { return recruiterId; }
+    public void setRecruiterId(Long recruiterId) { this.recruiterId = recruiterId; }
 }
