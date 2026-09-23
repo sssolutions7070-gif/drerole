@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Building, Briefcase, FileText, Trash2, ToggleLeft, ToggleRight, BarChart3 } from 'lucide-react';
+import { Users, Building, Briefcase, FileText, Trash2, ToggleLeft, ToggleRight, BarChart3, ScrollText } from 'lucide-react';
 import api from '../services/api';
 
 const AdminDashboard = () => {
@@ -9,6 +9,7 @@ const AdminDashboard = () => {
   const [recruiters, setRecruiters] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [applications, setApplications] = useState([]);
+  const [auditLog, setAuditLog] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -20,6 +21,7 @@ const AdminDashboard = () => {
     if (activeTab === 'recruiters') fetchRecruiters();
     if (activeTab === 'jobs') fetchJobs();
     if (activeTab === 'applications') fetchApplications();
+    if (activeTab === 'audit-log') fetchAuditLog();
   }, [activeTab]);
 
   const fetchDashboardStats = async () => {
@@ -67,6 +69,24 @@ const AdminDashboard = () => {
       setApplications(response.data);
     } catch (error) {
       console.error('Error fetching applications:', error);
+    }
+  };
+
+  const fetchAuditLog = async () => {
+    try {
+      const response = await api.get('/admin/audit-log');
+      setAuditLog(response.data);
+    } catch (error) {
+      console.error('Error fetching audit log:', error);
+    }
+  };
+
+  const toggleUserActive = async (userId) => {
+    try {
+      await api.put(`/admin/users/${userId}/toggle-active`);
+      fetchUsers();
+    } catch (error) {
+      alert('Failed to update user status: ' + (error.response?.data?.error || error.message));
     }
   };
 
@@ -148,7 +168,8 @@ const AdminDashboard = () => {
             { id: 'users', name: 'Users', icon: Users },
             { id: 'recruiters', name: 'Recruiters', icon: Building },
             { id: 'jobs', name: 'Jobs', icon: Briefcase },
-            { id: 'applications', name: 'Applications', icon: FileText }
+            { id: 'applications', name: 'Applications', icon: FileText },
+            { id: 'audit-log', name: 'Audit Log', icon: ScrollText }
           ].map((tab) => {
             const Icon = tab.icon;
             return (
@@ -234,6 +255,7 @@ const AdminDashboard = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
@@ -247,23 +269,91 @@ const AdminDashboard = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.phone || 'N/A'}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          user.roleId === 2 ? 'bg-red-100 text-red-800' : 
-                          user.roleId === 3 ? 'bg-green-100 text-green-800' : 
+                          user.roleId === 2 ? 'bg-red-100 text-red-800' :
+                          user.roleId === 3 ? 'bg-green-100 text-green-800' :
                           'bg-blue-100 text-blue-800'
                         }`}>
                           {user.role}
                         </span>
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          user.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {user.isActive ? 'Active' : 'Deactivated'}
+                        </span>
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         {user.roleId !== 2 && (
-                          <button
-                            onClick={() => deleteUser(user.id)}
-                            className="text-red-600 hover:text-red-900 flex items-center"
-                          >
-                            <Trash2 className="h-4 w-4 mr-1" />
-                            Delete
-                          </button>
+                          <div className="flex items-center space-x-4">
+                            <button
+                              onClick={() => toggleUserActive(user.id)}
+                              className="text-gray-600 hover:text-gray-900 flex items-center"
+                              title={user.isActive ? 'Deactivate account' : 'Reactivate account'}
+                            >
+                              {user.isActive ? (
+                                <ToggleRight className="h-4 w-4 mr-1 text-green-600" />
+                              ) : (
+                                <ToggleLeft className="h-4 w-4 mr-1" />
+                              )}
+                              {user.isActive ? 'Deactivate' : 'Reactivate'}
+                            </button>
+                            <button
+                              onClick={() => deleteUser(user.id)}
+                              className="text-red-600 hover:text-red-900 flex items-center"
+                            >
+                              <Trash2 className="h-4 w-4 mr-1" />
+                              Delete
+                            </button>
+                          </div>
                         )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Audit Log Tab */}
+      {activeTab === 'audit-log' && (
+        <div className="bg-white rounded-lg shadow-lg border border-gray-200">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-800">Admin Audit Log</h3>
+            <p className="text-sm text-gray-500 mt-1">The last 200 admin actions (deletes, activations/deactivations), most recent first.</p>
+          </div>
+          <div className="overflow-x-auto">
+            {auditLog.length === 0 ? (
+              <div className="text-center py-8">
+                <ScrollText className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                <p className="text-gray-500">No admin actions recorded yet.</p>
+              </div>
+            ) : (
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">When</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Admin</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Target</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {auditLog.map((entry) => (
+                    <tr key={entry.id}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {entry.createdAt ? new Date(entry.createdAt).toLocaleString() : 'N/A'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{entry.adminEmail}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          {entry.action}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {entry.targetType} #{entry.targetId} - {entry.targetDescription}
                       </td>
                     </tr>
                   ))}
