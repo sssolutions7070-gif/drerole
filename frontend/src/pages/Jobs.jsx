@@ -5,6 +5,7 @@ import api from '../services/api';
 import JobApplicationModal from '../components/JobApplicationModal';
 import JobRatingModal from '../components/JobRatingModal';
 import { isSkillMatch } from '../utils/skillMatching';
+import { parseSalary, getUniqueSalaryCurrencies } from '../utils/salaryParsing';
 
 const Jobs = () => {
   const [jobs, setJobs] = useState([]);
@@ -25,6 +26,9 @@ const Jobs = () => {
   const [debugInfo, setDebugInfo] = useState('');
   const [selectedLocation, setSelectedLocation] = useState('');
   const [selectedJobType, setSelectedJobType] = useState('');
+  const [selectedExperienceLevel, setSelectedExperienceLevel] = useState('');
+  const [selectedSalaryCurrency, setSelectedSalaryCurrency] = useState('');
+  const [minSalary, setMinSalary] = useState('');
   const [showFilters, setShowFilters] = useState(false);
 
   const currentUser = JSON.parse(localStorage.getItem('user'));
@@ -95,10 +99,31 @@ const Jobs = () => {
         job.jobType?.toLowerCase() === selectedJobType.toLowerCase()
       );
     }
-    
+
+    if (selectedExperienceLevel) {
+      filtered = filtered.filter(job =>
+        job.experienceLevel?.toLowerCase() === selectedExperienceLevel.toLowerCase()
+      );
+    }
+
+    if (minSalary) {
+      const min = parseFloat(minSalary);
+      if (!isNaN(min)) {
+        filtered = filtered.filter(job => {
+          const parsed = parseSalary(job.salaryRange);
+          // Salary is free text (recruiters type it); jobs we can't parse a number out of are
+          // excluded once a minimum is set, same as any other filter that can't be evaluated.
+          if (!parsed) return false;
+          if (selectedSalaryCurrency && parsed.currency !== selectedSalaryCurrency) return false;
+          return parsed.value >= min;
+        });
+      }
+    }
+
     filtered = sortJobs(filtered, sortBy);
     setFilteredJobs(filtered);
-  }, [searchTerm, jobs, recommendedJobs, showRecommended, sortBy, selectedLocation, selectedJobType]);
+  }, [searchTerm, jobs, recommendedJobs, showRecommended, sortBy, selectedLocation, selectedJobType,
+      selectedExperienceLevel, selectedSalaryCurrency, minSalary]);
 
   const parseSkillsFromJson = (skillsJson) => {
     try {
@@ -332,6 +357,9 @@ const Jobs = () => {
   const clearFilters = () => {
     setSelectedLocation('');
     setSelectedJobType('');
+    setSelectedExperienceLevel('');
+    setSelectedSalaryCurrency('');
+    setMinSalary('');
     setSearchTerm('');
   };
 
@@ -349,6 +377,14 @@ const Jobs = () => {
       if (job.jobType) types.add(job.jobType);
     });
     return Array.from(types);
+  };
+
+  const getUniqueExperienceLevels = () => {
+    const levels = new Set();
+    jobs.forEach(job => {
+      if (job.experienceLevel) levels.add(job.experienceLevel);
+    });
+    return Array.from(levels);
   };
 
   if (isLoading) {
@@ -478,7 +514,7 @@ const Jobs = () => {
             >
               <Filter className="h-4 w-4" />
               <span>Filters</span>
-              {(selectedLocation || selectedJobType) && (
+              {(selectedLocation || selectedJobType || selectedExperienceLevel || minSalary) && (
                 <span className="ml-1 w-2 h-2 bg-blue-600 rounded-full"></span>
               )}
             </button>
@@ -524,6 +560,44 @@ const Jobs = () => {
                   ))}
                 </select>
               </div>
+              <div className="flex-1 min-w-[150px]">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Experience Level</label>
+                <select
+                  value={selectedExperienceLevel}
+                  onChange={(e) => setSelectedExperienceLevel(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                >
+                  <option value="">All Levels</option>
+                  {getUniqueExperienceLevels().map(level => (
+                    <option key={level} value={level}>{level}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex-1 min-w-[110px]">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Min. Salary</label>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="e.g. 50000"
+                  value={minSalary}
+                  onChange={(e) => setMinSalary(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div className="flex-1 min-w-[130px]">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+                <select
+                  value={selectedSalaryCurrency}
+                  onChange={(e) => setSelectedSalaryCurrency(e.target.value)}
+                  disabled={!minSalary}
+                  className="w-full p-2 border border-gray-300 rounded-lg disabled:bg-gray-100 disabled:text-gray-400"
+                >
+                  <option value="">Any currency</option>
+                  {getUniqueSalaryCurrencies(jobs).map(currency => (
+                    <option key={currency} value={currency}>{currency}</option>
+                  ))}
+                </select>
+              </div>
               <button
                 onClick={clearFilters}
                 className="px-4 py-2 text-red-600 hover:text-red-800 flex items-center"
@@ -532,6 +606,13 @@ const Jobs = () => {
                 Clear Filters
               </button>
             </div>
+            {minSalary && !selectedSalaryCurrency && (
+              <p className="text-xs text-gray-500 mt-2">
+                Salary is entered as free text by recruiters and may be in different currencies.
+                Pick a currency above to compare like-for-like; postings with no parseable salary
+                figure are hidden while this filter is active.
+              </p>
+            )}
           </div>
         )}
       </div>
