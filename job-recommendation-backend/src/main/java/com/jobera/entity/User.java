@@ -75,6 +75,18 @@ public class User {
     @Column(name = "last_job_alert_sent_at")
     private LocalDateTime lastJobAlertSentAt;
 
+    @Column(name = "two_factor_enabled")
+    private Boolean twoFactorEnabled = false;
+
+    // AES-256-GCM encrypted TOTP seed (see AesGcmCipher) - never stored or logged in plain text.
+    @Column(name = "two_factor_secret_encrypted", columnDefinition = "TEXT")
+    private String twoFactorSecretEncrypted;
+
+    // JSON array of PBKDF2-hashed one-time backup codes (same PasswordEncoder used for
+    // passwords); a code is removed from the list the moment it's used.
+    @Column(name = "two_factor_backup_codes", columnDefinition = "TEXT")
+    private String twoFactorBackupCodes;
+
     @Column(name = "role_id")
     private Long roleId = 1L;
 
@@ -177,6 +189,12 @@ public class User {
     public void setJobAlertsEnabled(Boolean jobAlertsEnabled) { this.jobAlertsEnabled = jobAlertsEnabled; }
     public LocalDateTime getLastJobAlertSentAt() { return lastJobAlertSentAt; }
     public void setLastJobAlertSentAt(LocalDateTime lastJobAlertSentAt) { this.lastJobAlertSentAt = lastJobAlertSentAt; }
+    public Boolean getTwoFactorEnabled() { return twoFactorEnabled != null && twoFactorEnabled; }
+    public void setTwoFactorEnabled(Boolean twoFactorEnabled) { this.twoFactorEnabled = twoFactorEnabled; }
+    public String getTwoFactorSecretEncrypted() { return twoFactorSecretEncrypted; }
+    public void setTwoFactorSecretEncrypted(String twoFactorSecretEncrypted) { this.twoFactorSecretEncrypted = twoFactorSecretEncrypted; }
+    public String getTwoFactorBackupCodes() { return twoFactorBackupCodes; }
+    public void setTwoFactorBackupCodes(String twoFactorBackupCodes) { this.twoFactorBackupCodes = twoFactorBackupCodes; }
     public Long getRoleId() { return roleId; }
     public void setRoleId(Long roleId) { this.roleId = roleId; }
     public List<Resume> getResumes() { return resumes; }

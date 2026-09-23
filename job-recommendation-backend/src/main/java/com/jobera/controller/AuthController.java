@@ -15,9 +15,11 @@ import org.springframework.web.bind.annotation.RestController;
 import com.jobera.entity.User;
 import com.jobera.security.LoginAttemptService;
 import com.jobera.security.PasswordResetRateLimiter;
+import com.jobera.security.TwoFactorAttemptService;
 import com.jobera.service.AuthenticationService;
 import com.jobera.service.NotificationService;
 import com.jobera.service.PasswordResetService;
+import com.jobera.service.TwoFactorService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -40,6 +42,8 @@ public class AuthController {
     private final PasswordResetService passwordResetService;
     private final PasswordResetRateLimiter passwordResetRateLimiter;
     private final NotificationService notificationService;
+    private final TwoFactorService twoFactorService;
+    private final TwoFactorAttemptService twoFactorAttemptService;
     private final String frontendUrl;
 
     public AuthController(AuthenticationService authenticationService,
@@ -47,12 +51,16 @@ public class AuthController {
                           PasswordResetService passwordResetService,
                           PasswordResetRateLimiter passwordResetRateLimiter,
                           NotificationService notificationService,
+                          TwoFactorService twoFactorService,
+                          TwoFactorAttemptService twoFactorAttemptService,
                           @Value("${app.frontend-url:http://localhost:3000}") String frontendUrl) {
         this.authenticationService = authenticationService;
         this.loginAttemptService = loginAttemptService;
         this.passwordResetService = passwordResetService;
         this.passwordResetRateLimiter = passwordResetRateLimiter;
         this.notificationService = notificationService;
+        this.twoFactorService = twoFactorService;
+        this.twoFactorAttemptService = twoFactorAttemptService;
         this.frontendUrl = frontendUrl;
     }
     
@@ -97,9 +105,20 @@ public class AuthController {
 
         try {
             User user = authenticationService.loginUser(email, password);
-            String authToken = authenticationService.generateAuthToken(user);
+            // The password is correct at this point, so this counts as a successful attempt for
+            // rate-limiting purposes regardless of whether a second factor is still needed - 2FA
+            // protects a different step, and shouldn't cost the user their password-attempt budget.
             loginAttemptService.recordSuccess(email);
 
+            if (Boolean.TRUE.equals(user.getTwoFactorEnabled())) {
+                return ResponseEntity.ok(Map.of(
+                    "requiresTwoFactor", true,
+                    "userId", user.getId(),
+                    MESSAGE, "Enter your authenticator code to finish signing in"
+                ));
+            }
+
+            String authToken = authenticationService.generateAuthToken(user);
             Map<String, Object> response = new HashMap<>();
             response.put(MESSAGE, "Login successful");
             response.put(USER, createUserResponse(user));
@@ -112,6 +131,43 @@ public class AuthController {
             return ResponseEntity.badRequest()
                 .body(Map.of(ERROR, e.getMessage()));
         }
+    }
+
+    @PostMapping("/login/2fa")
+    public ResponseEntity<Map<String, Object>> loginTwoFactor(@RequestBody Map<String, Object> request) {
+        Long userId;
+        try {
+            userId = Long.valueOf(String.valueOf(request.get("userId")));
+        } catch (NumberFormatException e) {
+            return ResponseEntity.badRequest().body(Map.of(ERROR, "Invalid user"));
+        }
+        String code = String.valueOf(request.get("code"));
+
+        if (twoFactorAttemptService.isBlocked(userId)) {
+            long minutes = twoFactorAttemptService.retryAfterMinutes(userId);
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(minutes * 60))
+                .body(Map.of(ERROR, "Too many failed attempts. Try again in " + minutes + " minute(s)."));
+        }
+
+        Optional<User> userOptional = authenticationService.findById(userId);
+        if (userOptional.isEmpty() || !Boolean.TRUE.equals(userOptional.get().getTwoFactorEnabled())) {
+            return ResponseEntity.badRequest().body(Map.of(ERROR, "Invalid request"));
+        }
+        User user = userOptional.get();
+
+        if (!twoFactorService.verifyLoginCode(user, code)) {
+            twoFactorAttemptService.recordFailure(userId);
+            return ResponseEntity.badRequest().body(Map.of(ERROR, "Incorrect code"));
+        }
+        twoFactorAttemptService.recordSuccess(userId);
+
+        String authToken = authenticationService.generateAuthToken(user);
+        Map<String, Object> response = new HashMap<>();
+        response.put(MESSAGE, "Login successful");
+        response.put(USER, createUserResponse(user));
+        response.put(TOKEN, authToken);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/logout")

@@ -53,6 +53,7 @@ public class UserProfileController {
     private static final String FIELD_LINKEDIN = "linkedin";
     private static final String FIELD_GITHUB = "github";
     private static final String FIELD_JOB_ALERTS_ENABLED = "jobAlertsEnabled";
+    private static final String FIELD_TWO_FACTOR_ENABLED = "twoFactorEnabled";
     private static final String ERROR_KEY = "error";
     private static final String MESSAGE_KEY = "message";
     
@@ -108,6 +109,7 @@ public class UserProfileController {
             profile.put(FIELD_GITHUB, user.getGithub());
             profile.put("profilePicture", user.getProfilePicture());
             profile.put(FIELD_JOB_ALERTS_ENABLED, user.getJobAlertsEnabled());
+            profile.put(FIELD_TWO_FACTOR_ENABLED, user.getTwoFactorEnabled());
             profile.put("skills", skills);
             profile.put("education", education);
             profile.put("experience", experience);
@@ -158,6 +160,7 @@ public class UserProfileController {
             completeProfile.put(FIELD_GITHUB, user.getGithub());
             completeProfile.put("profilePicture", user.getProfilePicture());
             completeProfile.put(FIELD_JOB_ALERTS_ENABLED, user.getJobAlertsEnabled());
+            completeProfile.put(FIELD_TWO_FACTOR_ENABLED, user.getTwoFactorEnabled());
             completeProfile.put("skills", skillNames);
             
             if (latestResume.isPresent()) {

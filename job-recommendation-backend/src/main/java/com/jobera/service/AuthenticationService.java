@@ -119,6 +119,10 @@ public boolean isUserAdmin(Long userId) {
     Optional<User> user = userRepository.findById(userId);
     return user.isPresent() && user.get().getRoleId() == 2L; // ROLE_ADMIN
 }
+
+public Optional<User> findById(Long userId) {
+    return userRepository.findById(userId);
+}
     public static class AuthenticationException extends RuntimeException {
         public AuthenticationException(String message) {
             super(message);

@@ -5,11 +5,13 @@ import {
   Calendar, MapPin, Edit2, Save, X, Camera,
   Loader, CheckCircle, XCircle, Award,
   Linkedin, Github, Globe,
-  Trash2, Code, Heart, Cake, Plus, ExternalLink, Download, ShieldAlert
+  Trash2, Code, Heart, Cake, Plus, ExternalLink, Download, ShieldAlert, ShieldCheck, ShieldOff
 } from 'lucide-react';
 import api, { accountAPI } from '../services/api';
 import { BACKEND_ORIGIN } from '../config';
 import DeleteAccountModal from '../components/DeleteAccountModal';
+import TwoFactorSetupModal from '../components/TwoFactorSetupModal';
+import DisableTwoFactorModal from '../components/DisableTwoFactorModal';
 
 const UserProfile = () => {
   const [profile, setProfile] = useState(null);
@@ -24,6 +26,8 @@ const UserProfile = () => {
   const [showSkillForm, setShowSkillForm] = useState(false);
   const [showCertificateForm, setShowCertificateForm] = useState(false);
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
+  const [showTwoFactorSetupModal, setShowTwoFactorSetupModal] = useState(false);
+  const [showDisableTwoFactorModal, setShowDisableTwoFactorModal] = useState(false);
   const [exportingData, setExportingData] = useState(false);
   const [newSkill, setNewSkill] = useState('');
   const [newCertificate, setNewCertificate] = useState({
@@ -831,6 +835,36 @@ const UserProfile = () => {
               )}
             </div>
 
+            {/* Security Section */}
+            <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-1 flex items-center">
+                <ShieldCheck className="h-5 w-5 text-gray-600 mr-2" />
+                Two-Factor Authentication
+              </h3>
+              <p className="text-sm text-gray-500 mb-4">
+                {profile?.twoFactorEnabled
+                  ? 'Enabled. You need a code from your authenticator app to sign in.'
+                  : 'Add an extra layer of security: a code from an authenticator app, in addition to your password, when signing in.'}
+              </p>
+              {profile?.twoFactorEnabled ? (
+                <button
+                  onClick={() => setShowDisableTwoFactorModal(true)}
+                  className="inline-flex items-center px-4 py-2 border border-red-300 text-red-700 rounded-lg hover:bg-red-50"
+                >
+                  <ShieldOff className="h-4 w-4 mr-2" />
+                  Disable Two-Factor Auth
+                </button>
+              ) : (
+                <button
+                  onClick={() => setShowTwoFactorSetupModal(true)}
+                  className="inline-flex items-center px-4 py-2 border border-blue-300 text-blue-700 rounded-lg hover:bg-blue-50"
+                >
+                  <ShieldCheck className="h-4 w-4 mr-2" />
+                  Enable Two-Factor Auth
+                </button>
+              )}
+            </div>
+
             {/* Privacy & Data Section */}
             <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-6">
               <h3 className="text-lg font-semibold text-gray-800 mb-1 flex items-center">
@@ -866,6 +900,22 @@ const UserProfile = () => {
         <DeleteAccountModal
           userId={currentUser.id}
           onClose={() => setShowDeleteAccountModal(false)}
+        />
+      )}
+
+      {showTwoFactorSetupModal && (
+        <TwoFactorSetupModal
+          userId={currentUser.id}
+          onClose={() => setShowTwoFactorSetupModal(false)}
+          onEnabled={fetchUserProfile}
+        />
+      )}
+
+      {showDisableTwoFactorModal && (
+        <DisableTwoFactorModal
+          userId={currentUser.id}
+          onClose={() => setShowDisableTwoFactorModal(false)}
+          onDisabled={fetchUserProfile}
         />
       )}
     </div>

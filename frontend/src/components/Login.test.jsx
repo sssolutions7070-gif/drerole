@@ -36,4 +36,60 @@ describe('Login', () => {
 
     expect(await screen.findByText('Invalid email or password')).toBeInTheDocument();
   });
+
+  it('asks for a 2FA code instead of logging in immediately when the account requires one', async () => {
+    authService.login.mockResolvedValue({ requiresTwoFactor: true, userId: 42 });
+    const onAuthChange = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <Login onAuthChange={onAuthChange} />
+      </MemoryRouter>
+    );
+
+    await user.type(screen.getByLabelText(/email address/i), 'a@b.com');
+    await user.type(screen.getByLabelText(/^password$/i), 'correct-password');
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+    expect(await screen.findByText(/two-factor authentication/i)).toBeInTheDocument();
+    expect(onAuthChange).not.toHaveBeenCalled();
+  });
+
+  it('completes login once the 2FA code is verified', async () => {
+    authService.login.mockResolvedValue({ requiresTwoFactor: true, userId: 42 });
+    authService.loginWithTwoFactor.mockResolvedValue({ user: { id: 42, role: 'ROLE_USER' } });
+    const onAuthChange = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <Login onAuthChange={onAuthChange} />
+      </MemoryRouter>
+    );
+
+    await user.type(screen.getByLabelText(/email address/i), 'a@b.com');
+    await user.type(screen.getByLabelText(/^password$/i), 'correct-password');
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+    await user.type(await screen.findByLabelText(/authentication code/i), '123456');
+    await user.click(screen.getByRole('button', { name: /verify/i }));
+
+    expect(authService.loginWithTwoFactor).toHaveBeenCalledWith(42, '123456');
+    expect(onAuthChange).toHaveBeenCalledWith({ id: 42, role: 'ROLE_USER' });
+  });
+
+  it('shows an error and stays on the 2FA step when the code is wrong', async () => {
+    authService.login.mockResolvedValue({ requiresTwoFactor: true, userId: 42 });
+    authService.loginWithTwoFactor.mockRejectedValue({ error: 'Incorrect code' });
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.type(screen.getByLabelText(/email address/i), 'a@b.com');
+    await user.type(screen.getByLabelText(/^password$/i), 'correct-password');
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+    await user.type(await screen.findByLabelText(/authentication code/i), '000000');
+    await user.click(screen.getByRole('button', { name: /verify/i }));
+
+    expect(await screen.findByText('Incorrect code')).toBeInTheDocument();
+  });
 });

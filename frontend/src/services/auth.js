@@ -17,6 +17,8 @@ class AuthService {
   async login(credentials) {
     try {
       const response = await api.post('/auth/login', credentials);
+      // When the account has 2FA enabled, the response carries requiresTwoFactor + userId and no
+      // token yet - nothing to store until loginWithTwoFactor() completes the second step.
       if (response.data.token) {
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('user', JSON.stringify(response.data.user));
@@ -24,6 +26,19 @@ class AuthService {
       return response.data;
     } catch (error) {
       throw error.response?.data || { error: 'Login failed' };
+    }
+  }
+
+  async loginWithTwoFactor(userId, code) {
+    try {
+      const response = await api.post('/auth/login/2fa', { userId, code });
+      if (response.data.token) {
+        localStorage.setItem('token', response.data.token);
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+      }
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || { error: 'Verification failed' };
     }
   }
 
