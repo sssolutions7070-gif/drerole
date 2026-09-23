@@ -196,6 +196,7 @@ public class AccessPolicy {
         rule("GET", "/api/resumes/user/{userId}/latest", self("userId"));
         rule("GET", "/api/resumes/download/{applicationId}", c -> participatesInApplication(c, "applicationId"));
         rule("GET", "/api/resumes/{resumeId}/analysis", this::ownsResume);
+        rule("GET", "/api/resumes/{resumeId}/quality", this::ownsResume);
         rule("GET", "/api/resume-matching/job/{jobId}/applications/sorted", ownsJob("jobId"));
         rule("GET", "/api/resume-matching/application/{applicationId}/resume-analysis",
             c -> participatesInApplication(c, "applicationId"));

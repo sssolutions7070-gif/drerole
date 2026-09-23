@@ -335,6 +335,38 @@ const ResumeUpload = () => {
               </div>
             </div>
 
+            {/* Resume Quality Check */}
+            {analysis.qualityCheck && (
+              <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="font-semibold text-gray-800 text-lg">Resume Quality Check</h4>
+                  <div className={`text-2xl font-bold ${
+                    analysis.qualityCheck.score >= 80 ? 'text-green-600' :
+                    analysis.qualityCheck.score >= 50 ? 'text-yellow-600' : 'text-red-600'
+                  }`}>
+                    {analysis.qualityCheck.score}/100
+                  </div>
+                </div>
+                <ul className="space-y-2">
+                  {analysis.qualityCheck.checks.map((check) => (
+                    <li key={check.id} className="flex items-start text-sm">
+                      {check.passed ? (
+                        <CheckCircle className="h-4 w-4 text-green-600 mr-2 mt-0.5 flex-shrink-0" />
+                      ) : (
+                        <XCircle className="h-4 w-4 text-red-500 mr-2 mt-0.5 flex-shrink-0" />
+                      )}
+                      <span className={check.passed ? 'text-gray-600' : 'text-gray-800 font-medium'}>
+                        {check.message}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-xs text-gray-400 mt-4">
+                  This is an automated checklist, not a substitute for a human review - use it as a starting point.
+                </p>
+              </div>
+            )}
+
             {/* JOB RECOMMENDATIONS - FIXED: Only show if there are actual matches */}
             {analysis.job_recommendations && analysis.job_recommendations.length > 0 ? (
               <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">

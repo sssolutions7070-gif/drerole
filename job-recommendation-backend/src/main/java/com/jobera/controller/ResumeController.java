@@ -9,6 +9,7 @@ import com.jobera.entity.JobPosting;
 import com.jobera.entity.Resume;
 import com.jobera.repository.ApplicationRepository;
 import com.jobera.service.JobPostingService;
+import com.jobera.service.ResumeQualityService;
 import com.jobera.service.ResumeService;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
@@ -36,18 +37,21 @@ public class ResumeController {
     private final ResumeService resumeService;
     private final ApplicationRepository applicationRepository;
     private final JobPostingService jobPostingService;
+    private final ResumeQualityService resumeQualityService;
     private final ObjectMapper objectMapper;
-    
+
     private static final String ERROR_KEY = "error";
     private static final String UPLOADS_DIR = "uploads";
     private static final double MIN_MATCH_THRESHOLD = 50.0;
-    
-    public ResumeController(ResumeService resumeService, 
+
+    public ResumeController(ResumeService resumeService,
                            ApplicationRepository applicationRepository,
-                           JobPostingService jobPostingService) {
+                           JobPostingService jobPostingService,
+                           ResumeQualityService resumeQualityService) {
         this.resumeService = resumeService;
         this.applicationRepository = applicationRepository;
         this.jobPostingService = jobPostingService;
+        this.resumeQualityService = resumeQualityService;
         this.objectMapper = new ObjectMapper();
     }
     
@@ -85,6 +89,7 @@ public class ResumeController {
             response.put("skills", new ArrayList<>(extractedSkills));
             response.put("experienceYears", resume.getExperienceYears() != null ? resume.getExperienceYears() : 0);
             response.put("educationLevel", resume.getEducationLevel() != null ? resume.getEducationLevel() : "Not specified");
+            response.put("qualityCheck", resumeQualityService.analyze(resume));
             
             // Get job recommendations based on skills (filtered by threshold)
             List<Map<String, Object>> jobRecommendations = getJobRecommendations(extractedSkills);
@@ -434,6 +439,17 @@ public class ResumeController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(Map.of(ERROR_KEY, "Unexpected error: " + e.getMessage()));
         }
+    }
+
+    /** A checklist of concrete improvements (missing contact info, weak phrasing, etc.), distinct
+     *  from /analysis above which just re-extracts skills/experience/education. */
+    @GetMapping("/{resumeId}/quality")
+    public ResponseEntity<Map<String, Object>> getResumeQuality(@PathVariable Long resumeId) {
+        Optional<Resume> resume = resumeService.getResumeById(resumeId);
+        if (resume.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(resumeQualityService.analyze(resume.get()));
     }
     
     @GetMapping("/user/{userId}/latest")
