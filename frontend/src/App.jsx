@@ -31,6 +31,7 @@ const ResumeUpload = lazy(() => import('./pages/ResumeUpload'));
 const RecruiterRegister = lazy(() => import('./pages/RecruiterRegister'));
 const RecruiterDashboard = lazy(() => import('./pages/RecruiterDashboard'));
 const OAuthCallback = lazy(() => import('./pages/OAuthCallback'));
+const VideoInterviewRoom = lazy(() => import('./pages/VideoInterviewRoom'));
 
 function App() {
   const [user, setUser] = useState(null);
@@ -153,6 +154,12 @@ function App() {
             <Route path="/recruiter/interviews" element={
               <ProtectedRoute user={user}>
                 {isRecruiter(user) ? <InterviewPage /> : <Navigate to="/dashboard" replace />}
+              </ProtectedRoute>
+            } />
+
+            <Route path="/applications/:applicationId/video-interview" element={
+              <ProtectedRoute user={user}>
+                <VideoInterviewRoom />
               </ProtectedRoute>
             } />
 

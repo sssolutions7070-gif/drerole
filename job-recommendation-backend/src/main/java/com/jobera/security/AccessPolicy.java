@@ -157,6 +157,12 @@ public class AccessPolicy {
         rule("PUT", "/api/applications/{applicationId}/messages/read", c -> participatesInApplication(c, "applicationId"));
         rule("GET", "/api/messages/unread-count/{userId}", self("userId"));
 
+        // Video interviews, scoped to one application - the recruiter schedules it, either side
+        // can join, check status or end it
+        rule("POST", "/api/applications/{applicationId}/video-interview", c -> recruiterManagesApplication(c, "applicationId"));
+        rule("GET", "/api/applications/{applicationId}/video-interview", c -> participatesInApplication(c, "applicationId"));
+        rule("PUT", "/api/applications/{applicationId}/video-interview/status", c -> participatesInApplication(c, "applicationId"));
+
         // Aptitude tests
         rule("POST", "/api/aptitude-tests/create", recruiter);
         rule("GET", "/api/aptitude-tests/recruiter/{recruiterId}", ownRecruiterId("recruiterId"));

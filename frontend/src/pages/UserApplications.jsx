@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Briefcase, Calendar, Clock, Eye, CheckCircle, XCircle, Star, MapPin, ChevronDown, ChevronUp, RefreshCw, AlertCircle, MessageCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Briefcase, Calendar, Clock, Eye, CheckCircle, XCircle, Star, MapPin, ChevronDown, ChevronUp, RefreshCw, AlertCircle, MessageCircle, Video } from 'lucide-react';
 import api from '../services/api';
 import MessageThread from '../components/MessageThread';
 
 const UserApplications = () => {
+  const navigate = useNavigate();
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -257,6 +259,15 @@ const UserApplications = () => {
                       <MessageCircle className="h-4 w-4 mr-1" />
                       Message Recruiter
                     </button>
+                    {application.status !== 'REJECTED' && (
+                      <button
+                        onClick={() => navigate(`/applications/${application.id}/video-interview`)}
+                        className="text-teal-600 hover:text-teal-800 text-sm font-medium flex items-center"
+                      >
+                        <Video className="h-4 w-4 mr-1" />
+                        Video Interview
+                      </button>
+                    )}
                   </div>
                 </div>
 

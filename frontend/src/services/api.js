@@ -106,6 +106,18 @@ export const messagesAPI = {
     api.get(`/messages/unread-count/${userId}`),
 };
 
+// Video interview API calls (WebRTC, scoped to one application)
+export const videoInterviewAPI = {
+  schedule: (applicationId, scheduledAt) =>
+    api.post(`/applications/${applicationId}/video-interview`, { scheduledAt }),
+
+  getJoinInfo: (applicationId) =>
+    api.get(`/applications/${applicationId}/video-interview`),
+
+  updateStatus: (applicationId, status) =>
+    api.put(`/applications/${applicationId}/video-interview/status`, { status }),
+};
+
 // Resume Matching API calls
 export const resumeMatchingAPI = {
   // Get applications sorted by match percentage
