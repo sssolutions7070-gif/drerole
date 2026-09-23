@@ -139,51 +139,150 @@ public class JobRecommendationService {
     }
     
     /**
-     * Enhanced skill matching with variations
+     * Skill groups that should be treated as the same skill regardless of how each side
+     * wrote it. Looked up via {@link #SKILL_TO_GROUP}, built once from this list.
      */
-    private boolean isSkillMatch(String jobSkill, String userSkill) {
-        String js = jobSkill.toLowerCase().trim();
-        String us = userSkill.toLowerCase().trim();
-        
-        // Exact match
-        if (js.equals(us)) return true;
-        
-        // Contains match
-        if (us.contains(js) || js.contains(us)) return true;
-        
-        // Common variations mapping
-        Map<String, List<String>> variations = new HashMap<>();
-        variations.put("javascript", Arrays.asList("js", "javascript", "ecmascript"));
-        variations.put("node.js", Arrays.asList("node", "nodejs", "node.js"));
-        variations.put("spring boot", Arrays.asList("springboot", "spring", "spring-boot"));
-        variations.put("react", Arrays.asList("react", "reactjs", "react.js"));
-        variations.put("python", Arrays.asList("python", "py", "python3"));
-        variations.put("java", Arrays.asList("java", "java8", "java11", "java17"));
-        variations.put("html", Arrays.asList("html", "html5"));
-        variations.put("css", Arrays.asList("css", "css3"));
-        variations.put("rest api", Arrays.asList("rest", "restapi", "restful", "rest api"));
-        variations.put("mongodb", Arrays.asList("mongo", "mongodb"));
-        variations.put("postgresql", Arrays.asList("postgres", "postgresql"));
-        variations.put("typescript", Arrays.asList("ts", "typescript"));
-        variations.put("docker", Arrays.asList("docker", "docker container"));
-        variations.put("kubernetes", Arrays.asList("k8s", "kubernetes"));
-        variations.put("aws", Arrays.asList("aws", "amazon web services"));
-        variations.put("azure", Arrays.asList("azure", "microsoft azure"));
-        variations.put("machine learning", Arrays.asList("ml", "machine learning"));
-        variations.put("data science", Arrays.asList("ds", "data science"));
-        
-        for (Map.Entry<String, List<String>> entry : variations.entrySet()) {
-            String standard = entry.getKey();
-            List<String> variants = entry.getValue();
-            
-            if ((variants.contains(js) && variants.contains(us)) ||
-                (js.equals(standard) && variants.contains(us)) ||
-                (us.equals(standard) && variants.contains(js))) {
+    private static final List<Set<String>> SKILL_SYNONYM_GROUPS = List.of(
+        Set.of("javascript", "js", "ecmascript"),
+        Set.of("typescript", "ts"),
+        Set.of("node", "nodejs", "node.js"),
+        Set.of("react", "reactjs", "react.js"),
+        Set.of("vue", "vuejs", "vue.js"),
+        Set.of("angular", "angularjs"),
+        Set.of("next", "nextjs", "next.js"),
+        Set.of("spring boot", "springboot", "spring-boot"),
+        Set.of("spring", "springframework"),
+        Set.of("python", "py"),
+        Set.of("html", "html5"),
+        Set.of("css", "css3"),
+        Set.of("sass", "scss"),
+        Set.of("rest", "restapi", "restful", "rest api"),
+        Set.of("graphql", "graph ql"),
+        Set.of("mongodb", "mongo"),
+        Set.of("postgresql", "postgres", "psql"),
+        Set.of("mysql", "my sql"),
+        Set.of("docker", "containerization"),
+        Set.of("kubernetes", "k8s"),
+        Set.of("aws", "amazon web services"),
+        Set.of("gcp", "google cloud", "google cloud platform"),
+        Set.of("azure", "microsoft azure"),
+        Set.of("ci cd", "cicd", "ci/cd", "continuous integration"),
+        Set.of("machine learning", "ml"),
+        Set.of("artificial intelligence", "ai"),
+        Set.of("data science", "ds"),
+        Set.of("natural language processing", "nlp"),
+        Set.of("deep learning", "dl"),
+        Set.of("git", "github", "version control"),
+        Set.of("c sharp", "c#", "csharp"),
+        Set.of("c plus plus", "c++", "cpp"),
+        Set.of("golang", "go"),
+        Set.of("dotnet", ".net", "asp.net"),
+        Set.of("ui ux", "ui/ux", "user interface design"),
+        Set.of("qa", "quality assurance", "testing"),
+        Set.of("oop", "object oriented programming"),
+        Set.of("api", "apis"),
+        Set.of("sql", "structured query language"),
+        Set.of("nosql", "no sql")
+    );
+
+    private static final Map<String, Set<String>> SKILL_TO_GROUP = buildSkillToGroupIndex();
+
+    private static Map<String, Set<String>> buildSkillToGroupIndex() {
+        Map<String, Set<String>> index = new HashMap<>();
+        for (Set<String> group : SKILL_SYNONYM_GROUPS) {
+            for (String member : group) {
+                index.put(member, group);
+            }
+        }
+        return index;
+    }
+
+    /** Minimum token length before a small edit distance is trusted as a typo rather than a different word. */
+    private static final int MIN_FUZZY_TOKEN_LENGTH = 5;
+
+    /**
+     * True when a job's required skill and a candidate's listed skill should count as the same
+     * thing. Checks, in order: exact match, a shared synonym group (e.g. "js"/"javascript"),
+     * an exact shared word after splitting on punctuation (so "Spring Boot" matches "spring-boot"
+     * without "Java" ever matching "JavaScript" the way naive substring matching would), and
+     * finally a bounded edit-distance check to catch typos in longer skill names.
+     */
+    boolean isSkillMatch(String jobSkill, String userSkill) {
+        String js = normalizeSkill(jobSkill);
+        String us = normalizeSkill(userSkill);
+        if (js.isEmpty() || us.isEmpty()) {
+            return false;
+        }
+        if (js.equals(us)) {
+            return true;
+        }
+        if (shareASynonymGroup(js, us)) {
+            return true;
+        }
+
+        Set<String> jsTokens = tokenize(js);
+        Set<String> usTokens = tokenize(us);
+        for (String token : jsTokens) {
+            if (usTokens.contains(token)) {
                 return true;
             }
         }
-        
+        for (String jsToken : jsTokens) {
+            for (String usToken : usTokens) {
+                if (shareASynonymGroup(jsToken, usToken) || isTypoOfEachOther(jsToken, usToken)) {
+                    return true;
+                }
+            }
+        }
         return false;
+    }
+
+    private boolean shareASynonymGroup(String a, String b) {
+        Set<String> group = SKILL_TO_GROUP.get(a);
+        return group != null && group.contains(b);
+    }
+
+    private boolean isTypoOfEachOther(String a, String b) {
+        if (a.length() < MIN_FUZZY_TOKEN_LENGTH || b.length() < MIN_FUZZY_TOKEN_LENGTH) {
+            return false;
+        }
+        int maxLen = Math.max(a.length(), b.length());
+        int threshold = Math.min(3, maxLen / 5);
+        return levenshteinDistance(a, b) <= threshold;
+    }
+
+    private String normalizeSkill(String skill) {
+        return skill == null ? "" : skill.toLowerCase().trim();
+    }
+
+    private static Set<String> tokenize(String normalized) {
+        Set<String> tokens = new HashSet<>();
+        for (String token : normalized.split("[^a-z0-9#+]+")) {
+            if (!token.isEmpty()) {
+                tokens.add(token);
+            }
+        }
+        return tokens;
+    }
+
+    /** Classic Levenshtein edit distance (insert/delete/substitute), O(n*m). */
+    private static int levenshteinDistance(String a, String b) {
+        int[] previous = new int[b.length() + 1];
+        int[] current = new int[b.length() + 1];
+        for (int j = 0; j <= b.length(); j++) {
+            previous[j] = j;
+        }
+        for (int i = 1; i <= a.length(); i++) {
+            current[0] = i;
+            for (int j = 1; j <= b.length(); j++) {
+                int cost = a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1;
+                current[j] = Math.min(Math.min(current[j - 1] + 1, previous[j] + 1), previous[j - 1] + cost);
+            }
+            int[] swap = previous;
+            previous = current;
+            current = swap;
+        }
+        return previous[b.length()];
     }
     
     /**

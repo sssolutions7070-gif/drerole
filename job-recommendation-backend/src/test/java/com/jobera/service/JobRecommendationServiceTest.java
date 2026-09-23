@@ -1,6 +1,7 @@
 package com.jobera.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
@@ -85,5 +86,76 @@ class JobRecommendationServiceTest {
         when(jobPostingService.getActiveJobPostings()).thenReturn(List.of(frontend));
 
         assertEquals(List.of(frontend), service.recommendJobsForUser(1L));
+    }
+
+    // -------------------------------------------------------------- isSkillMatch
+
+    @Test
+    void identicalSkillsMatchRegardlessOfCase() {
+        assertTrue(service.isSkillMatch("Python", "python"));
+        assertTrue(service.isSkillMatch(" Docker ", "docker"));
+    }
+
+    @Test
+    void knownSynonymsMatch() {
+        assertTrue(service.isSkillMatch("JavaScript", "JS"));
+        assertTrue(service.isSkillMatch("React", "ReactJS"));
+        assertTrue(service.isSkillMatch("Kubernetes", "K8s"));
+        assertTrue(service.isSkillMatch("Spring Boot", "springboot"));
+    }
+
+    @Test
+    void javaDoesNotFalselyMatchJavaScript() {
+        // Regression test: naive substring matching ("javascript".contains("java")) used to
+        // treat these as the same skill, which is wrong - they are different languages.
+        assertFalse(service.isSkillMatch("Java", "JavaScript"));
+        assertFalse(service.isSkillMatch("JavaScript", "Java"));
+    }
+
+    @Test
+    void aSingleLetterSkillDoesNotMatchUnrelatedSkillsThatContainThatLetter() {
+        // Regression test: "R" (the language) used to match almost every skill via
+        // substring containment, since nearly every English word contains the letter "r".
+        assertFalse(service.isSkillMatch("R", "React"));
+        assertFalse(service.isSkillMatch("R", "Docker"));
+        assertFalse(service.isSkillMatch("R", "JavaScript"));
+    }
+
+    @Test
+    void multiWordSkillsMatchOnASharedWordEvenOutsideTheSynonymList() {
+        assertTrue(service.isSkillMatch("Node.js Development", "Node"));
+        assertTrue(service.isSkillMatch("Senior Python Developer", "Python"));
+    }
+
+    @Test
+    void aSmallTypoInALongEnoughSkillStillMatches() {
+        assertTrue(service.isSkillMatch("Kubernetes", "Kubernets"));
+        assertTrue(service.isSkillMatch("PostgreSQL", "Postgresql"));
+    }
+
+    @Test
+    void shortSkillsGetNoFuzzyLeniency() {
+        // Below the fuzzy-matching length floor: a 1-character edit distance between two
+        // short, genuinely different skills must not be treated as a typo.
+        assertFalse(service.isSkillMatch("Go", "Do"));
+        assertFalse(service.isSkillMatch("C", "R"));
+    }
+
+    @Test
+    void punctuationDoesNotPreventAnOtherwiseExactMatch() {
+        assertTrue(service.isSkillMatch("Go", "Go!"));
+    }
+
+    @Test
+    void unrelatedLongSkillsDoNotMatch() {
+        assertFalse(service.isSkillMatch("Kubernetes", "JavaScript"));
+        assertFalse(service.isSkillMatch("MongoDB", "PostgreSQL"));
+    }
+
+    @Test
+    void blankOrNullSkillsNeverMatch() {
+        assertFalse(service.isSkillMatch("", "Java"));
+        assertFalse(service.isSkillMatch("Java", ""));
+        assertFalse(service.isSkillMatch(null, "Java"));
     }
 }

@@ -4,6 +4,7 @@ import { Search, MapPin, DollarSign, Calendar, Star, TrendingUp, Clock, AlertCir
 import api from '../services/api';
 import JobApplicationModal from '../components/JobApplicationModal';
 import JobRatingModal from '../components/JobRatingModal';
+import { isSkillMatch } from '../utils/skillMatching';
 
 const Jobs = () => {
   const [jobs, setJobs] = useState([]);
@@ -122,47 +123,6 @@ const Jobs = () => {
     } catch (e) {
       return [];
     }
-  };
-
-  const isSkillMatch = (jobSkill, userSkill) => {
-    const js = jobSkill.toLowerCase().trim();
-    const us = userSkill.toLowerCase().trim();
-    
-    if (js === us) return true;
-    if (us.includes(js) || js.includes(us)) return true;
-    
-    const variations = {
-      'javascript': ['js', 'javascript', 'ecmascript'],
-      'node.js': ['node', 'nodejs', 'node.js'],
-      'spring boot': ['springboot', 'spring', 'spring-boot'],
-      'react': ['react', 'reactjs', 'react.js'],
-      'python': ['python', 'py', 'python3'],
-      'java': ['java', 'java8', 'java11', 'java17'],
-      'html': ['html', 'html5'],
-      'css': ['css', 'css3'],
-      'rest api': ['rest', 'restapi', 'restful', 'rest api'],
-      'mongodb': ['mongo', 'mongodb'],
-      'postgresql': ['postgres', 'postgresql'],
-      'mysql': ['mysql', 'my sql'],
-      'typescript': ['ts', 'typescript'],
-      'docker': ['docker', 'docker container'],
-      'kubernetes': ['k8s', 'kubernetes'],
-      'aws': ['aws', 'amazon web services'],
-      'azure': ['azure', 'microsoft azure'],
-      'git': ['git', 'github', 'gitlab'],
-      'machine learning': ['ml', 'machine learning'],
-      'data science': ['data science', 'ds']
-    };
-    
-    for (const [standard, variants] of Object.entries(variations)) {
-      if ((variants.includes(js) && variants.includes(us)) ||
-          (js === standard && variants.includes(us)) ||
-          (us === standard && variants.includes(js))) {
-        return true;
-      }
-    }
-    
-    return false;
   };
 
   // FIXED: Only return matchScore >= 50%
