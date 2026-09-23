@@ -14,6 +14,10 @@ replay_pid*.log
 job-recommendation-backend/uploads/
 camera-proctoring/violations/
 
+# Downloaded proctoring models (fetched by download_models.py, not stored in git - see
+# camera-proctoring/test_images/ for the small, committed images the tests verify them against)
+camera-proctoring/models/
+
 # Local environment and IDE files
 .env
 .env.local

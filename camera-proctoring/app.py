@@ -26,6 +26,29 @@ BACKEND_URL = os.environ.get('BACKEND_URL', 'http://localhost:8081/api')
 active_sessions = {}
 session_lock = threading.Lock()
 
+# Pretrained models (see download_models.py). Optional: if a file is missing, the affected
+# detector falls back to the older Haar-cascade/brightness-heuristic method instead of the
+# service failing to start.
+_MODELS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'models')
+FACE_PROTOTXT = os.path.join(_MODELS_DIR, 'face_detector', 'deploy.prototxt')
+FACE_WEIGHTS = os.path.join(_MODELS_DIR, 'face_detector', 'res10_300x300_ssd_iter_140000_fp16.caffemodel')
+YOLO_CFG = os.path.join(_MODELS_DIR, 'yolo', 'yolov4-tiny.cfg')
+YOLO_WEIGHTS = os.path.join(_MODELS_DIR, 'yolo', 'yolov4-tiny.weights')
+YOLO_NAMES = os.path.join(_MODELS_DIR, 'yolo', 'coco.names')
+FACE_DNN_AVAILABLE = os.path.exists(FACE_PROTOTXT) and os.path.exists(FACE_WEIGHTS)
+YOLO_AVAILABLE = os.path.exists(YOLO_CFG) and os.path.exists(YOLO_WEIGHTS) and os.path.exists(YOLO_NAMES)
+
+if not FACE_DNN_AVAILABLE:
+    logger.warning("Face detector model files not found under %s - falling back to Haar cascade. "
+                    "Run download_models.py to get the more accurate DNN detector.", _MODELS_DIR)
+if not YOLO_AVAILABLE:
+    logger.warning("YOLO model files not found under %s - falling back to the brightness/contour "
+                    "phone heuristic. Run download_models.py for real object-detection-based phone detection.",
+                    _MODELS_DIR)
+
+COCO_CLASS_NAMES = open(YOLO_NAMES).read().strip().split('\n') if YOLO_AVAILABLE else []
+PHONE_CLASS_NAME = 'cell phone'
+
 class Proctor:
     def __init__(self, assignment_id, user_id, test_name):
         self.assignment_id = assignment_id
@@ -57,12 +80,79 @@ class Proctor:
         self.key_violations = 0
         self.key_violation_threshold = 1  # Terminate on first key violation
         
-        # Load face detection
+        # Load face detection - the more accurate DNN detector when available, Haar cascade always
+        # (used as the fallback, and it's cheap to keep loaded either way).
         self.face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-        
-        logger.info(f"Proctor initialized for test {assignment_id}")
-    
+        self.face_net = None
+        if FACE_DNN_AVAILABLE:
+            try:
+                self.face_net = cv2.dnn.readNetFromCaffe(FACE_PROTOTXT, FACE_WEIGHTS)
+            except Exception as e:
+                logger.error(f"Failed to load DNN face detector, falling back to Haar cascade: {e}")
+
+        # Load the phone/object detector when available.
+        self.yolo_net = None
+        self.yolo_output_layers = None
+        if YOLO_AVAILABLE:
+            try:
+                self.yolo_net = cv2.dnn.readNetFromDarknet(YOLO_CFG, YOLO_WEIGHTS)
+                self.yolo_output_layers = self.yolo_net.getUnconnectedOutLayersNames()
+            except Exception as e:
+                logger.error(f"Failed to load YOLO phone detector, falling back to the brightness heuristic: {e}")
+
+        logger.info(f"Proctor initialized for test {assignment_id} "
+                    f"(face_dnn={'on' if self.face_net else 'off'}, yolo={'on' if self.yolo_net else 'off'})")
+
+    def detect_faces(self, gray, frame):
+        """Detect faces, returning a list of (x, y, w, h) boxes - same shape regardless of method."""
+        if self.face_net is not None:
+            return self._detect_faces_dnn(frame)
+        return self.face_cascade.detectMultiScale(gray, 1.1, 5, minSize=(80, 80))
+
+    def _detect_faces_dnn(self, frame):
+        height, width = frame.shape[:2]
+        blob = cv2.dnn.blobFromImage(cv2.resize(frame, (300, 300)), 1.0, (300, 300), (104.0, 177.0, 123.0))
+        self.face_net.setInput(blob)
+        detections = self.face_net.forward()
+
+        boxes = []
+        for i in range(detections.shape[2]):
+            confidence = detections[0, 0, i, 2]
+            if confidence > 0.5:
+                box = detections[0, 0, i, 3:7] * np.array([width, height, width, height])
+                (x1, y1, x2, y2) = box.astype('int')
+                boxes.append((max(0, x1), max(0, y1), max(0, x2 - x1), max(0, y2 - y1)))
+        return boxes
+
     def detect_mobile_phone(self, frame, faces):
+        """Detect a mobile phone, returning an (x, y, w, h) box or None - same contract either way."""
+        if self.yolo_net is not None:
+            return self._detect_mobile_phone_yolo(frame)
+        return self._detect_mobile_phone_heuristic(frame, faces)
+
+    def _detect_mobile_phone_yolo(self, frame, confidence_threshold=0.3):
+        height, width = frame.shape[:2]
+        blob = cv2.dnn.blobFromImage(frame, 1 / 255.0, (416, 416), swapRB=True, crop=False)
+        self.yolo_net.setInput(blob)
+        outputs = self.yolo_net.forward(self.yolo_output_layers)
+
+        best_box = None
+        best_confidence = confidence_threshold
+        for output in outputs:
+            for detection in output:
+                scores = detection[5:]
+                class_id = int(np.argmax(scores))
+                confidence = float(scores[class_id])
+                if confidence <= best_confidence or class_id >= len(COCO_CLASS_NAMES):
+                    continue
+                if COCO_CLASS_NAMES[class_id] != PHONE_CLASS_NAME:
+                    continue
+                cx, cy, bw, bh = (detection[0:4] * np.array([width, height, width, height])).astype('int')
+                best_confidence = confidence
+                best_box = (max(0, cx - bw // 2), max(0, cy - bh // 2), bw, bh)
+        return best_box
+
+    def _detect_mobile_phone_heuristic(self, frame, faces):
         """Detect mobile phones in frame"""
         height, width = frame.shape[:2]
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -183,7 +273,7 @@ class Proctor:
                 
                 # Face detection
                 gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-                faces = self.face_cascade.detectMultiScale(gray, 1.1, 5, minSize=(80, 80))
+                faces = self.detect_faces(gray, frame)
                 num_faces = len(faces)
                 
                 # Draw faces

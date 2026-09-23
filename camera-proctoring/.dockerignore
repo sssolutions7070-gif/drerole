@@ -1,0 +1,7 @@
+venv/
+__pycache__/
+*.pyc
+models/
+test_images/*.jpg
+violations/
+.pytest_cache/

@@ -23,6 +23,10 @@ COPY . .
 # Create directory for violation output
 RUN mkdir -p violations
 
+# Download the face/phone detection models (falls back to the older Haar-cascade/heuristic
+# detectors at runtime if this step is skipped or a download fails, so it's not build-fatal)
+RUN python download_models.py
+
 # Expose port
 EXPOSE 5001
 

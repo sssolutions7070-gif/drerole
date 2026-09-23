@@ -6,7 +6,7 @@ A hiring platform that goes beyond job listings: candidates get matched to jobs 
 
 - **Resume-based job and internship recommendations** using skill extraction and fuzzy skill matching (only jobs at or above a 50% match are shown).
 - **Assessment pipeline for recruiters:** manual aptitude tests and "DreamRole" tests (40 branch-based aptitude questions plus technical questions), with results, statistics and pass/fail handling that feed the application status.
-- **Camera proctoring:** a separate Python/OpenCV service detects missing faces, multiple people, phones and looking away. The frontend also reports tab switches and blocked key combinations. Any critical violation terminates the test and marks it `FAILED_PROCTORING` (score 0, application `TEST_FAILED`).
+- **Camera proctoring:** a separate Python/OpenCV service detects missing/multiple faces and phones using pretrained DNN models (OpenCV's SSD face detector, YOLOv4-tiny for phones — see `camera-proctoring/download_models.py`; falls back to a Haar cascade and a brightness heuristic if the models aren't downloaded). The frontend also reports tab switches and blocked key combinations. Any critical violation terminates the test and marks it `FAILED_PROCTORING` (score 0, application `TEST_FAILED`).
 - **External candidate hiring:** bulk-upload resumes for a job, parse and score them, shortlist the top N, generate credentials, assign tests and schedule interviews.
 - **Voice assistant** in English, Hindi and Marathi for navigating the site.
 - **Roles:** candidate, recruiter, admin.
@@ -39,8 +39,10 @@ cd job-recommendation-backend && ./mvnw spring-boot:run
 cd frontend && npm install && npm run dev
 
 # proctoring
-cd camera-proctoring && python -m venv venv && venv\Scripts\activate && pip install -r requirements.txt && python app.py
+cd camera-proctoring && python -m venv venv && venv\Scripts\activate && pip install -r requirements.txt && python download_models.py && python app.py
 ```
+
+`download_models.py` fetches the face/phone detection models (~30MB, from OpenCV's and AlexeyAB/darknet's own GitHub-hosted files). It's optional - skip it and the service still runs, just with the older, less accurate Haar-cascade/heuristic detectors.
 
 ### Configuration
 
@@ -73,8 +75,9 @@ The proctoring container needs access to a camera device (`/dev/video0`), which 
 ## Tests
 
 ```bash
-cd job-recommendation-backend && mvn test   # unit tests, no database needed
-cd frontend && npm run build                # type/bundle check
+cd job-recommendation-backend && mvn test        # unit tests, no database needed
+cd frontend && npm test                          # Vitest + React Testing Library
+cd camera-proctoring && pytest test_detection.py # needs download_models.py to have been run
 ```
 
 ## Project layout
