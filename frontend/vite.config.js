@@ -11,10 +11,14 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom'],
-          icons: ['lucide-react'],
-          http: ['axios']
+        // Vite 8's default bundler (rolldown) only accepts a function here, not the
+        // old object-map shorthand rollup allowed.
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (/[\\/](react|react-dom|react-router-dom)[\\/]/.test(id)) return 'vendor'
+            if (id.includes('lucide-react')) return 'icons'
+            if (id.includes('axios')) return 'http'
+          }
         }
       }
     }
