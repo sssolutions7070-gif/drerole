@@ -124,6 +124,7 @@ public class AccessPolicy {
         // matters if a token happens to be present, since the interceptor bypasses it otherwise.
         rule("GET", "/api/companies", authenticated);
         rule("GET", "/api/companies/{recruiterId}", authenticated);
+        rule("GET", "/api/companies/{recruiterId}/reviews", authenticated);
         rule("GET", "/api/jobs/{jobId}", authenticated);
 
         // Internships

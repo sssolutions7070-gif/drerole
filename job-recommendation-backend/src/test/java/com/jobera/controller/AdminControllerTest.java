@@ -46,6 +46,7 @@ class AdminControllerTest {
     @Mock AdminAuditService adminAuditService;
     @Mock JobPostingService jobPostingService;
     @Mock NotificationService notificationService;
+    @Mock com.jobera.service.CompanyReviewService companyReviewService;
 
     AdminController controller;
     HttpServletRequest request;
@@ -54,7 +55,8 @@ class AdminControllerTest {
     @BeforeEach
     void setUp() {
         controller = new AdminController(userRepository, recruiterRepository, jobPostingRepository,
-            applicationRepository, resumeRepository, adminAuditService, jobPostingService, notificationService);
+            applicationRepository, resumeRepository, adminAuditService, jobPostingService, notificationService,
+            companyReviewService);
         admin = user(1L, "admin@example.com", 2L);
         request = mock(HttpServletRequest.class);
         lenient().when(request.getAttribute(AuthInterceptor.AUTHENTICATED_USER)).thenReturn(admin);

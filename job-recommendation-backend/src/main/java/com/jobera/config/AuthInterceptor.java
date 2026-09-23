@@ -48,7 +48,8 @@ public class AuthInterceptor implements HandlerInterceptor {
         "/api/jobs/{jobId}/ratings",
         "/api/jobs/{jobId}/rating/stats",
         "/api/companies",
-        "/api/companies/{recruiterId}"
+        "/api/companies/{recruiterId}",
+        "/api/companies/{recruiterId}/reviews"
     );
 
     private final AntPathMatcher pathMatcher = new AntPathMatcher();

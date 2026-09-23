@@ -28,6 +28,7 @@ import com.jobera.repository.RecruiterRepository;
 import com.jobera.repository.ResumeRepository;
 import com.jobera.repository.UserRepository;
 import com.jobera.service.AdminAuditService;
+import com.jobera.service.CompanyReviewService;
 import com.jobera.service.JobPostingService;
 import com.jobera.service.NotificationService;
 
@@ -52,6 +53,7 @@ public class AdminController {
     private final AdminAuditService adminAuditService;
     private final JobPostingService jobPostingService;
     private final NotificationService notificationService;
+    private final CompanyReviewService companyReviewService;
 
     public AdminController(UserRepository userRepository,
                          RecruiterRepository recruiterRepository,
@@ -60,7 +62,8 @@ public class AdminController {
                          ResumeRepository resumeRepository,
                          AdminAuditService adminAuditService,
                          JobPostingService jobPostingService,
-                         NotificationService notificationService) {
+                         NotificationService notificationService,
+                         CompanyReviewService companyReviewService) {
         this.userRepository = userRepository;
         this.recruiterRepository = recruiterRepository;
         this.jobPostingRepository = jobPostingRepository;
@@ -69,6 +72,7 @@ public class AdminController {
         this.adminAuditService = adminAuditService;
         this.jobPostingService = jobPostingService;
         this.notificationService = notificationService;
+        this.companyReviewService = companyReviewService;
     }
 
     private User actingAdmin(HttpServletRequest request) {
@@ -356,6 +360,38 @@ public class AdminController {
             notificationService.sendJobPostingApproved(recruiterUser.getEmail(), recruiterUser.getFullName(), job.getTitle());
         } else {
             notificationService.sendJobPostingRejected(recruiterUser.getEmail(), recruiterUser.getFullName(), job.getTitle(), reason);
+        }
+    }
+
+    @GetMapping("/company-reviews/pending")
+    public ResponseEntity<List<com.jobera.entity.CompanyReview>> getPendingCompanyReviews() {
+        return ResponseEntity.ok(companyReviewService.getPendingReviews());
+    }
+
+    @PutMapping("/company-reviews/{reviewId}/approve")
+    public ResponseEntity<Map<String, Object>> approveCompanyReview(@PathVariable Long reviewId, HttpServletRequest request) {
+        try {
+            com.jobera.entity.CompanyReview review = companyReviewService.approveReview(reviewId);
+            adminAuditService.record(actingAdmin(request), "COMPANY_REVIEW_APPROVED", "COMPANY_REVIEW", reviewId,
+                review.getRecruiter().getCompanyName());
+            return ResponseEntity.ok(Map.of(MESSAGE_KEY, "Review approved", "moderationStatus", review.getModerationStatus()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "Failed to approve review: " + e.getMessage()));
+        }
+    }
+
+    @PutMapping("/company-reviews/{reviewId}/reject")
+    public ResponseEntity<Map<String, Object>> rejectCompanyReview(@PathVariable Long reviewId,
+                                                                    @RequestBody Map<String, String> payload,
+                                                                    HttpServletRequest request) {
+        try {
+            String reason = payload.get("reason");
+            com.jobera.entity.CompanyReview review = companyReviewService.rejectReview(reviewId, reason);
+            adminAuditService.record(actingAdmin(request), "COMPANY_REVIEW_REJECTED", "COMPANY_REVIEW", reviewId,
+                review.getRecruiter().getCompanyName());
+            return ResponseEntity.ok(Map.of(MESSAGE_KEY, "Review rejected", "moderationStatus", review.getModerationStatus()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "Failed to reject review: " + e.getMessage()));
         }
     }
 

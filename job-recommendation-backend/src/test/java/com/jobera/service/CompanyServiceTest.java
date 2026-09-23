@@ -3,6 +3,8 @@ package com.jobera.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
@@ -25,12 +27,15 @@ class CompanyServiceTest {
 
     @Mock RecruiterRepository recruiterRepository;
     @Mock JobPostingRepository jobPostingRepository;
+    @Mock CompanyReviewService companyReviewService;
 
     CompanyService service;
 
     @BeforeEach
     void setUp() {
-        service = new CompanyService(recruiterRepository, jobPostingRepository);
+        service = new CompanyService(recruiterRepository, jobPostingRepository, companyReviewService);
+        lenient().when(companyReviewService.getPublicReviews(anyLong()))
+            .thenReturn(Map.of("averageRating", 0.0, "totalReviews", 0));
     }
 
     private Recruiter recruiter(long id, String name) {
@@ -103,6 +108,21 @@ class CompanyServiceTest {
         Map<String, Object> profile = service.getCompanyProfile(1L);
 
         assertTrue(!profile.containsKey("contactEmail") && !profile.containsKey("contactPhone"));
+    }
+
+    @Test
+    void companyProfileIncludesTheReviewSummary() {
+        Recruiter recruiter = recruiter(1L, "Acme");
+        when(recruiterRepository.findById(1L)).thenReturn(Optional.of(recruiter));
+        when(jobPostingRepository.findByRecruiterIdAndIsActiveTrueAndModerationStatusOrderByPostedDateDesc(1L, "APPROVED"))
+            .thenReturn(List.of());
+        when(companyReviewService.getPublicReviews(1L))
+            .thenReturn(Map.of("averageRating", 4.5, "totalReviews", 2, "reviews", List.of()));
+
+        Map<String, Object> profile = service.getCompanyProfile(1L);
+
+        assertEquals(4.5, profile.get("averageRating"));
+        assertEquals(2, profile.get("totalReviews"));
     }
 
     @Test

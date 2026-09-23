@@ -35,10 +35,14 @@ public class CompanyService {
 
     private final RecruiterRepository recruiterRepository;
     private final JobPostingRepository jobPostingRepository;
+    private final CompanyReviewService companyReviewService;
 
-    public CompanyService(RecruiterRepository recruiterRepository, JobPostingRepository jobPostingRepository) {
+    public CompanyService(RecruiterRepository recruiterRepository,
+                           JobPostingRepository jobPostingRepository,
+                           CompanyReviewService companyReviewService) {
         this.recruiterRepository = recruiterRepository;
         this.jobPostingRepository = jobPostingRepository;
+        this.companyReviewService = companyReviewService;
     }
 
     private List<JobPosting> openJobsFor(Long recruiterId) {
@@ -82,6 +86,10 @@ public class CompanyService {
         // Contact email/phone are deliberately left out of the public profile - a candidate
         // reaches the company by applying or messaging through the platform, not a cold contact.
         profile.put("jobs", openJobsFor(recruiterId).stream().map(JobPostingDTO::new).toList());
+
+        Map<String, Object> reviewSummary = companyReviewService.getPublicReviews(recruiterId);
+        profile.put("averageRating", reviewSummary.get("averageRating"));
+        profile.put("totalReviews", reviewSummary.get("totalReviews"));
         return profile;
     }
 }

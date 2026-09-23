@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Building, Briefcase, FileText, Trash2, ToggleLeft, ToggleRight, BarChart3, ScrollText, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { Users, Building, Briefcase, FileText, Trash2, ToggleLeft, ToggleRight, BarChart3, ScrollText, Clock, CheckCircle, XCircle, Star } from 'lucide-react';
 import api from '../services/api';
 
 const AdminDashboard = () => {
@@ -9,6 +9,7 @@ const AdminDashboard = () => {
   const [recruiters, setRecruiters] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [pendingJobs, setPendingJobs] = useState([]);
+  const [pendingReviews, setPendingReviews] = useState([]);
   const [applications, setApplications] = useState([]);
   const [auditLog, setAuditLog] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -16,6 +17,7 @@ const AdminDashboard = () => {
   useEffect(() => {
     fetchDashboardStats();
     fetchPendingJobs();
+    fetchPendingReviews();
   }, []);
 
   useEffect(() => {
@@ -23,6 +25,7 @@ const AdminDashboard = () => {
     if (activeTab === 'recruiters') fetchRecruiters();
     if (activeTab === 'jobs') fetchJobs();
     if (activeTab === 'pending-jobs') fetchPendingJobs();
+    if (activeTab === 'pending-reviews') fetchPendingReviews();
     if (activeTab === 'applications') fetchApplications();
     if (activeTab === 'audit-log') fetchAuditLog();
   }, [activeTab]);
@@ -171,6 +174,36 @@ const AdminDashboard = () => {
     }
   };
 
+  const fetchPendingReviews = async () => {
+    try {
+      const response = await api.get('/admin/company-reviews/pending');
+      setPendingReviews(response.data);
+    } catch (error) {
+      console.error('Error fetching pending reviews:', error);
+    }
+  };
+
+  const approveReview = async (reviewId) => {
+    try {
+      await api.put(`/admin/company-reviews/${reviewId}/approve`);
+      fetchPendingReviews();
+    } catch (error) {
+      alert('Failed to approve review: ' + (error.response?.data?.error || error.message));
+    }
+  };
+
+  const rejectReview = async (reviewId) => {
+    const reason = window.prompt('Reason for rejecting this review (shown to the reviewer):');
+    if (reason === null) return; // cancelled
+
+    try {
+      await api.put(`/admin/company-reviews/${reviewId}/reject`, { reason });
+      fetchPendingReviews();
+    } catch (error) {
+      alert('Failed to reject review: ' + (error.response?.data?.error || error.message));
+    }
+  };
+
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto py-8 px-4">
@@ -202,6 +235,7 @@ const AdminDashboard = () => {
             { id: 'recruiters', name: 'Recruiters', icon: Building },
             { id: 'jobs', name: 'Jobs', icon: Briefcase },
             { id: 'pending-jobs', name: `Pending Jobs${pendingJobs.length > 0 ? ` (${pendingJobs.length})` : ''}`, icon: Clock },
+            { id: 'pending-reviews', name: `Pending Reviews${pendingReviews.length > 0 ? ` (${pendingReviews.length})` : ''}`, icon: Star },
             { id: 'applications', name: 'Applications', icon: FileText },
             { id: 'audit-log', name: 'Audit Log', icon: ScrollText }
           ].map((tab) => {
@@ -544,6 +578,53 @@ const AdminDashboard = () => {
                     </button>
                     <button
                       onClick={() => rejectJob(job.id)}
+                      className="inline-flex items-center px-3 py-2 border border-red-300 text-red-700 rounded-md text-sm font-medium hover:bg-red-50"
+                    >
+                      <XCircle className="h-4 w-4 mr-1" />
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'pending-reviews' && (
+        <div className="bg-white rounded-lg shadow-lg border border-gray-200">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-800">Pending Company Reviews ({pendingReviews.length})</h3>
+            <p className="text-sm text-gray-500 mt-1">A new or edited review waits here until approved, so nothing unreviewed reaches a company's public profile.</p>
+          </div>
+          {pendingReviews.length === 0 ? (
+            <div className="text-center py-12 text-gray-500">
+              <Star className="mx-auto h-12 w-12 text-gray-300 mb-3" />
+              Nothing waiting for review.
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-200">
+              {pendingReviews.map((review) => (
+                <div key={review.id} className="px-6 py-4 flex items-start justify-between">
+                  <div>
+                    <div className="text-sm font-medium text-gray-900">
+                      {review.recruiter?.companyName || 'Unknown company'} - {review.rating}/5
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      by {review.user?.email || 'unknown reviewer'}
+                    </div>
+                    <p className="text-sm text-gray-600 mt-2 max-w-xl">{review.comment}</p>
+                  </div>
+                  <div className="flex items-center space-x-3 flex-shrink-0 ml-4">
+                    <button
+                      onClick={() => approveReview(review.id)}
+                      className="inline-flex items-center px-3 py-2 border border-green-300 text-green-700 rounded-md text-sm font-medium hover:bg-green-50"
+                    >
+                      <CheckCircle className="h-4 w-4 mr-1" />
+                      Approve
+                    </button>
+                    <button
+                      onClick={() => rejectReview(review.id)}
                       className="inline-flex items-center px-3 py-2 border border-red-300 text-red-700 rounded-md text-sm font-medium hover:bg-red-50"
                     >
                       <XCircle className="h-4 w-4 mr-1" />

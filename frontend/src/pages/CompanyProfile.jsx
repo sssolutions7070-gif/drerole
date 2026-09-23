@@ -1,30 +1,93 @@
 // src/pages/CompanyProfile.jsx
 import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { Building, Globe, Users, Briefcase, MapPin, Clock, ArrowLeft } from 'lucide-react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { Building, Globe, Users, Briefcase, MapPin, Clock, ArrowLeft, Star } from 'lucide-react';
 import api from '../services/api';
+
+const StarRow = ({ rating, size = 'h-4 w-4' }) => (
+  <div className="flex items-center">
+    {[1, 2, 3, 4, 5].map((n) => (
+      <Star
+        key={n}
+        className={`${size} ${n <= Math.round(rating) ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`}
+      />
+    ))}
+  </div>
+);
 
 const CompanyProfile = () => {
   const { recruiterId } = useParams();
+  const navigate = useNavigate();
+  const currentUser = JSON.parse(localStorage.getItem('user'));
+
   const [company, setCompany] = useState(null);
+  const [reviews, setReviews] = useState({ averageRating: 0, totalReviews: 0, reviews: [] });
+  const [myReview, setMyReview] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    (async () => {
-      setIsLoading(true);
-      setError('');
-      try {
-        const response = await api.get(`/companies/${recruiterId}`);
-        setCompany(response.data);
-      } catch (err) {
-        console.error('Error fetching company:', err);
-        setError(err.response?.status === 404 ? 'Company not found' : 'Failed to load company');
-      } finally {
-        setIsLoading(false);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitMessage, setSubmitMessage] = useState('');
+
+  const fetchAll = async () => {
+    setIsLoading(true);
+    setError('');
+    try {
+      const [companyRes, reviewsRes] = await Promise.all([
+        api.get(`/companies/${recruiterId}`),
+        api.get(`/companies/${recruiterId}/reviews`),
+      ]);
+      setCompany(companyRes.data);
+      setReviews(reviewsRes.data);
+
+      if (currentUser?.id) {
+        try {
+          const mine = await api.get(`/users/${currentUser.id}/company-reviews/${recruiterId}`);
+          if (mine.status === 200) {
+            setMyReview(mine.data);
+            setReviewRating(mine.data.rating);
+            setReviewComment(mine.data.comment || '');
+          }
+        } catch {
+          // No existing review - fine, the form just starts blank.
+        }
       }
-    })();
+    } catch (err) {
+      console.error('Error fetching company:', err);
+      setError(err.response?.status === 404 ? 'Company not found' : 'Failed to load company');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recruiterId]);
+
+  const handleSubmitReview = async (e) => {
+    e.preventDefault();
+    if (!currentUser) {
+      navigate('/login');
+      return;
+    }
+    setSubmitting(true);
+    setSubmitMessage('');
+    try {
+      await api.post(`/users/${currentUser.id}/company-reviews/${recruiterId}`, {
+        rating: reviewRating,
+        comment: reviewComment,
+      });
+      setSubmitMessage('Thanks! Your review is awaiting approval before it appears publicly.');
+      fetchAll();
+    } catch (err) {
+      setSubmitMessage(err.response?.data?.error || 'Failed to submit review');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const formatDate = (dateString) => {
     if (!dateString) return '';
@@ -58,7 +121,7 @@ const CompanyProfile = () => {
           </div>
           <div className="flex-1">
             <h1 className="text-2xl font-bold text-gray-800">{company.companyName}</h1>
-            <div className="flex flex-wrap gap-4 mt-2 text-sm text-gray-500">
+            <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-gray-500">
               {company.industry && <span>{company.industry}</span>}
               {company.companySize && (
                 <span className="flex items-center">
@@ -77,6 +140,12 @@ const CompanyProfile = () => {
                   Website
                 </a>
               )}
+              {reviews.totalReviews > 0 && (
+                <span className="flex items-center">
+                  <StarRow rating={reviews.averageRating} />
+                  <span className="ml-1">{reviews.averageRating} ({reviews.totalReviews} {reviews.totalReviews === 1 ? 'review' : 'reviews'})</span>
+                </span>
+              )}
             </div>
             {company.companyDescription && (
               <p className="mt-4 text-gray-700 whitespace-pre-line">{company.companyDescription}</p>
@@ -90,12 +159,12 @@ const CompanyProfile = () => {
       </h2>
 
       {!company.jobs || company.jobs.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-lg shadow">
+        <div className="text-center py-12 bg-white rounded-lg shadow mb-6">
           <Briefcase className="mx-auto h-12 w-12 text-gray-300 mb-3" />
           <p className="text-gray-500">No open positions right now. Check back later.</p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-4 mb-8">
           {company.jobs.map((job) => (
             <Link
               key={job.id}
@@ -117,6 +186,71 @@ const CompanyProfile = () => {
                 </span>
               </div>
             </Link>
+          ))}
+        </div>
+      )}
+
+      <h2 className="text-xl font-semibold text-gray-800 mb-4">
+        Reviews ({reviews.totalReviews})
+      </h2>
+
+      <div className="bg-white rounded-lg shadow border border-gray-200 p-6 mb-6">
+        <h3 className="font-semibold text-gray-800 mb-3">
+          {myReview ? 'Update your review' : 'Write a review'}
+        </h3>
+        {myReview?.moderationStatus === 'PENDING' && (
+          <p className="text-sm text-yellow-700 bg-yellow-50 rounded px-3 py-2 mb-3">
+            Your review is awaiting approval.
+          </p>
+        )}
+        {myReview?.moderationStatus === 'REJECTED' && (
+          <p className="text-sm text-red-700 bg-red-50 rounded px-3 py-2 mb-3">
+            Your review wasn't approved{myReview.rejectionReason ? `: ${myReview.rejectionReason}` : '.'} You can edit and resubmit it below.
+          </p>
+        )}
+        <form onSubmit={handleSubmitReview} className="space-y-3">
+          <div className="flex items-center space-x-1">
+            {[1, 2, 3, 4, 5].map((n) => (
+              <button
+                type="button"
+                key={n}
+                onClick={() => setReviewRating(n)}
+                aria-label={`Rate ${n} star${n > 1 ? 's' : ''}`}
+              >
+                <Star className={`h-6 w-6 ${n <= reviewRating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`} />
+              </button>
+            ))}
+          </div>
+          <textarea
+            value={reviewComment}
+            onChange={(e) => setReviewComment(e.target.value)}
+            placeholder="Share your experience with this company..."
+            rows={3}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2"
+          />
+          {submitMessage && <p className="text-sm text-gray-600">{submitMessage}</p>}
+          <button
+            type="submit"
+            disabled={submitting || reviewRating === 0}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {submitting ? 'Submitting...' : myReview ? 'Update Review' : 'Submit Review'}
+          </button>
+        </form>
+      </div>
+
+      {reviews.reviews.length === 0 ? (
+        <p className="text-gray-500 text-center py-6">No reviews yet. Be the first to share your experience.</p>
+      ) : (
+        <div className="space-y-3">
+          {reviews.reviews.map((review) => (
+            <div key={review.id} className="bg-white rounded-lg shadow border border-gray-200 p-4">
+              <div className="flex items-center justify-between mb-1">
+                <StarRow rating={review.rating} />
+                <span className="text-xs text-gray-400">{formatDate(review.createdAt)}</span>
+              </div>
+              {review.comment && <p className="text-gray-700 text-sm">{review.comment}</p>}
+            </div>
           ))}
         </div>
       )}
