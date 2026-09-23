@@ -87,6 +87,9 @@ public class User {
     @Column(name = "two_factor_backup_codes", columnDefinition = "TEXT")
     private String twoFactorBackupCodes;
 
+    @Column(name = "referral_code", unique = true, length = 12)
+    private String referralCode;
+
     @Column(name = "role_id")
     private Long roleId = 1L;
 
@@ -195,6 +198,8 @@ public class User {
     public void setTwoFactorSecretEncrypted(String twoFactorSecretEncrypted) { this.twoFactorSecretEncrypted = twoFactorSecretEncrypted; }
     public String getTwoFactorBackupCodes() { return twoFactorBackupCodes; }
     public void setTwoFactorBackupCodes(String twoFactorBackupCodes) { this.twoFactorBackupCodes = twoFactorBackupCodes; }
+    public String getReferralCode() { return referralCode; }
+    public void setReferralCode(String referralCode) { this.referralCode = referralCode; }
     public Long getRoleId() { return roleId; }
     public void setRoleId(Long roleId) { this.roleId = roleId; }
     public List<Resume> getResumes() { return resumes; }

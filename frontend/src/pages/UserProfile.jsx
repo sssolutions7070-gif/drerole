@@ -5,7 +5,8 @@ import {
   Calendar, MapPin, Edit2, Save, X, Camera,
   Loader, CheckCircle, XCircle, Award,
   Linkedin, Github, Globe,
-  Trash2, Code, Heart, Cake, Plus, ExternalLink, Download, ShieldAlert, ShieldCheck, ShieldOff
+  Trash2, Code, Heart, Cake, Plus, ExternalLink, Download, ShieldAlert, ShieldCheck, ShieldOff,
+  Gift, Copy, Check
 } from 'lucide-react';
 import api, { accountAPI } from '../services/api';
 import { BACKEND_ORIGIN } from '../config';
@@ -28,6 +29,8 @@ const UserProfile = () => {
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
   const [showTwoFactorSetupModal, setShowTwoFactorSetupModal] = useState(false);
   const [showDisableTwoFactorModal, setShowDisableTwoFactorModal] = useState(false);
+  const [referralStats, setReferralStats] = useState(null);
+  const [referralCopied, setReferralCopied] = useState(false);
   const [exportingData, setExportingData] = useState(false);
   const [newSkill, setNewSkill] = useState('');
   const [newCertificate, setNewCertificate] = useState({
@@ -102,7 +105,28 @@ const UserProfile = () => {
 
   useEffect(() => {
     fetchUserProfile();
+    fetchReferralStats();
   }, []);
+
+  const fetchReferralStats = async () => {
+    try {
+      const response = await api.get(`/users/${currentUser.id}/referrals`);
+      setReferralStats(response.data);
+    } catch (error) {
+      console.error('Error fetching referral stats:', error);
+    }
+  };
+
+  const handleCopyReferralLink = async () => {
+    const link = `${window.location.origin}/register?ref=${referralStats.referralCode}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      setReferralCopied(true);
+      setTimeout(() => setReferralCopied(false), 2000);
+    } catch {
+      // Clipboard access can be denied by the browser; the link is still shown as text.
+    }
+  };
 
   const fetchUserProfile = async () => {
     try {
@@ -834,6 +858,43 @@ const UserProfile = () => {
                 </div>
               )}
             </div>
+
+            {/* Refer a Friend Section */}
+            {referralStats && (
+              <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-6">
+                <h3 className="text-lg font-semibold text-gray-800 mb-1 flex items-center">
+                  <Gift className="h-5 w-5 text-gray-600 mr-2" />
+                  Refer a Friend
+                </h3>
+                <p className="text-sm text-gray-500 mb-4">
+                  Share your link - anyone who signs up through it counts as your referral.
+                </p>
+                <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-3 mb-4">
+                  <span className="text-sm font-mono text-gray-700 truncate flex-1">
+                    {window.location.origin}/register?ref={referralStats.referralCode}
+                  </span>
+                  <button
+                    onClick={handleCopyReferralLink}
+                    className="text-blue-600 hover:text-blue-800 flex-shrink-0"
+                    title="Copy referral link"
+                  >
+                    {referralCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  </button>
+                </div>
+                <p className="text-sm text-gray-700 font-medium mb-2">
+                  {referralStats.totalReferrals} {referralStats.totalReferrals === 1 ? 'person has' : 'people have'} joined through your link
+                </p>
+                {referralStats.referrals.length > 0 && (
+                  <ul className="text-sm text-gray-600 space-y-1">
+                    {referralStats.referrals.map((referral, index) => (
+                      <li key={index}>
+                        {referral.name} joined {new Date(referral.joinedAt).toLocaleDateString()}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
 
             {/* Security Section */}
             <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-6">

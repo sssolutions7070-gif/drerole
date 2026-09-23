@@ -92,4 +92,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * @return List of users eligible for the job alert digest
      */
     List<User> findByJobAlertsEnabledTrueAndIsActiveTrue();
+
+    Optional<User> findByReferralCode(String referralCode);
+
+    boolean existsByReferralCode(String referralCode);
 }

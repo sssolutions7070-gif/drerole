@@ -71,8 +71,9 @@ public class AuthController {
             String password = request.get("password");
             String fullName = request.get("fullName");
             String phone = request.get("phone");
-            
-            User user = authenticationService.registerUser(email, password, fullName, phone);
+            String referralCode = request.get("referralCode");
+
+            User user = authenticationService.registerUser(email, password, fullName, phone, referralCode);
             String authToken = authenticationService.generateAuthToken(user);
             notificationService.sendWelcome(user.getEmail(), user.getFullName());
 
@@ -241,7 +242,8 @@ public class AuthController {
         userResponse.put("role", user.getRole());
         userResponse.put("lastLogin", user.getLastLogin());
         userResponse.put("createdAt", user.getCreatedAt());
-        
+        userResponse.put("referralCode", user.getReferralCode());
+
         return userResponse;
     }
 }

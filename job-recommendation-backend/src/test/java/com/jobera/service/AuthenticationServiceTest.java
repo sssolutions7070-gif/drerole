@@ -28,13 +28,14 @@ class AuthenticationServiceTest {
 
     @Mock UserRepository userRepository;
     @Mock AuthTokenRepository authTokenRepository;
+    @Mock ReferralService referralService;
 
     AuthenticationService service;
     final PasswordEncoder encoder = new PasswordEncoder();
 
     @BeforeEach
     void setUp() {
-        service = new AuthenticationService(userRepository, authTokenRepository);
+        service = new AuthenticationService(userRepository, authTokenRepository, referralService);
     }
 
     private User userWithPassword(String encodedPassword) {
@@ -101,10 +102,23 @@ class AuthenticationServiceTest {
     void registrationStoresAPbkdf2Hash() {
         when(userRepository.findByEmail("new@b.com")).thenReturn(Optional.empty());
         when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
+        when(referralService.generateUniqueCode()).thenReturn("ABCD1234");
 
         User created = service.registerUser("new@b.com", "s3cret!", "New User", "123");
 
         assertFalse(created.getPassword().equals("s3cret!"));
         assertTrue(encoder.matches("s3cret!", created.getPassword()));
+    }
+
+    @Test
+    void registrationGeneratesAReferralCodeAndRecordsAnyReferrerGiven() {
+        when(userRepository.findByEmail("new@b.com")).thenReturn(Optional.empty());
+        when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
+        when(referralService.generateUniqueCode()).thenReturn("ABCD1234");
+
+        User created = service.registerUser("new@b.com", "s3cret!", "New User", "123", "REFCODE1");
+
+        assertEquals("ABCD1234", created.getReferralCode());
+        verify(referralService).recordReferralIfValid("REFCODE1", created);
     }
 }

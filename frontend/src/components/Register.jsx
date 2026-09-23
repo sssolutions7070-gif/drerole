@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, User, Phone, Eye, EyeOff, Building } from 'lucide-react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Mail, Lock, User, Phone, Eye, EyeOff, Building, Gift } from 'lucide-react';
 import authService from '../services/auth';
 
 const Register = ({ onAuthChange }) => {
@@ -15,6 +15,8 @@ const Register = ({ onAuthChange }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const referralCode = searchParams.get('ref');
 
   const handleChange = (e) => {
     setFormData({
@@ -45,7 +47,8 @@ const Register = ({ onAuthChange }) => {
         fullName: formData.fullName,
         email: formData.email,
         phone: formData.phone,
-        password: formData.password
+        password: formData.password,
+        ...(referralCode ? { referralCode } : {})
       });
       onAuthChange(result.user); // Notify parent component
       navigate('/dashboard');
@@ -83,6 +86,13 @@ const Register = ({ onAuthChange }) => {
           {error && (
             <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
               {error}
+            </div>
+          )}
+
+          {referralCode && (
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-700 rounded flex items-center text-sm">
+              <Gift className="h-4 w-4 mr-2 flex-shrink-0" />
+              You were invited by a friend - your account will be linked to their referral.
             </div>
           )}
 

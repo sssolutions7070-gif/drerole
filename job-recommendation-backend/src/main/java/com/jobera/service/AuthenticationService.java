@@ -19,21 +19,28 @@ public class AuthenticationService {
     
     private final UserRepository userRepository;
     private final AuthTokenRepository authTokenRepository;
+    private final ReferralService referralService;
     private final PasswordEncoder passwordEncoder;
-    
+
     public AuthenticationService(UserRepository userRepository,
-                               AuthTokenRepository authTokenRepository) {
+                               AuthTokenRepository authTokenRepository,
+                               ReferralService referralService) {
         this.userRepository = userRepository;
         this.authTokenRepository = authTokenRepository;
+        this.referralService = referralService;
         this.passwordEncoder = new PasswordEncoder();
     }
-    
+
     public User registerUser(String email, String password, String fullName, String phone) {
+        return registerUser(email, password, fullName, phone, null);
+    }
+
+    public User registerUser(String email, String password, String fullName, String phone, String referralCode) {
         // Check if user already exists
         if (userRepository.findByEmail(email).isPresent()) {
             throw new AuthenticationException("User with email " + email + " already exists");
         }
-        
+
         // Create new user
         User user = new User();
         user.setEmail(email);
@@ -42,8 +49,11 @@ public class AuthenticationService {
         user.setPhone(phone);
         user.setIsActive(true);
         user.setRoleId(1L); // ROLE_USER
-        
-        return userRepository.save(user);
+        user.setReferralCode(referralService.generateUniqueCode());
+
+        User saved = userRepository.save(user);
+        referralService.recordReferralIfValid(referralCode, saved);
+        return saved;
     }
     
     public User loginUser(String email, String password) {
