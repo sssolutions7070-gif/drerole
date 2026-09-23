@@ -7,12 +7,14 @@ import {
   FileText, Percent, Target, Award, Sparkles
 } from 'lucide-react';
 import api from '../services/api';
+import MessageThread from './MessageThread';
 
 const ApplicationsList = ({ job, onClose }) => {
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedApplication, setSelectedApplication] = useState(null);
+  const [messageThreadApplication, setMessageThreadApplication] = useState(null);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showInterviewModal, setShowInterviewModal] = useState(false);
   const [showTestModal, setShowTestModal] = useState(false);
@@ -1256,7 +1258,15 @@ const ApplicationsList = ({ job, onClose }) => {
                       <CheckCircle className="h-4 w-4 mr-1" />
                       Shortlist
                     </button>
-                    
+
+                    <button
+                      onClick={() => setMessageThreadApplication(application)}
+                      className="inline-flex items-center px-3 py-2 border border-gray-300 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-50"
+                    >
+                      <MessageCircle className="h-4 w-4 mr-1" />
+                      Message Candidate
+                    </button>
+
                     {application.status === 'SHORTLISTED' && (
                       <button
                         onClick={() => handleAssignTest(application)}
@@ -1322,6 +1332,13 @@ const ApplicationsList = ({ job, onClose }) => {
         {showStatusModal && <StatusUpdateModal />}
         {showTestModal && <TestAssignmentModal />}
         {showTestResultsModal && <TestResultsModal />}
+        {messageThreadApplication && (
+          <MessageThread
+            applicationId={messageThreadApplication.id}
+            title={`${messageThreadApplication.applicantName || messageThreadApplication.applicant?.fullName || 'Candidate'} - ${job?.title || ''}`}
+            onClose={() => setMessageThreadApplication(null)}
+          />
+        )}
       </div>
     </div>
   );

@@ -82,6 +82,21 @@ export const savedJobsAPI = {
     api.delete(`/users/${userId}/saved-jobs/${jobId}`),
 };
 
+// Messaging API calls (chat between a candidate and the recruiter behind their application)
+export const messagesAPI = {
+  getThread: (applicationId) =>
+    api.get(`/applications/${applicationId}/messages`),
+
+  sendMessage: (applicationId, body) =>
+    api.post(`/applications/${applicationId}/messages`, { body }),
+
+  markRead: (applicationId) =>
+    api.put(`/applications/${applicationId}/messages/read`),
+
+  getUnreadCount: (userId) =>
+    api.get(`/messages/unread-count/${userId}`),
+};
+
 // Resume Matching API calls
 export const resumeMatchingAPI = {
   // Get applications sorted by match percentage

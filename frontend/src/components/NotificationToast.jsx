@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Bell, X, CalendarCheck } from 'lucide-react';
+import { Bell, X, CalendarCheck, MessageCircle } from 'lucide-react';
 import useRealtimeNotifications from '../hooks/useRealtimeNotifications';
 
 const TOAST_LIFETIME_MS = 8000;
@@ -22,6 +22,14 @@ const describeEvent = (event) => {
       icon: CalendarCheck,
       title: data?.jobTitle ? `Interview scheduled: ${data.jobTitle}` : 'Interview scheduled',
       message: [data?.interviewDate, data?.interviewLocation].filter(Boolean).join(' • ') || 'Check your applications for details.',
+    };
+  }
+
+  if (type === 'NEW_MESSAGE') {
+    return {
+      icon: MessageCircle,
+      title: 'New message',
+      message: data?.preview || 'You have a new message on one of your applications.',
     };
   }
 

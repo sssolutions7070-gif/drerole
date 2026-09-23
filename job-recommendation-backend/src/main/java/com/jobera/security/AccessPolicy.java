@@ -145,6 +145,12 @@ public class AccessPolicy {
         rule("GET", "/api/applications/recruiter/{recruiterId}/**", ownRecruiterId("recruiterId"));
         rule("PUT", "/api/applications/{applicationId}/*", c -> recruiterManagesApplication(c, "applicationId"));
 
+        // Messaging between a candidate and the recruiter behind their application
+        rule("GET", "/api/applications/{applicationId}/messages", c -> participatesInApplication(c, "applicationId"));
+        rule("POST", "/api/applications/{applicationId}/messages", c -> participatesInApplication(c, "applicationId"));
+        rule("PUT", "/api/applications/{applicationId}/messages/read", c -> participatesInApplication(c, "applicationId"));
+        rule("GET", "/api/messages/unread-count/{userId}", self("userId"));
+
         // Aptitude tests
         rule("POST", "/api/aptitude-tests/create", recruiter);
         rule("GET", "/api/aptitude-tests/recruiter/{recruiterId}", ownRecruiterId("recruiterId"));

@@ -1,0 +1,98 @@
+package com.jobera.service;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+import org.springframework.stereotype.Service;
+
+import com.jobera.entity.Application;
+import com.jobera.entity.Message;
+import com.jobera.repository.ApplicationRepository;
+import com.jobera.repository.MessageRepository;
+
+/** Chat between a candidate and a recruiter, scoped to one application. */
+@Service
+public class MessageService {
+
+    public static class ApplicationNotFoundException extends RuntimeException {
+        public ApplicationNotFoundException(Long applicationId) {
+            super("Application not found: " + applicationId);
+        }
+    }
+
+    /** Raised when the sender isn't actually one of the two people who belong on this thread. */
+    public static class NotAParticipantException extends RuntimeException {
+        public NotAParticipantException(Long senderId, Long applicationId) {
+            super("User " + senderId + " is not a participant in application " + applicationId);
+        }
+    }
+
+    private final MessageRepository messageRepository;
+    private final ApplicationRepository applicationRepository;
+    private final RealtimeNotifier realtimeNotifier;
+
+    public MessageService(MessageRepository messageRepository,
+                           ApplicationRepository applicationRepository,
+                           RealtimeNotifier realtimeNotifier) {
+        this.messageRepository = messageRepository;
+        this.applicationRepository = applicationRepository;
+        this.realtimeNotifier = realtimeNotifier;
+    }
+
+    private Long candidateUserId(Application application) {
+        return application.getUser() != null ? application.getUser().getId() : null;
+    }
+
+    private Long recruiterUserId(Application application) {
+        if (application.getJobPosting() == null || application.getJobPosting().getRecruiter() == null) {
+            return null;
+        }
+        return Optional.ofNullable(application.getJobPosting().getRecruiter().getUser())
+            .map(user -> user.getId())
+            .orElse(null);
+    }
+
+    public Message sendMessage(Long applicationId, Long senderId, String body) {
+        Application application = applicationRepository.findById(applicationId)
+            .orElseThrow(() -> new ApplicationNotFoundException(applicationId));
+
+        Long candidateId = candidateUserId(application);
+        Long recruiterId = recruiterUserId(application);
+
+        Long recipientId;
+        if (senderId.equals(candidateId)) {
+            recipientId = recruiterId;
+        } else if (senderId.equals(recruiterId)) {
+            recipientId = candidateId;
+        } else {
+            throw new NotAParticipantException(senderId, applicationId);
+        }
+
+        Message saved = messageRepository.save(new Message(applicationId, senderId, recipientId, body));
+
+        if (recipientId != null) {
+            realtimeNotifier.notifyUser(recipientId, "NEW_MESSAGE", Map.of(
+                "applicationId", applicationId,
+                "senderId", senderId,
+                "preview", body.length() > 120 ? body.substring(0, 120) + "..." : body
+            ));
+        }
+
+        return saved;
+    }
+
+    public List<Message> getThread(Long applicationId) {
+        return messageRepository.findByApplicationIdOrderBySentAtAsc(applicationId);
+    }
+
+    /** Marks every message in this thread addressed to {@code readerId} as read. */
+    public void markThreadRead(Long applicationId, Long readerId) {
+        messageRepository.markThreadRead(applicationId, readerId, LocalDateTime.now());
+    }
+
+    public long getUnreadCount(Long userId) {
+        return messageRepository.countByRecipientIdAndReadAtIsNull(userId);
+    }
+}

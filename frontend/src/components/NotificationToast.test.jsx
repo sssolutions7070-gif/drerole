@@ -85,6 +85,24 @@ describe('NotificationToast', () => {
     expect(screen.getByText(/Zoom/)).toBeInTheDocument();
   });
 
+  it('shows a new-message toast with the message preview', () => {
+    localStorage.setItem('user', JSON.stringify({ id: 1, fullName: 'Asha' }));
+    localStorage.setItem('token', 'my-token');
+
+    render(<NotificationToast />);
+    const socket = FakeWebSocket.instances[0];
+
+    act(() => {
+      socket.emitMessage({
+        type: 'NEW_MESSAGE',
+        data: { applicationId: 42, senderId: 2, preview: 'Are you available Friday?' },
+      });
+    });
+
+    expect(screen.getByText('New message')).toBeInTheDocument();
+    expect(screen.getByText('Are you available Friday?')).toBeInTheDocument();
+  });
+
   it('dismisses a toast when its close button is clicked', () => {
     localStorage.setItem('user', JSON.stringify({ id: 1, fullName: 'Asha' }));
     localStorage.setItem('token', 'my-token');

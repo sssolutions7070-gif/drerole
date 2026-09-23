@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Briefcase, Calendar, Clock, Eye, CheckCircle, XCircle, Star, MapPin, ChevronDown, ChevronUp, RefreshCw, AlertCircle } from 'lucide-react';
+import { Briefcase, Calendar, Clock, Eye, CheckCircle, XCircle, Star, MapPin, ChevronDown, ChevronUp, RefreshCw, AlertCircle, MessageCircle } from 'lucide-react';
 import api from '../services/api';
+import MessageThread from '../components/MessageThread';
 
 const UserApplications = () => {
   const [applications, setApplications] = useState([]);
@@ -8,6 +9,7 @@ const UserApplications = () => {
   const [error, setError] = useState('');
   const [expandedApplication, setExpandedApplication] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [messageThreadApplication, setMessageThreadApplication] = useState(null);
 
   useEffect(() => {
     fetchUserApplications();
@@ -248,6 +250,13 @@ const UserApplications = () => {
                         </>
                       )}
                     </button>
+                    <button
+                      onClick={() => setMessageThreadApplication(application)}
+                      className="text-gray-600 hover:text-gray-800 text-sm font-medium flex items-center"
+                    >
+                      <MessageCircle className="h-4 w-4 mr-1" />
+                      Message Recruiter
+                    </button>
                   </div>
                 </div>
 
@@ -368,6 +377,14 @@ const UserApplications = () => {
             </div>
           ))}
         </div>
+      )}
+
+      {messageThreadApplication && (
+        <MessageThread
+          applicationId={messageThreadApplication.id}
+          title={`${messageThreadApplication.job?.title || 'Application'} - ${messageThreadApplication.job?.company || ''}`}
+          onClose={() => setMessageThreadApplication(null)}
+        />
       )}
     </div>
   );
