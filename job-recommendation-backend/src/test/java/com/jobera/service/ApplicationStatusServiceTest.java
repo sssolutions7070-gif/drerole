@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -124,5 +125,118 @@ class ApplicationStatusServiceTest {
 
         verify(notificationService, never()).sendApplicationStatusChanged(any(), any(), any(), any());
         verify(realtimeNotifier, never()).notifyUser(any(), any(), any());
+    }
+
+    private Application analyticsApplication(String status, Double matchPercentage) {
+        Application application = new Application();
+        application.setStatus(status);
+        application.setMatchPercentage(matchPercentage);
+        return application;
+    }
+
+    @Test
+    void analyticsAggregatesFunnelCountsAcrossAllOfARecruitersJobs() {
+        JobPosting jobA = new JobPosting();
+        jobA.setId(1L);
+        jobA.setTitle("Backend Developer");
+        JobPosting jobB = new JobPosting();
+        jobB.setId(2L);
+        jobB.setTitle("Frontend Developer");
+
+        when(applicationRepository.findByJobPostingId(1L)).thenReturn(java.util.List.of(
+            analyticsApplication("SHORTLISTED", 80.0),
+            analyticsApplication("REJECTED", 30.0)
+        ));
+        when(applicationRepository.findByJobPostingId(2L)).thenReturn(java.util.List.of(
+            analyticsApplication("OFFER_SENT", 90.0)
+        ));
+
+        Map<String, Object> analytics = service.getRecruiterAnalytics(java.util.List.of(jobA, jobB));
+
+        assertEquals(2, analytics.get("totalJobs"));
+        assertEquals(3L, analytics.get("totalApplications"));
+        assertEquals(1L, analytics.get("totalOffers"));
+        assertEquals(200.0 / 3.0, (double) analytics.get("averageMatchPercentage"), 0.2);
+    }
+
+    @Test
+    void analyticsComputesAverageTimeToFirstView() {
+        JobPosting job = new JobPosting();
+        job.setId(1L);
+        job.setTitle("Backend Developer");
+
+        Application viewedQuickly = analyticsApplication("SHORTLISTED", 80.0);
+        viewedQuickly.setApplicationDate(LocalDateTime.now().minusHours(10));
+        viewedQuickly.setViewedByRecruiter(true);
+        viewedQuickly.setViewedAt(LocalDateTime.now().minusHours(8)); // 2 hours later
+
+        Application neverViewed = analyticsApplication("APPLICATION_SUBMITTED", 50.0);
+        neverViewed.setApplicationDate(LocalDateTime.now().minusHours(5));
+
+        when(applicationRepository.findByJobPostingId(1L)).thenReturn(java.util.List.of(viewedQuickly, neverViewed));
+
+        Map<String, Object> analytics = service.getRecruiterAnalytics(java.util.List.of(job));
+
+        assertEquals(1L, analytics.get("totalViewed"));
+        assertEquals(2.0, (double) analytics.get("averageHoursToFirstView"), 0.1);
+    }
+
+    @Test
+    void analyticsComputesAverageTimeToOffer() {
+        JobPosting job = new JobPosting();
+        job.setId(1L);
+        job.setTitle("Backend Developer");
+
+        Application offered = analyticsApplication("OFFER_SENT", 95.0);
+        offered.setApplicationDate(LocalDateTime.now().minusDays(5));
+        offered.setStatusUpdatedAt(LocalDateTime.now()); // 5 days later
+
+        when(applicationRepository.findByJobPostingId(1L)).thenReturn(java.util.List.of(offered));
+
+        Map<String, Object> analytics = service.getRecruiterAnalytics(java.util.List.of(job));
+
+        assertEquals(5.0, (double) analytics.get("averageDaysToOffer"), 0.1);
+    }
+
+    @Test
+    void analyticsHandlesARecruiterWithNoApplicationsGracefully() {
+        JobPosting job = new JobPosting();
+        job.setId(1L);
+        job.setTitle("Backend Developer");
+
+        when(applicationRepository.findByJobPostingId(1L)).thenReturn(java.util.List.of());
+
+        Map<String, Object> analytics = service.getRecruiterAnalytics(java.util.List.of(job));
+
+        assertEquals(0L, analytics.get("totalApplications"));
+        assertEquals(null, analytics.get("averageMatchPercentage"));
+        assertEquals(null, analytics.get("averageHoursToFirstView"));
+        assertEquals(null, analytics.get("averageDaysToOffer"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void perJobBreakdownIsSortedByApplicationCountDescending() {
+        JobPosting smallJob = new JobPosting();
+        smallJob.setId(1L);
+        smallJob.setTitle("Small Job");
+        JobPosting bigJob = new JobPosting();
+        bigJob.setId(2L);
+        bigJob.setTitle("Big Job");
+
+        when(applicationRepository.findByJobPostingId(1L)).thenReturn(java.util.List.of(
+            analyticsApplication("APPLICATION_SUBMITTED", 50.0)
+        ));
+        when(applicationRepository.findByJobPostingId(2L)).thenReturn(java.util.List.of(
+            analyticsApplication("APPLICATION_SUBMITTED", 50.0),
+            analyticsApplication("SHORTLISTED", 70.0),
+            analyticsApplication("REJECTED", 20.0)
+        ));
+
+        Map<String, Object> analytics = service.getRecruiterAnalytics(java.util.List.of(smallJob, bigJob));
+
+        List<Map<String, Object>> perJob = (List<Map<String, Object>>) analytics.get("jobs");
+        assertEquals("Big Job", perJob.get(0).get("jobTitle"));
+        assertEquals("Small Job", perJob.get(1).get("jobTitle"));
     }
 }

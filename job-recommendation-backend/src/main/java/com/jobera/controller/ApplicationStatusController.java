@@ -256,13 +256,26 @@ public class ApplicationStatusController {
             stats.put(RESPONSE_KEY_RECRUITER_ID, recruiterId);
             
             return ResponseEntity.ok(stats);
-            
+
         } catch (Exception e) {
             return ResponseEntity.badRequest()
                 .body(Map.of(RESPONSE_KEY_ERROR, "Failed to fetch stats: " + e.getMessage()));
         }
     }
-    
+
+    /** Richer than /stats: a per-job breakdown plus time-to-first-view and time-to-offer. */
+    @GetMapping("/recruiter/{recruiterId}/analytics")
+    public ResponseEntity<Map<String, Object>> getApplicationAnalytics(@PathVariable Long recruiterId) {
+        try {
+            List<JobPosting> jobs = jobPostingService.getJobsByRecruiter(recruiterId);
+            Map<String, Object> analytics = applicationStatusService.getRecruiterAnalytics(jobs);
+            return ResponseEntity.ok(analytics);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                .body(Map.of(RESPONSE_KEY_ERROR, "Failed to fetch analytics: " + e.getMessage()));
+        }
+    }
+
     @PutMapping("/{applicationId}/status")
     public ResponseEntity<Map<String, Object>> updateApplicationStatus(
             @PathVariable Long applicationId,

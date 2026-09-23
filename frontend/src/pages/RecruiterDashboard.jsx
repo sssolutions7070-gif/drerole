@@ -27,7 +27,10 @@ const RecruiterDashboard = () => {
   const [error, setError] = useState('');
   const [recruiterProfile, setRecruiterProfile] = useState(null);
   const [activeTab, setActiveTab] = useState('jobs');
-  
+  const [analyticsData, setAnalyticsData] = useState(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState('');
+
   // External results state
   const [externalJobsWithStats, setExternalJobsWithStats] = useState([]);
   const [showExternalResults, setShowExternalResults] = useState(false);
@@ -100,6 +103,22 @@ const RecruiterDashboard = () => {
       setExternalJobsWithStats([]);
     } finally {
       setLoadingExternalStats(false);
+    }
+  };
+
+  const fetchAnalytics = async () => {
+    if (!recruiterProfile?.id) return;
+
+    try {
+      setAnalyticsLoading(true);
+      setAnalyticsError('');
+      const response = await api.get(`/applications/recruiter/${recruiterProfile.id}/analytics`);
+      setAnalyticsData(response.data);
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
+      setAnalyticsError('Failed to load analytics');
+    } finally {
+      setAnalyticsLoading(false);
     }
   };
 
@@ -210,7 +229,7 @@ const RecruiterDashboard = () => {
     });
   };
 
-  if (loading && activeTab !== 'tests' && activeTab !== 'external' && activeTab !== 'external-results') {
+  if (loading && activeTab !== 'tests' && activeTab !== 'external' && activeTab !== 'external-results' && activeTab !== 'analytics') {
     return (
       <div className="max-w-7xl mx-auto py-8 px-4">
         <div className="animate-pulse">
@@ -330,6 +349,20 @@ const RecruiterDashboard = () => {
             >
               <BarChart3 className="h-5 w-5 mr-2" />
               External Results
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab('analytics');
+                fetchAnalytics();
+              }}
+              className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center whitespace-nowrap ${
+                activeTab === 'analytics'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <TrendingUp className="h-5 w-5 mr-2" />
+              Analytics
             </button>
           </nav>
         </div>
@@ -672,6 +705,98 @@ const RecruiterDashboard = () => {
                 </div>
               ))}
             </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'analytics' && (
+        <div className="bg-white rounded-lg shadow-lg p-6">
+          <h3 className="text-xl font-semibold text-gray-800 mb-1">Hiring Analytics</h3>
+          <p className="text-gray-500 text-sm mb-6">
+            Based on current application status across all of your jobs. Timing figures only
+            cover applications with the relevant timestamps recorded.
+          </p>
+
+          {analyticsLoading ? (
+            <div className="text-center py-12">
+              <Loader className="h-8 w-8 animate-spin text-blue-600 mx-auto" />
+              <p className="mt-2 text-gray-600">Loading analytics...</p>
+            </div>
+          ) : analyticsError ? (
+            <div className="text-center py-12 text-red-600">{analyticsError}</div>
+          ) : !analyticsData || analyticsData.totalApplications === 0 ? (
+            <div className="text-center py-12">
+              <TrendingUp className="mx-auto h-16 w-16 text-gray-400 mb-4" />
+              <p className="text-gray-500">No applications yet to show analytics for.</p>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+                <div className="bg-blue-50 rounded-lg p-4 text-center">
+                  <p className="text-2xl font-bold text-blue-700">{analyticsData.totalJobs}</p>
+                  <p className="text-xs text-gray-600 mt-1">Active Jobs</p>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-4 text-center">
+                  <p className="text-2xl font-bold text-gray-800">{analyticsData.totalApplications}</p>
+                  <p className="text-xs text-gray-600 mt-1">Total Applications</p>
+                </div>
+                <div className="bg-purple-50 rounded-lg p-4 text-center">
+                  <p className="text-2xl font-bold text-purple-700">{analyticsData.totalViewed}</p>
+                  <p className="text-xs text-gray-600 mt-1">Viewed</p>
+                </div>
+                <div className="bg-green-50 rounded-lg p-4 text-center">
+                  <p className="text-2xl font-bold text-green-700">{analyticsData.totalOffers}</p>
+                  <p className="text-xs text-gray-600 mt-1">Offers Sent</p>
+                </div>
+                <div className="bg-yellow-50 rounded-lg p-4 text-center">
+                  <p className="text-2xl font-bold text-yellow-700">
+                    {analyticsData.averageMatchPercentage != null ? `${analyticsData.averageMatchPercentage}%` : '—'}
+                  </p>
+                  <p className="text-xs text-gray-600 mt-1">Avg. Match Score</p>
+                </div>
+                <div className="bg-indigo-50 rounded-lg p-4 text-center">
+                  <p className="text-2xl font-bold text-indigo-700">
+                    {analyticsData.averageDaysToOffer != null ? `${analyticsData.averageDaysToOffer}d` : '—'}
+                  </p>
+                  <p className="text-xs text-gray-600 mt-1">Avg. Time to Offer</p>
+                </div>
+              </div>
+
+              {analyticsData.averageHoursToFirstView != null && (
+                <p className="text-sm text-gray-600 mb-6 flex items-center">
+                  <Clock className="h-4 w-4 mr-1 text-gray-400" />
+                  On average, you first view a new application after {analyticsData.averageHoursToFirstView} hours.
+                </p>
+              )}
+
+              <h4 className="font-semibold text-gray-800 mb-3">By Job</h4>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-gray-500 border-b border-gray-200">
+                      <th className="py-2 pr-4">Job</th>
+                      <th className="py-2 pr-4">Applications</th>
+                      <th className="py-2 pr-4">Shortlisted</th>
+                      <th className="py-2 pr-4">Rejected</th>
+                      <th className="py-2 pr-4">Offers</th>
+                      <th className="py-2 pr-4">Avg. Match</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {analyticsData.jobs.map((job) => (
+                      <tr key={job.jobId} className="border-b border-gray-100">
+                        <td className="py-2 pr-4 font-medium text-gray-800">{job.jobTitle}</td>
+                        <td className="py-2 pr-4">{job.totalApplications}</td>
+                        <td className="py-2 pr-4">{job.shortlisted}</td>
+                        <td className="py-2 pr-4">{job.rejected}</td>
+                        <td className="py-2 pr-4">{job.offers}</td>
+                        <td className="py-2 pr-4">{job.averageMatchPercentage}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
       )}

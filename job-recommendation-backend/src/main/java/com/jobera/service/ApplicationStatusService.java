@@ -2,7 +2,10 @@ package com.jobera.service;
 
 import org.slf4j.LoggerFactory;
 import org.slf4j.Logger;
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
 
@@ -11,6 +14,7 @@ import org.springframework.stereotype.Service;
 import java.util.Map;
 
 import com.jobera.entity.Application;
+import com.jobera.entity.JobPosting;
 import com.jobera.repository.ApplicationRepository;
 
 @Service
@@ -166,7 +170,90 @@ public class ApplicationStatusService {
     public List<Application> getJobApplications(Long jobId) {
         return applicationRepository.findByJobPostingId(jobId);
     }
-    
+
+    private static final String STATUS_SHORTLISTED = "SHORTLISTED";
+    private static final String STATUS_REJECTED = "REJECTED";
+    private static final String STATUS_OFFER_SENT = "OFFER_SENT";
+
+    private static Double round1(double value) {
+        return Math.round(value * 10.0) / 10.0;
+    }
+
+    /**
+     * Aggregates the funnel a recruiter's applications are actually sitting in, plus two honest
+     * timing metrics derivable from the timestamps already recorded: how long applications sit
+     * before a recruiter first looks at them, and how long it takes from application to offer.
+     * There's no separate status-history table, so this reflects current status, not a full
+     * stage-by-stage history.
+     */
+    public Map<String, Object> getRecruiterAnalytics(List<JobPosting> jobs) {
+        List<Map<String, Object>> perJob = new ArrayList<>();
+
+        long totalApplications = 0;
+        long totalViewed = 0;
+        long totalOffers = 0;
+        double sumMatchPercentage = 0;
+        long matchCount = 0;
+        double sumHoursToFirstView = 0;
+        long viewedWithTimestamps = 0;
+        double sumDaysToOffer = 0;
+        long offersWithTimestamps = 0;
+
+        for (JobPosting job : jobs) {
+            List<Application> apps = getJobApplications(job.getId());
+
+            long shortlisted = apps.stream().filter(a -> STATUS_SHORTLISTED.equals(a.getStatus())).count();
+            long rejected = apps.stream().filter(a -> STATUS_REJECTED.equals(a.getStatus())).count();
+            long offers = apps.stream().filter(a -> STATUS_OFFER_SENT.equals(a.getStatus())).count();
+            double avgMatch = apps.stream()
+                .filter(a -> a.getMatchPercentage() != null)
+                .mapToDouble(Application::getMatchPercentage)
+                .average().orElse(0.0);
+
+            Map<String, Object> jobStats = new HashMap<>();
+            jobStats.put("jobId", job.getId());
+            jobStats.put("jobTitle", job.getTitle());
+            jobStats.put("totalApplications", apps.size());
+            jobStats.put("shortlisted", shortlisted);
+            jobStats.put("rejected", rejected);
+            jobStats.put("offers", offers);
+            jobStats.put("averageMatchPercentage", round1(avgMatch));
+            perJob.add(jobStats);
+
+            totalApplications += apps.size();
+            totalOffers += offers;
+
+            for (Application a : apps) {
+                if (Boolean.TRUE.equals(a.getViewedByRecruiter()) && a.getViewedAt() != null && a.getApplicationDate() != null) {
+                    totalViewed++;
+                    sumHoursToFirstView += Duration.between(a.getApplicationDate(), a.getViewedAt()).toMinutes() / 60.0;
+                    viewedWithTimestamps++;
+                }
+                if (STATUS_OFFER_SENT.equals(a.getStatus()) && a.getStatusUpdatedAt() != null && a.getApplicationDate() != null) {
+                    sumDaysToOffer += Duration.between(a.getApplicationDate(), a.getStatusUpdatedAt()).toHours() / 24.0;
+                    offersWithTimestamps++;
+                }
+                if (a.getMatchPercentage() != null) {
+                    sumMatchPercentage += a.getMatchPercentage();
+                    matchCount++;
+                }
+            }
+        }
+
+        perJob.sort((a, b) -> Integer.compare((int) b.get("totalApplications"), (int) a.get("totalApplications")));
+
+        Map<String, Object> analytics = new HashMap<>();
+        analytics.put("totalJobs", jobs.size());
+        analytics.put("totalApplications", totalApplications);
+        analytics.put("totalViewed", totalViewed);
+        analytics.put("totalOffers", totalOffers);
+        analytics.put("averageMatchPercentage", matchCount > 0 ? round1(sumMatchPercentage / matchCount) : null);
+        analytics.put("averageHoursToFirstView", viewedWithTimestamps > 0 ? round1(sumHoursToFirstView / viewedWithTimestamps) : null);
+        analytics.put("averageDaysToOffer", offersWithTimestamps > 0 ? round1(sumDaysToOffer / offersWithTimestamps) : null);
+        analytics.put("jobs", perJob);
+        return analytics;
+    }
+
     public static class ApplicationStatusException extends RuntimeException {
         public ApplicationStatusException(String message) {
             super(message);
