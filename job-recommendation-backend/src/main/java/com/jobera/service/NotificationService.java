@@ -1,6 +1,11 @@
 package com.jobera.service;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
 import org.springframework.stereotype.Service;
+
+import com.jobera.entity.JobPosting;
 
 /** Composes the email content for each notifiable event; {@link EmailService} handles transport. */
 @Service
@@ -49,6 +54,25 @@ public class NotificationService {
                 + "When: " + interviewDate + "\n"
                 + "Where: " + interviewLocation + "\n\n"
                 + "Log in to DreamRole for more details.");
+    }
+
+    public void sendJobAlertDigest(String toEmail, String fullName, List<JobPosting> matchingJobs) {
+        String jobList = matchingJobs.stream()
+            .map(job -> "- " + job.getTitle() + " at " + job.getCompany()
+                + (job.getLocation() != null ? " (" + job.getLocation() + ")" : ""))
+            .collect(Collectors.joining("\n"));
+
+        String subject = matchingJobs.size() == 1
+            ? "A new job matches your skills"
+            : matchingJobs.size() + " new jobs match your skills";
+
+        emailService.send(toEmail, subject,
+            "Hi " + safe(fullName) + ",\n\n"
+                + "Since your last alert, these new postings matched the skills on your resume:\n\n"
+                + jobList + "\n\n"
+                + "Log in to DreamRole to view and apply.\n\n"
+                + "You're receiving this because job alerts are turned on in your profile settings; "
+                + "you can turn them off there at any time.");
     }
 
     private static String safe(String value) {

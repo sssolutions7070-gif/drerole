@@ -68,10 +68,16 @@ public class User {
     private LocalDateTime lastLogin;
     
     private Boolean isActive;
-    
+
+    @Column(name = "job_alerts_enabled")
+    private Boolean jobAlertsEnabled = false;
+
+    @Column(name = "last_job_alert_sent_at")
+    private LocalDateTime lastJobAlertSentAt;
+
     @Column(name = "role_id")
     private Long roleId = 1L;
-    
+
     // Relationships
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnore
@@ -167,6 +173,10 @@ public class User {
     public void setLastLogin(LocalDateTime lastLogin) { this.lastLogin = lastLogin; }
     public Boolean getIsActive() { return isActive; }
     public void setIsActive(Boolean isActive) { this.isActive = isActive; }
+    public Boolean getJobAlertsEnabled() { return jobAlertsEnabled != null && jobAlertsEnabled; }
+    public void setJobAlertsEnabled(Boolean jobAlertsEnabled) { this.jobAlertsEnabled = jobAlertsEnabled; }
+    public LocalDateTime getLastJobAlertSentAt() { return lastJobAlertSentAt; }
+    public void setLastJobAlertSentAt(LocalDateTime lastJobAlertSentAt) { this.lastJobAlertSentAt = lastJobAlertSentAt; }
     public Long getRoleId() { return roleId; }
     public void setRoleId(Long roleId) { this.roleId = roleId; }
     public List<Resume> getResumes() { return resumes; }

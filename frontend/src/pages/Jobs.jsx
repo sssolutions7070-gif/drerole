@@ -1,7 +1,7 @@
 // src/pages/Jobs.jsx
 import React, { useState, useEffect } from 'react';
-import { Search, MapPin, DollarSign, Calendar, Star, TrendingUp, Clock, AlertCircle, Briefcase, Filter, X } from 'lucide-react';
-import api from '../services/api';
+import { Search, MapPin, DollarSign, Calendar, Star, TrendingUp, Clock, AlertCircle, Briefcase, Filter, X, Bookmark, BookmarkCheck } from 'lucide-react';
+import api, { savedJobsAPI } from '../services/api';
 import JobApplicationModal from '../components/JobApplicationModal';
 import JobRatingModal from '../components/JobRatingModal';
 import { isSkillMatch } from '../utils/skillMatching';
@@ -30,6 +30,8 @@ const Jobs = () => {
   const [selectedSalaryCurrency, setSelectedSalaryCurrency] = useState('');
   const [minSalary, setMinSalary] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [savedJobIds, setSavedJobIds] = useState(new Set());
+  const [showSavedOnly, setShowSavedOnly] = useState(false);
 
   const currentUser = JSON.parse(localStorage.getItem('user'));
 
@@ -37,6 +39,7 @@ const Jobs = () => {
   useEffect(() => {
     loadUserSkillsFromLocalStorage();
     fetchJobs();
+    fetchSavedJobIds();
 
     const handleSkillsUpdate = (event) => {
       if (event.detail && event.detail.skills) {
@@ -59,6 +62,44 @@ const Jobs = () => {
     }
   }, [refreshKey]);
 
+  const fetchSavedJobIds = async () => {
+    if (!currentUser?.id) return;
+    try {
+      const response = await savedJobsAPI.getSavedJobs(currentUser.id);
+      setSavedJobIds(new Set(response.data.map(job => job.id)));
+    } catch (error) {
+      console.error('Error loading saved jobs:', error);
+    }
+  };
+
+  const toggleSaveJob = async (job) => {
+    if (!currentUser?.id) return;
+    const alreadySaved = savedJobIds.has(job.id);
+
+    // Optimistic update: the bookmark icon should flip instantly, not after a round trip.
+    setSavedJobIds(prev => {
+      const next = new Set(prev);
+      alreadySaved ? next.delete(job.id) : next.add(job.id);
+      return next;
+    });
+
+    try {
+      if (alreadySaved) {
+        await savedJobsAPI.unsaveJob(currentUser.id, job.id);
+      } else {
+        await savedJobsAPI.saveJob(currentUser.id, job.id);
+      }
+    } catch (error) {
+      console.error('Error toggling saved job:', error);
+      // Roll back on failure so the UI doesn't lie about what's actually saved.
+      setSavedJobIds(prev => {
+        const next = new Set(prev);
+        alreadySaved ? next.add(job.id) : next.delete(job.id);
+        return next;
+      });
+    }
+  };
+
   const loadUserSkillsFromLocalStorage = () => {
     try {
       const storedSkills = localStorage.getItem('userSkills');
@@ -79,7 +120,11 @@ const Jobs = () => {
 
   useEffect(() => {
     let filtered = showRecommended && recommendedJobs.length > 0 ? recommendedJobs : jobs;
-    
+
+    if (showSavedOnly) {
+      filtered = filtered.filter(job => savedJobIds.has(job.id));
+    }
+
     if (searchTerm) {
       filtered = filtered.filter(job =>
         job.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -123,7 +168,7 @@ const Jobs = () => {
     filtered = sortJobs(filtered, sortBy);
     setFilteredJobs(filtered);
   }, [searchTerm, jobs, recommendedJobs, showRecommended, sortBy, selectedLocation, selectedJobType,
-      selectedExperienceLevel, selectedSalaryCurrency, minSalary]);
+      selectedExperienceLevel, selectedSalaryCurrency, minSalary, showSavedOnly, savedJobIds]);
 
   const parseSkillsFromJson = (skillsJson) => {
     try {
@@ -508,6 +553,20 @@ const Jobs = () => {
           </div>
           
           <div className="flex space-x-3">
+            {currentUser && (
+              <button
+                onClick={() => setShowSavedOnly(!showSavedOnly)}
+                className={`px-4 py-3 border rounded-lg flex items-center space-x-2 transition-colors ${
+                  showSavedOnly
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                {showSavedOnly ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
+                <span>Saved{savedJobIds.size > 0 ? ` (${savedJobIds.size})` : ''}</span>
+              </button>
+            )}
+
             <button
               onClick={() => setShowFilters(!showFilters)}
               className="px-4 py-3 border border-gray-300 rounded-lg flex items-center space-x-2 hover:bg-gray-50 transition-colors"
@@ -518,7 +577,7 @@ const Jobs = () => {
                 <span className="ml-1 w-2 h-2 bg-blue-600 rounded-full"></span>
               )}
             </button>
-            
+
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
@@ -627,14 +686,29 @@ const Jobs = () => {
         <div className="lg:col-span-2 space-y-4">
           {filteredJobs.length === 0 ? (
             <div className="text-center py-12 bg-white rounded-lg shadow">
-              <Briefcase className="mx-auto h-16 w-16 text-gray-400 mb-4" />
-              <p className="text-gray-500">No jobs found matching your criteria.</p>
-              <button
-                onClick={clearFilters}
-                className="mt-4 text-blue-600 hover:text-blue-800"
-              >
-                Clear all filters
-              </button>
+              {showSavedOnly ? (
+                <>
+                  <Bookmark className="mx-auto h-16 w-16 text-gray-400 mb-4" />
+                  <p className="text-gray-500">You haven't saved any jobs yet.</p>
+                  <button
+                    onClick={() => setShowSavedOnly(false)}
+                    className="mt-4 text-blue-600 hover:text-blue-800"
+                  >
+                    Browse all jobs
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Briefcase className="mx-auto h-16 w-16 text-gray-400 mb-4" />
+                  <p className="text-gray-500">No jobs found matching your criteria.</p>
+                  <button
+                    onClick={clearFilters}
+                    className="mt-4 text-blue-600 hover:text-blue-800"
+                  >
+                    Clear all filters
+                  </button>
+                </>
+              )}
             </div>
           ) : (
             filteredJobs.map((job) => (
@@ -661,6 +735,21 @@ const Jobs = () => {
                     </div>
                     <p className="text-lg text-gray-600 mb-2">{job.company}</p>
                   </div>
+                  {currentUser && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); toggleSaveJob(job); }}
+                      title={savedJobIds.has(job.id) ? 'Remove from saved jobs' : 'Save this job'}
+                      className={`p-2 rounded-full hover:bg-gray-100 transition-colors ${
+                        savedJobIds.has(job.id) ? 'text-blue-600' : 'text-gray-400'
+                      }`}
+                    >
+                      {savedJobIds.has(job.id) ? (
+                        <BookmarkCheck className="h-5 w-5" />
+                      ) : (
+                        <Bookmark className="h-5 w-5" />
+                      )}
+                    </button>
+                  )}
                 </div>
 
                 <div className="flex flex-wrap gap-4 mb-4 text-sm text-gray-600">

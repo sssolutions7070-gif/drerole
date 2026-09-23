@@ -18,27 +18,31 @@ import com.jobera.entity.User;
 import com.jobera.repository.ApplicationRepository;
 import com.jobera.repository.JobPostingRepository;
 import com.jobera.repository.RecruiterRepository;
+import com.jobera.repository.SavedJobRepository;
 import com.jobera.repository.UserRepository;
 
 @Service
 public class JobPostingService {
     private static final Logger log = LoggerFactory.getLogger(JobPostingService.class);
 
-    
+
     private final JobPostingRepository jobPostingRepository;
     private final ApplicationRepository applicationRepository;
     private final UserRepository userRepository;
     private final RecruiterRepository recruiterRepository;
+    private final SavedJobRepository savedJobRepository;
     private final ObjectMapper objectMapper;
-    
+
     public JobPostingService(JobPostingRepository jobPostingRepository,
                            ApplicationRepository applicationRepository,
                            UserRepository userRepository,
-                           RecruiterRepository recruiterRepository) {
+                           RecruiterRepository recruiterRepository,
+                           SavedJobRepository savedJobRepository) {
         this.jobPostingRepository = jobPostingRepository;
         this.applicationRepository = applicationRepository;
         this.userRepository = userRepository;
         this.recruiterRepository = recruiterRepository;
+        this.savedJobRepository = savedJobRepository;
         this.objectMapper = new ObjectMapper();
     }
     
@@ -464,9 +468,10 @@ public class JobPostingService {
             throw new JobPostingException("You are not authorized to delete this job posting");
         }
         
+        savedJobRepository.deleteByJobPostingId(jobId);
         jobPostingRepository.delete(jobPosting);
     }
-    
+
     public List<JobPosting> getJobsByRecruiter(Long recruiterId) {
         return jobPostingRepository.findByRecruiterIdAndIsActiveTrue(recruiterId);
     }

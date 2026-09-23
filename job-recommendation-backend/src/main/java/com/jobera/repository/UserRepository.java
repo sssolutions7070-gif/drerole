@@ -86,4 +86,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
      */
     @Query("SELECT u FROM User u WHERE u.createdAt >= :date")
     List<User> findUsersRegisteredAfter(@Param("date") LocalDateTime date);
+
+    /**
+     * Active users who have opted in to job alert emails
+     * @return List of users eligible for the job alert digest
+     */
+    List<User> findByJobAlertsEnabledTrueAndIsActiveTrue();
 }

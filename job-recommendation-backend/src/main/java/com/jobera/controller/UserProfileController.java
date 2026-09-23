@@ -52,6 +52,7 @@ public class UserProfileController {
     private static final String FIELD_WEBSITE = "website";
     private static final String FIELD_LINKEDIN = "linkedin";
     private static final String FIELD_GITHUB = "github";
+    private static final String FIELD_JOB_ALERTS_ENABLED = "jobAlertsEnabled";
     private static final String ERROR_KEY = "error";
     private static final String MESSAGE_KEY = "message";
     
@@ -106,6 +107,7 @@ public class UserProfileController {
             profile.put(FIELD_LINKEDIN, user.getLinkedin());
             profile.put(FIELD_GITHUB, user.getGithub());
             profile.put("profilePicture", user.getProfilePicture());
+            profile.put(FIELD_JOB_ALERTS_ENABLED, user.getJobAlertsEnabled());
             profile.put("skills", skills);
             profile.put("education", education);
             profile.put("experience", experience);
@@ -155,6 +157,7 @@ public class UserProfileController {
             completeProfile.put(FIELD_LINKEDIN, user.getLinkedin());
             completeProfile.put(FIELD_GITHUB, user.getGithub());
             completeProfile.put("profilePicture", user.getProfilePicture());
+            completeProfile.put(FIELD_JOB_ALERTS_ENABLED, user.getJobAlertsEnabled());
             completeProfile.put("skills", skillNames);
             
             if (latestResume.isPresent()) {
@@ -274,9 +277,12 @@ public class UserProfileController {
             if (profileData.containsKey(FIELD_GITHUB)) {
                 user.setGithub((String) profileData.get(FIELD_GITHUB));
             }
-            
+            if (profileData.containsKey(FIELD_JOB_ALERTS_ENABLED)) {
+                user.setJobAlertsEnabled(Boolean.TRUE.equals(profileData.get(FIELD_JOB_ALERTS_ENABLED)));
+            }
+
             User savedUser = userRepository.save(user);
-            
+
             Map<String, Object> response = new HashMap<>();
             response.put("id", savedUser.getId());
             response.put(FIELD_FULL_NAME, savedUser.getFullName());
@@ -290,7 +296,8 @@ public class UserProfileController {
             response.put(FIELD_LINKEDIN, savedUser.getLinkedin());
             response.put(FIELD_GITHUB, savedUser.getGithub());
             response.put("profilePicture", savedUser.getProfilePicture());
-            
+            response.put(FIELD_JOB_ALERTS_ENABLED, savedUser.getJobAlertsEnabled());
+
             return ResponseEntity.ok(response);
             
         } catch (Exception e) {

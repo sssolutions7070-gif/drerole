@@ -63,6 +63,25 @@ export const jobRatingAPI = {
     api.delete(`/jobs/ratings/${ratingId}`),
 };
 
+// Saved Jobs API calls
+export const savedJobsAPI = {
+  // List a user's saved jobs
+  getSavedJobs: (userId) =>
+    api.get(`/users/${userId}/saved-jobs`),
+
+  // Whether a specific job is already saved by this user
+  isJobSaved: (userId, jobId) =>
+    api.get(`/users/${userId}/saved-jobs/${jobId}/status`),
+
+  // Bookmark a job
+  saveJob: (userId, jobId) =>
+    api.post(`/users/${userId}/saved-jobs/${jobId}`),
+
+  // Remove a bookmark
+  unsaveJob: (userId, jobId) =>
+    api.delete(`/users/${userId}/saved-jobs/${jobId}`),
+};
+
 // Resume Matching API calls
 export const resumeMatchingAPI = {
   // Get applications sorted by match percentage

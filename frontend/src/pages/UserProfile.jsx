@@ -62,6 +62,7 @@ const UserProfile = () => {
     website: '',
     linkedin: '',
     github: '',
+    jobAlertsEnabled: false,
     skills: [],
     education: [],
     experience: [],
@@ -117,6 +118,7 @@ const UserProfile = () => {
         website: userData.website || '',
         linkedin: userData.linkedin || '',
         github: userData.github || '',
+        jobAlertsEnabled: userData.jobAlertsEnabled || false,
         skills: userData.skills || [],
         education: userData.education || [],
         experience: userData.experience || [],
@@ -587,6 +589,19 @@ const UserProfile = () => {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">GitHub</label>
                     <input type="url" name="github" value={formData.github} onChange={handleInputChange} className="w-full border border-gray-300 rounded-lg px-3 py-2" />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={formData.jobAlertsEnabled}
+                        onChange={(e) => setFormData({ ...formData, jobAlertsEnabled: e.target.checked })}
+                        className="h-4 w-4 text-blue-600 rounded border-gray-300"
+                      />
+                      <span className="text-sm font-medium text-gray-700">
+                        Email me when a new job posting matches the skills on my resume
+                      </span>
+                    </label>
                   </div>
                 </div>
               </div>
