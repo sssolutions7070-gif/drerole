@@ -38,6 +38,17 @@ public class AuthInterceptor implements HandlerInterceptor {
     );
     private static final String PROCTORING_CALLBACK = "/api/aptitude-tests/*/violations";
 
+    // Anyone can browse job listings without an account - only applying, saving or rating a job
+    // requires one. Recommendations stay authenticated since they're personalized to whichever
+    // resume is on file, which only makes sense for a logged-in user.
+    private static final Set<String> PUBLIC_GET_PATTERNS = Set.of(
+        "/api/jobs",
+        "/api/jobs/search",
+        "/api/jobs/{jobId}",
+        "/api/jobs/{jobId}/ratings",
+        "/api/jobs/{jobId}/rating/stats"
+    );
+
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
     private final AuthenticationService authenticationService;
     private final AccessPolicy accessPolicy;
@@ -60,6 +71,9 @@ public class AuthInterceptor implements HandlerInterceptor {
 
         String path = request.getRequestURI();
         if (PUBLIC_PATHS.contains(path)) {
+            return true;
+        }
+        if (HttpMethod.GET.matches(request.getMethod()) && isPublicGetRoute(path)) {
             return true;
         }
         if (HttpMethod.POST.matches(request.getMethod())
@@ -96,6 +110,10 @@ public class AuthInterceptor implements HandlerInterceptor {
             params.put(UriUtils.decode(name, StandardCharsets.UTF_8),
                 values.stream().map(v -> UriUtils.decode(v == null ? "" : v, StandardCharsets.UTF_8)).toArray(String[]::new)));
         return params;
+    }
+
+    private boolean isPublicGetRoute(String path) {
+        return PUBLIC_GET_PATTERNS.stream().anyMatch(pattern -> pathMatcher.match(pattern, path));
     }
 
     private boolean isTrustedProctoringCall(HttpServletRequest request) {

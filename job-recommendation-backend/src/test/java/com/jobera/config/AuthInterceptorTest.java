@@ -66,7 +66,7 @@ class AuthInterceptorTest {
 
     @Test
     void missingTokenIsRejectedWith401() throws Exception {
-        assertFalse(interceptor.preHandle(request("GET", "/api/jobs"), response, new Object()));
+        assertFalse(interceptor.preHandle(request("GET", "/api/jobs/recommendations/skills"), response, new Object()));
         assertEquals(401, response.getStatus());
         assertTrue(response.getContentAsString().contains("Authentication required"));
     }
@@ -74,7 +74,7 @@ class AuthInterceptorTest {
     @Test
     void invalidTokenIsRejectedWith401() throws Exception {
         when(authenticationService.validateToken("bad")).thenReturn(Optional.empty());
-        MockHttpServletRequest request = request("GET", "/api/jobs");
+        MockHttpServletRequest request = request("GET", "/api/jobs/recommendations/skills");
         request.addHeader("Authorization", "Bearer bad");
 
         assertFalse(interceptor.preHandle(request, response, new Object()));
@@ -85,12 +85,38 @@ class AuthInterceptorTest {
     void validTokenAllowedByThePolicyPassesAndExposesTheUser() throws Exception {
         User user = user(5);
         when(authenticationService.validateToken("good")).thenReturn(Optional.of(user));
-        when(accessPolicy.isAllowed(eq(user), eq("GET"), eq("/api/jobs"), any())).thenReturn(true);
-        MockHttpServletRequest request = request("GET", "/api/jobs");
+        when(accessPolicy.isAllowed(eq(user), eq("GET"), eq("/api/jobs/recommendations/skills"), any())).thenReturn(true);
+        MockHttpServletRequest request = request("GET", "/api/jobs/recommendations/skills");
         request.addHeader("Authorization", "Bearer good");
 
         assertTrue(interceptor.preHandle(request, response, new Object()));
         assertSame(user, request.getAttribute(AuthInterceptor.AUTHENTICATED_USER));
+    }
+
+    @Test
+    void jobBrowsingNeedsNoTokenButPersonalizedRoutesStillDo() throws Exception {
+        for (String path : new String[] {
+                "/api/jobs", "/api/jobs/search", "/api/jobs/42", "/api/jobs/42/ratings", "/api/jobs/42/rating/stats"}) {
+            assertTrue(interceptor.preHandle(request("GET", path), new MockHttpServletResponse(), new Object()), path);
+        }
+        verifyNoInteractions(accessPolicy);
+
+        // Recommendations are personalized to a resume on file, so they stay behind a login,
+        // even though the path shape looks similar to the now-public job-browsing routes.
+        for (String path : new String[] {
+                "/api/jobs/recommendations/skills", "/api/jobs/recommendations/42", "/api/jobs/recommendations/42/detailed"}) {
+            MockHttpServletResponse resp = new MockHttpServletResponse();
+            assertFalse(interceptor.preHandle(request("GET", path), resp, new Object()), path);
+            assertEquals(401, resp.getStatus(), path);
+        }
+    }
+
+    @Test
+    void jobBrowsingPublicAccessIsGetOnly() throws Exception {
+        // A public *read* doesn't mean a public *write* - posting/rating/applying still needs a
+        // real account, even though it shares a URL prefix with the now-public browsing routes.
+        assertFalse(interceptor.preHandle(request("POST", "/api/jobs/42/rate/5"), response, new Object()));
+        assertEquals(401, response.getStatus());
     }
 
     @Test

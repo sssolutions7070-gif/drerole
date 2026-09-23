@@ -1,5 +1,6 @@
 // src/pages/Jobs.jsx
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Search, MapPin, DollarSign, Calendar, Star, TrendingUp, Clock, AlertCircle, Briefcase, Filter, X, Bookmark, BookmarkCheck } from 'lucide-react';
 import api, { savedJobsAPI } from '../services/api';
 import JobApplicationModal from '../components/JobApplicationModal';
@@ -32,6 +33,7 @@ const Jobs = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [savedJobIds, setSavedJobIds] = useState(new Set());
   const [showSavedOnly, setShowSavedOnly] = useState(false);
+  const navigate = useNavigate();
 
   const currentUser = JSON.parse(localStorage.getItem('user'));
 
@@ -340,11 +342,19 @@ const Jobs = () => {
   };
 
   const applyForJob = (job) => {
+    if (!currentUser) {
+      navigate('/login');
+      return;
+    }
     setSelectedJobForApplication(job);
     setShowApplicationModal(true);
   };
 
   const rateJob = (job) => {
+    if (!currentUser) {
+      navigate('/login');
+      return;
+    }
     setSelectedJob(job);
     setShowRatingModal(true);
   };
@@ -465,7 +475,18 @@ const Jobs = () => {
           </div>
         )}
         
-        {userSkills.length === 0 && (
+        {!currentUser && (
+          <div className="mt-2 text-sm text-blue-700 bg-blue-50 p-2 rounded flex items-center">
+            <AlertCircle className="h-4 w-4 mr-2" />
+            You're browsing as a guest.{' '}
+            <button onClick={() => navigate('/login')} className="underline font-medium ml-1">
+              Sign in
+            </button>
+            <span className="ml-1">to apply, save or rate jobs.</span>
+          </div>
+        )}
+
+        {currentUser && userSkills.length === 0 && (
           <div className="mt-2 text-sm text-yellow-600 bg-yellow-50 p-2 rounded flex items-center">
             <AlertCircle className="h-4 w-4 mr-2" />
             ⚠️ No skills found. Please upload your resume to get personalized job recommendations.

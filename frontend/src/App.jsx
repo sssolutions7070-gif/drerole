@@ -165,11 +165,9 @@ function App() {
               </ProtectedRoute>
             } />
             
-            <Route path="/jobs" element={
-              <ProtectedRoute user={user}>
-                <Jobs />
-              </ProtectedRoute>
-            } />
+            {/* Public: anyone can browse jobs without an account; applying/saving/rating
+                still require one, and those actions are gated inside the page itself. */}
+            <Route path="/jobs" element={<Jobs />} />
             
             <Route path="/upload" element={
               <ProtectedRoute user={user}>
