@@ -39,7 +39,7 @@ public class WebSocketConfig implements WebSocketConfigurer {
         registry.addHandler(notificationHandler, "/ws/notifications")
             .addInterceptors(tokenHandshakeInterceptor)
             .setAllowedOriginPatterns(allowedOriginPatterns);
-        registry.addHandler(videoSignalHandler, "/ws/video-interview")
+        registry.addHandler(videoSignalHandler, "/ws/interview-round")
             .addInterceptors(videoSignalHandshakeInterceptor)
             .setAllowedOriginPatterns(allowedOriginPatterns);
     }

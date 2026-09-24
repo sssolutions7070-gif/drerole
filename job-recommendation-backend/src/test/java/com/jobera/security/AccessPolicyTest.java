@@ -29,6 +29,7 @@ import com.jobera.repository.DreamRoleTestAssignmentRepository;
 import com.jobera.repository.DreamRoleTestRepository;
 import com.jobera.repository.ExternalCandidateRepository;
 import com.jobera.repository.ExternalJobPostingRepository;
+import com.jobera.repository.InterviewRoundRepository;
 import com.jobera.repository.JobPostingRepository;
 import com.jobera.repository.JobRatingRepository;
 import com.jobera.repository.RecruiterRepository;
@@ -50,6 +51,7 @@ class AccessPolicyTest {
     DreamRoleTestAssignmentRepository dreamRoleAssignmentRepository = mock(DreamRoleTestAssignmentRepository.class);
     JobRatingRepository ratingRepository = mock(JobRatingRepository.class);
     ResumeRepository resumeRepository = mock(ResumeRepository.class);
+    InterviewRoundRepository interviewRoundRepository = mock(InterviewRoundRepository.class);
 
     AccessPolicy policy;
 
@@ -79,7 +81,7 @@ class AccessPolicyTest {
     void setUp() {
         policy = new AccessPolicy(recruiterRepository, jobRepository, externalJobRepository, externalCandidateRepository,
             aptitudeTestRepository, dreamRoleTestRepository, applicationRepository, assignmentRepository,
-            dreamRoleAssignmentRepository, ratingRepository, resumeRepository);
+            dreamRoleAssignmentRepository, ratingRepository, resumeRepository, interviewRoundRepository);
         lenient().when(recruiterRepository.findByUserId(20L)).thenReturn(Optional.of(recruiter));
         lenient().when(recruiterRepository.findByUserId(21L)).thenReturn(Optional.of(otherRecruiter));
         lenient().when(recruiterRepository.findByUserId(10L)).thenReturn(Optional.empty());

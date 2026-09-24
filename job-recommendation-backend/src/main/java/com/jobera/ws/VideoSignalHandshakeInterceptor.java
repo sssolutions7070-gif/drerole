@@ -14,14 +14,14 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import com.jobera.entity.User;
 import com.jobera.service.AuthenticationService;
-import com.jobera.service.VideoInterviewService;
+import com.jobera.service.InterviewRoundService;
 
 /**
- * Authenticates a video-interview signaling connection the same way TokenHandshakeInterceptor
- * does (bearer token as a query param, since browsers can't set a header on a WebSocket upgrade),
- * then also checks the caller is actually one of the two people on this application's interview -
- * a WebSocket handshake never passes through AuthInterceptor/AccessPolicy, so that check has to
- * happen here instead.
+ * Authenticates an interview-round signaling connection (video + the shared code editor) the
+ * same way TokenHandshakeInterceptor does (bearer token as a query param, since browsers can't
+ * set a header on a WebSocket upgrade), then also checks the caller is actually one of the two
+ * people on this round's application - a WebSocket handshake never passes through
+ * AuthInterceptor/AccessPolicy, so that check has to happen here instead.
  */
 @Component
 public class VideoSignalHandshakeInterceptor implements HandshakeInterceptor {
@@ -29,12 +29,12 @@ public class VideoSignalHandshakeInterceptor implements HandshakeInterceptor {
     static final String ROOM_ID_ATTRIBUTE = "roomId";
 
     private final AuthenticationService authenticationService;
-    private final VideoInterviewService videoInterviewService;
+    private final InterviewRoundService interviewRoundService;
 
     public VideoSignalHandshakeInterceptor(AuthenticationService authenticationService,
-                                            VideoInterviewService videoInterviewService) {
+                                            InterviewRoundService interviewRoundService) {
         this.authenticationService = authenticationService;
-        this.videoInterviewService = videoInterviewService;
+        this.interviewRoundService = interviewRoundService;
     }
 
     @Override
@@ -48,7 +48,7 @@ public class VideoSignalHandshakeInterceptor implements HandshakeInterceptor {
         }
 
         Optional<User> user = authenticationService.validateToken(token);
-        if (user.isEmpty() || !videoInterviewService.isParticipant(roomId, user.get().getId())) {
+        if (user.isEmpty() || !interviewRoundService.isParticipant(roomId, user.get().getId())) {
             return false;
         }
 

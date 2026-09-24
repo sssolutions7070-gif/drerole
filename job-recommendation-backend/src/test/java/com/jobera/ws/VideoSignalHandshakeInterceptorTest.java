@@ -20,13 +20,13 @@ import org.springframework.web.socket.WebSocketHandler;
 
 import com.jobera.entity.User;
 import com.jobera.service.AuthenticationService;
-import com.jobera.service.VideoInterviewService;
+import com.jobera.service.InterviewRoundService;
 
 @ExtendWith(MockitoExtension.class)
 class VideoSignalHandshakeInterceptorTest {
 
     @Mock AuthenticationService authenticationService;
-    @Mock VideoInterviewService videoInterviewService;
+    @Mock InterviewRoundService interviewRoundService;
     @Mock ServerHttpRequest request;
     @Mock ServerHttpResponse response;
     @Mock WebSocketHandler wsHandler;
@@ -39,12 +39,12 @@ class VideoSignalHandshakeInterceptorTest {
 
     @Test
     void aParticipantWithAValidTokenIsAdmitted() {
-        interceptor = new VideoSignalHandshakeInterceptor(authenticationService, videoInterviewService);
-        requestUri("ws://localhost:8081/ws/video-interview?token=good-token&roomId=room-1");
+        interceptor = new VideoSignalHandshakeInterceptor(authenticationService, interviewRoundService);
+        requestUri("ws://localhost:8081/ws/interview-round?token=good-token&roomId=room-1");
         User user = new User();
         user.setId(9L);
         when(authenticationService.validateToken("good-token")).thenReturn(Optional.of(user));
-        when(videoInterviewService.isParticipant("room-1", 9L)).thenReturn(true);
+        when(interviewRoundService.isParticipant("room-1", 9L)).thenReturn(true);
 
         Map<String, Object> attributes = new HashMap<>();
         boolean allowed = interceptor.beforeHandshake(request, response, wsHandler, attributes);
@@ -56,12 +56,12 @@ class VideoSignalHandshakeInterceptorTest {
 
     @Test
     void someoneNotOnTheApplicationIsRejectedEvenWithAValidToken() {
-        interceptor = new VideoSignalHandshakeInterceptor(authenticationService, videoInterviewService);
-        requestUri("ws://localhost:8081/ws/video-interview?token=good-token&roomId=room-1");
+        interceptor = new VideoSignalHandshakeInterceptor(authenticationService, interviewRoundService);
+        requestUri("ws://localhost:8081/ws/interview-round?token=good-token&roomId=room-1");
         User user = new User();
         user.setId(9L);
         when(authenticationService.validateToken("good-token")).thenReturn(Optional.of(user));
-        when(videoInterviewService.isParticipant("room-1", 9L)).thenReturn(false);
+        when(interviewRoundService.isParticipant("room-1", 9L)).thenReturn(false);
 
         boolean allowed = interceptor.beforeHandshake(request, response, wsHandler, new HashMap<>());
 
@@ -70,8 +70,8 @@ class VideoSignalHandshakeInterceptorTest {
 
     @Test
     void anInvalidTokenIsRejected() {
-        interceptor = new VideoSignalHandshakeInterceptor(authenticationService, videoInterviewService);
-        requestUri("ws://localhost:8081/ws/video-interview?token=bad-token&roomId=room-1");
+        interceptor = new VideoSignalHandshakeInterceptor(authenticationService, interviewRoundService);
+        requestUri("ws://localhost:8081/ws/interview-round?token=bad-token&roomId=room-1");
         when(authenticationService.validateToken("bad-token")).thenReturn(Optional.empty());
 
         boolean allowed = interceptor.beforeHandshake(request, response, wsHandler, new HashMap<>());
@@ -81,8 +81,8 @@ class VideoSignalHandshakeInterceptorTest {
 
     @Test
     void aMissingRoomIdIsRejectedWithoutEvenCheckingTheToken() {
-        interceptor = new VideoSignalHandshakeInterceptor(authenticationService, videoInterviewService);
-        requestUri("ws://localhost:8081/ws/video-interview?token=good-token");
+        interceptor = new VideoSignalHandshakeInterceptor(authenticationService, interviewRoundService);
+        requestUri("ws://localhost:8081/ws/interview-round?token=good-token");
 
         boolean allowed = interceptor.beforeHandshake(request, response, wsHandler, new HashMap<>());
 
@@ -91,8 +91,8 @@ class VideoSignalHandshakeInterceptorTest {
 
     @Test
     void aMissingTokenIsRejected() {
-        interceptor = new VideoSignalHandshakeInterceptor(authenticationService, videoInterviewService);
-        requestUri("ws://localhost:8081/ws/video-interview?roomId=room-1");
+        interceptor = new VideoSignalHandshakeInterceptor(authenticationService, interviewRoundService);
+        requestUri("ws://localhost:8081/ws/interview-round?roomId=room-1");
 
         boolean allowed = interceptor.beforeHandshake(request, response, wsHandler, new HashMap<>());
 

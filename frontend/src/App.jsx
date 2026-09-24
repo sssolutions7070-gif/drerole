@@ -31,7 +31,7 @@ const ResumeUpload = lazy(() => import('./pages/ResumeUpload'));
 const RecruiterRegister = lazy(() => import('./pages/RecruiterRegister'));
 const RecruiterDashboard = lazy(() => import('./pages/RecruiterDashboard'));
 const OAuthCallback = lazy(() => import('./pages/OAuthCallback'));
-const VideoInterviewRoom = lazy(() => import('./pages/VideoInterviewRoom'));
+const InterviewRoundRoom = lazy(() => import('./pages/InterviewRoundRoom'));
 
 function App() {
   const [user, setUser] = useState(null);
@@ -157,9 +157,9 @@ function App() {
               </ProtectedRoute>
             } />
 
-            <Route path="/applications/:applicationId/video-interview" element={
+            <Route path="/interview-rounds/:roundId" element={
               <ProtectedRoute user={user}>
-                <VideoInterviewRoom />
+                <InterviewRoundRoom />
               </ProtectedRoute>
             } />
 

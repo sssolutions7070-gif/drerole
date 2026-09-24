@@ -106,16 +106,35 @@ export const messagesAPI = {
     api.get(`/messages/unread-count/${userId}`),
 };
 
-// Video interview API calls (WebRTC, scoped to one application)
-export const videoInterviewAPI = {
-  schedule: (applicationId, scheduledAt) =>
-    api.post(`/applications/${applicationId}/video-interview`, { scheduledAt }),
+// Interview pipeline API calls (a sequence of rounds per application, each with its own
+// video/code-editor room - WebRTC signaling itself happens over a separate WebSocket)
+export const interviewRoundsAPI = {
+  schedule: (applicationId, title, roundType, scheduledAt) =>
+    api.post(`/applications/${applicationId}/interview-rounds`, { title, roundType, scheduledAt }),
 
-  getJoinInfo: (applicationId) =>
-    api.get(`/applications/${applicationId}/video-interview`),
+  list: (applicationId) =>
+    api.get(`/applications/${applicationId}/interview-rounds`),
 
-  updateStatus: (applicationId, status) =>
-    api.put(`/applications/${applicationId}/video-interview/status`, { status }),
+  getJoinInfo: (roundId) =>
+    api.get(`/interview-rounds/${roundId}/join`),
+
+  updateStatus: (roundId, status) =>
+    api.put(`/interview-rounds/${roundId}/status`, { status }),
+
+  reschedule: (roundId, scheduledAt) =>
+    api.put(`/interview-rounds/${roundId}/reschedule`, { scheduledAt }),
+};
+
+// Structured interview scorecards - recruiter-only
+export const scorecardAPI = {
+  submit: (roundId, scorecard) =>
+    api.put(`/interview-rounds/${roundId}/scorecard`, scorecard),
+
+  get: (roundId) =>
+    api.get(`/interview-rounds/${roundId}/scorecard`),
+
+  getForApplication: (applicationId) =>
+    api.get(`/applications/${applicationId}/scorecards`),
 };
 
 // Resume Matching API calls

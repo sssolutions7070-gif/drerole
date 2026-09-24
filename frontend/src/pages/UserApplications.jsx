@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Briefcase, Calendar, Clock, Eye, CheckCircle, XCircle, Star, MapPin, ChevronDown, ChevronUp, RefreshCw, AlertCircle, MessageCircle, Video } from 'lucide-react';
 import api from '../services/api';
 import MessageThread from '../components/MessageThread';
+import InterviewPipelinePanel from '../components/InterviewPipelinePanel';
 
 const UserApplications = () => {
-  const navigate = useNavigate();
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [expandedApplication, setExpandedApplication] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [messageThreadApplication, setMessageThreadApplication] = useState(null);
+  const [pipelineApplicationId, setPipelineApplicationId] = useState(null);
 
   useEffect(() => {
     fetchUserApplications();
@@ -261,11 +261,11 @@ const UserApplications = () => {
                     </button>
                     {application.status !== 'REJECTED' && (
                       <button
-                        onClick={() => navigate(`/applications/${application.id}/video-interview`)}
+                        onClick={() => setPipelineApplicationId(application.id)}
                         className="text-teal-600 hover:text-teal-800 text-sm font-medium flex items-center"
                       >
                         <Video className="h-4 w-4 mr-1" />
-                        Video Interview
+                        Interview Pipeline
                       </button>
                     )}
                   </div>
@@ -395,6 +395,13 @@ const UserApplications = () => {
           applicationId={messageThreadApplication.id}
           title={`${messageThreadApplication.job?.title || 'Application'} - ${messageThreadApplication.job?.company || ''}`}
           onClose={() => setMessageThreadApplication(null)}
+        />
+      )}
+      {pipelineApplicationId && (
+        <InterviewPipelinePanel
+          applicationId={pipelineApplicationId}
+          isRecruiter={false}
+          onClose={() => setPipelineApplicationId(null)}
         />
       )}
     </div>

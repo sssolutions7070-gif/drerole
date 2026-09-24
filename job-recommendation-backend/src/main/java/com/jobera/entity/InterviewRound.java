@@ -10,17 +10,27 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 
-/** One video interview "room" for a single application - at most one per application, created
- *  when the recruiter schedules it and reused (rescheduled in place) if they change the time. */
+/** One stage of a (possibly multi-round) interview pipeline for an application - a phone screen,
+ *  a technical round, a culture-fit round, and so on. Each round gets its own video/code-editor
+ *  room, scheduled and run independently of the others. */
 @Entity
-@Table(name = "video_interviews")
-public class VideoInterview {
+@Table(name = "interview_rounds")
+public class InterviewRound {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "application_id", nullable = false, unique = true)
+    @Column(name = "application_id", nullable = false)
     private Long applicationId;
+
+    @Column(name = "round_number", nullable = false)
+    private Integer roundNumber;
+
+    @Column(nullable = false)
+    private String title;
+
+    @Column(name = "round_type", nullable = false, length = 20)
+    private String roundType;
 
     @Column(name = "room_id", nullable = false, unique = true, length = 36)
     private String roomId;
@@ -37,10 +47,14 @@ public class VideoInterview {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    public VideoInterview() {}
+    public InterviewRound() {}
 
-    public VideoInterview(Long applicationId, String roomId, LocalDateTime scheduledAt) {
+    public InterviewRound(Long applicationId, Integer roundNumber, String title, String roundType,
+                           String roomId, LocalDateTime scheduledAt) {
         this.applicationId = applicationId;
+        this.roundNumber = roundNumber;
+        this.title = title;
+        this.roundType = roundType;
         this.roomId = roomId;
         this.scheduledAt = scheduledAt;
     }
@@ -58,6 +72,12 @@ public class VideoInterview {
     public void setId(Long id) { this.id = id; }
     public Long getApplicationId() { return applicationId; }
     public void setApplicationId(Long applicationId) { this.applicationId = applicationId; }
+    public Integer getRoundNumber() { return roundNumber; }
+    public void setRoundNumber(Integer roundNumber) { this.roundNumber = roundNumber; }
+    public String getTitle() { return title; }
+    public void setTitle(String title) { this.title = title; }
+    public String getRoundType() { return roundType; }
+    public void setRoundType(String roundType) { this.roundType = roundType; }
     public String getRoomId() { return roomId; }
     public void setRoomId(String roomId) { this.roomId = roomId; }
     public LocalDateTime getScheduledAt() { return scheduledAt; }

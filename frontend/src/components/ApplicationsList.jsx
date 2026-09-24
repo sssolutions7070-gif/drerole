@@ -1,23 +1,22 @@
 // src/components/ApplicationsList.jsx
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   X, Mail, Phone, Calendar, Download, Star, BookOpen, User,
   Briefcase, RefreshCw, Eye, Clock, CheckCircle, XCircle,
   Calendar as CalendarIcon, MapPin, MessageCircle, TrendingUp,
   FileText, Percent, Target, Award, Sparkles, Video
 } from 'lucide-react';
-import api, { videoInterviewAPI } from '../services/api';
+import api from '../services/api';
 import MessageThread from './MessageThread';
+import InterviewPipelinePanel from './InterviewPipelinePanel';
 
 const ApplicationsList = ({ job, onClose }) => {
-  const navigate = useNavigate();
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedApplication, setSelectedApplication] = useState(null);
   const [messageThreadApplication, setMessageThreadApplication] = useState(null);
-  const [videoInterviewApplication, setVideoInterviewApplication] = useState(null);
+  const [pipelineApplicationId, setPipelineApplicationId] = useState(null);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showInterviewModal, setShowInterviewModal] = useState(false);
   const [showTestModal, setShowTestModal] = useState(false);
@@ -838,94 +837,6 @@ const ApplicationsList = ({ job, onClose }) => {
     );
   };
 
-  // Video Interview Modal Component - checks whether a room already exists for this application
-  // and either offers to schedule one or lets the recruiter join it.
-  const VideoInterviewModal = () => {
-    const [checking, setChecking] = useState(true);
-    const [joinInfo, setJoinInfo] = useState(null);
-    const [date, setDate] = useState('');
-    const [time, setTime] = useState('');
-    const [scheduling, setScheduling] = useState(false);
-    const [modalError, setModalError] = useState('');
-
-    useEffect(() => {
-      videoInterviewAPI.getJoinInfo(videoInterviewApplication.id)
-        .then((res) => setJoinInfo(res.data))
-        .catch(() => setJoinInfo(null))
-        .finally(() => setChecking(false));
-    }, []);
-
-    const handleSchedule = async () => {
-      if (!date || !time) {
-        setModalError('Pick a date and time');
-        return;
-      }
-      setScheduling(true);
-      setModalError('');
-      try {
-        await videoInterviewAPI.schedule(videoInterviewApplication.id, `${date}T${time}:00`);
-        const res = await videoInterviewAPI.getJoinInfo(videoInterviewApplication.id);
-        setJoinInfo(res.data);
-      } catch (err) {
-        setModalError(err.response?.data?.error || 'Failed to schedule the interview');
-      } finally {
-        setScheduling(false);
-      }
-    };
-
-    return (
-      <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-        <div className="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold">Video Interview</h3>
-            <button onClick={() => setVideoInterviewApplication(null)} className="text-gray-400 hover:text-gray-600">
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-
-          {checking ? (
-            <p className="text-gray-500 text-sm">Checking...</p>
-          ) : joinInfo ? (
-            <div className="space-y-3">
-              <p className="text-sm text-gray-700">
-                Scheduled for {joinInfo.scheduledAt ? new Date(joinInfo.scheduledAt).toLocaleString() : 'now'}.
-              </p>
-              <p className="text-sm text-gray-500">Status: {joinInfo.status}</p>
-              <button
-                onClick={() => navigate(`/applications/${videoInterviewApplication.id}/video-interview`)}
-                className="w-full px-4 py-2 bg-teal-600 text-white rounded-md text-sm font-medium hover:bg-teal-700"
-              >
-                Join Video Interview
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <p className="text-sm text-gray-600">No video interview scheduled yet.</p>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Time</label>
-                <input type="time" value={time} onChange={(e) => setTime(e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2" />
-              </div>
-              {modalError && <p className="text-red-500 text-xs">{modalError}</p>}
-              <button
-                onClick={handleSchedule}
-                disabled={scheduling}
-                className="w-full px-4 py-2 bg-teal-600 text-white rounded-md text-sm font-medium hover:bg-teal-700 disabled:opacity-50"
-              >
-                {scheduling ? 'Scheduling...' : 'Schedule Video Interview'}
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
-
   // Status Update Modal Component
   const StatusUpdateModal = () => {
     const [notes, setNotes] = useState('');
@@ -1360,11 +1271,11 @@ const ApplicationsList = ({ job, onClose }) => {
 
                     {application.status !== 'REJECTED' && (
                       <button
-                        onClick={() => setVideoInterviewApplication(application)}
+                        onClick={() => setPipelineApplicationId(application.id)}
                         className="inline-flex items-center px-3 py-2 border border-teal-300 text-teal-700 rounded-md text-sm font-medium hover:bg-teal-50"
                       >
                         <Video className="h-4 w-4 mr-1" />
-                        Video Interview
+                        Interview Pipeline
                       </button>
                     )}
 
@@ -1430,7 +1341,13 @@ const ApplicationsList = ({ job, onClose }) => {
 
         {/* Modals */}
         {showInterviewModal && <InterviewModal />}
-        {videoInterviewApplication && <VideoInterviewModal />}
+        {pipelineApplicationId && (
+          <InterviewPipelinePanel
+            applicationId={pipelineApplicationId}
+            isRecruiter={true}
+            onClose={() => setPipelineApplicationId(null)}
+          />
+        )}
         {showStatusModal && <StatusUpdateModal />}
         {showTestModal && <TestAssignmentModal />}
         {showTestResultsModal && <TestResultsModal />}

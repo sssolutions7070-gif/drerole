@@ -1,16 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Mic, MicOff, Video, VideoOff, PhoneOff, Users } from 'lucide-react';
-import { videoInterviewAPI } from '../services/api';
+import { Mic, MicOff, Video, VideoOff, PhoneOff, Users, Code } from 'lucide-react';
+import { interviewRoundsAPI } from '../services/api';
 import { WS_ORIGIN } from '../config';
 
+const LANGUAGES = ['JavaScript', 'Python', 'Java', 'C++', 'Other'];
+
 // The server only ever relays two kinds of messages it builds itself - {"type":"peer-joined"}
-// and {"type":"peer-left"} - everything else is opaque SDP/ICE JSON this page both writes and
-// reads. Whichever side receives "peer-joined" is, by construction, the one who was already
-// waiting in the room, so that side (regardless of candidate/recruiter role) is the one that
-// creates the offer; this sidesteps any offer/answer race without needing a fixed caller role.
-const VideoInterviewRoom = () => {
-  const { applicationId } = useParams();
+// and {"type":"peer-left"} - everything else (SDP offers/answers, ICE candidates, and this page's
+// own code-editor sync messages) is opaque JSON this page both writes and reads. Whichever side
+// receives "peer-joined" is, by construction, the one who was already waiting in the room, so
+// that side is the one that creates the WebRTC offer, sidestepping any offer/answer race without
+// needing a fixed caller role.
+const InterviewRoundRoom = () => {
+  const { roundId } = useParams();
   const navigate = useNavigate();
 
   const [joinInfo, setJoinInfo] = useState(null);
@@ -19,25 +22,30 @@ const VideoInterviewRoom = () => {
   const [micOn, setMicOn] = useState(true);
   const [cameraOn, setCameraOn] = useState(true);
   const [peerPresent, setPeerPresent] = useState(false);
+  const [showEditor, setShowEditor] = useState(false);
+  const [code, setCode] = useState('');
+  const [language, setLanguage] = useState('JavaScript');
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const localStreamRef = useRef(null);
   const pcRef = useRef(null);
   const wsRef = useRef(null);
+  const codeChangeTimeoutRef = useRef(null);
 
   useEffect(() => {
-    videoInterviewAPI.getJoinInfo(applicationId)
+    interviewRoundsAPI.getJoinInfo(roundId)
       .then((res) => {
         setJoinInfo(res.data);
+        setShowEditor(res.data.roundType === 'TECHNICAL');
         setPhase('lobby');
       })
       .catch((err) => {
-        setError(err.response?.data?.error || 'This video interview could not be loaded.');
+        setError(err.response?.data?.error || 'This interview round could not be loaded.');
         setPhase('error');
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [applicationId]);
+  }, [roundId]);
 
   const teardown = () => {
     wsRef.current?.close();
@@ -68,9 +76,6 @@ const VideoInterviewRoom = () => {
     pc.ontrack = (event) => {
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = event.streams[0];
-        // Some browsers block autoplay of an unmuted <video> unless play() is called explicitly,
-        // even after a user gesture elsewhere on the page (the "Join call" click); a rejected
-        // promise here just means the remote video stays paused until the next user interaction.
         remoteVideoRef.current.play().catch(() => {});
       }
       setPeerPresent(true);
@@ -89,7 +94,6 @@ const VideoInterviewRoom = () => {
 
   const handleSignal = async (message) => {
     const pc = pcRef.current;
-    if (!pc) return;
 
     switch (message.type) {
       case 'peer-joined': {
@@ -114,6 +118,10 @@ const VideoInterviewRoom = () => {
         } catch (e) {
           // A candidate that arrives before the remote description is set is harmless to drop.
         }
+        break;
+      case 'code-update':
+        setCode(message.code);
+        setLanguage(message.language);
         break;
       case 'peer-left':
         setPeerPresent(false);
@@ -143,7 +151,7 @@ const VideoInterviewRoom = () => {
     createPeerConnection();
 
     const token = localStorage.getItem('token');
-    const ws = new WebSocket(`${WS_ORIGIN}/ws/video-interview?token=${encodeURIComponent(token)}&roomId=${encodeURIComponent(joinInfo.roomId)}`);
+    const ws = new WebSocket(`${WS_ORIGIN}/ws/interview-round?token=${encodeURIComponent(token)}&roomId=${encodeURIComponent(joinInfo.roomId)}`);
     wsRef.current = ws;
 
     ws.onmessage = (event) => {
@@ -157,13 +165,13 @@ const VideoInterviewRoom = () => {
       setPhase((current) => (current === 'ended' ? current : 'ended'));
     };
 
-    videoInterviewAPI.updateStatus(applicationId, 'IN_PROGRESS').catch(() => {});
+    interviewRoundsAPI.updateStatus(roundId, 'IN_PROGRESS').catch(() => {});
     setPhase('in-call');
   };
 
   const endCall = () => {
     teardown();
-    videoInterviewAPI.updateStatus(applicationId, 'COMPLETED').catch(() => {});
+    interviewRoundsAPI.updateStatus(roundId, 'COMPLETED').catch(() => {});
     setPhase('ended');
   };
 
@@ -181,6 +189,19 @@ const VideoInterviewRoom = () => {
       track.enabled = !track.enabled;
       setCameraOn(track.enabled);
     }
+  };
+
+  const handleCodeChange = (newCode) => {
+    setCode(newCode);
+    clearTimeout(codeChangeTimeoutRef.current);
+    codeChangeTimeoutRef.current = setTimeout(() => {
+      sendSignal({ type: 'code-update', code: newCode, language });
+    }, 250);
+  };
+
+  const handleLanguageChange = (newLanguage) => {
+    setLanguage(newLanguage);
+    sendSignal({ type: 'code-update', code, language: newLanguage });
   };
 
   if (phase === 'loading') {
@@ -222,7 +243,8 @@ const VideoInterviewRoom = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full text-center">
           <Users className="h-10 w-10 text-blue-600 mx-auto mb-3" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-1">Video interview with {joinInfo.counterpartName}</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-1">{joinInfo.title}</h2>
+          <p className="text-sm text-gray-500 mb-1">with {joinInfo.counterpartName}</p>
           {joinInfo.scheduledAt && (
             <p className="text-sm text-gray-500 mb-4">
               Scheduled for {new Date(joinInfo.scheduledAt).toLocaleString()}
@@ -242,21 +264,46 @@ const VideoInterviewRoom = () => {
 
   return (
     <div className="min-h-screen bg-gray-900 flex flex-col">
-      <div className="flex-1 relative">
-        <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover bg-black" />
-        {!peerPresent && (
-          <div className="absolute inset-0 flex items-center justify-center text-gray-400">
-            Waiting for {joinInfo.counterpartName} to join...
+      <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 relative">
+          <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover bg-black" />
+          {!peerPresent && (
+            <div className="absolute inset-0 flex items-center justify-center text-gray-400">
+              Waiting for {joinInfo.counterpartName} to join...
+            </div>
+          )}
+          <video
+            ref={localVideoRef}
+            autoPlay
+            playsInline
+            muted
+            className="absolute bottom-4 right-4 w-40 h-28 object-cover rounded-md border-2 border-gray-700 bg-black"
+          />
+        </div>
+
+        {showEditor && (
+          <div className="w-1/2 bg-gray-950 flex flex-col border-l border-gray-700">
+            <div className="flex justify-between items-center px-3 py-2 border-b border-gray-700">
+              <span className="text-gray-300 text-sm font-medium">Shared code editor</span>
+              <select
+                value={language}
+                onChange={(e) => handleLanguageChange(e.target.value)}
+                className="bg-gray-800 text-gray-200 text-sm rounded px-2 py-1 border border-gray-700"
+              >
+                {LANGUAGES.map((lang) => <option key={lang} value={lang}>{lang}</option>)}
+              </select>
+            </div>
+            <textarea
+              value={code}
+              onChange={(e) => handleCodeChange(e.target.value)}
+              spellCheck={false}
+              className="flex-1 bg-gray-950 text-green-300 font-mono text-sm p-3 resize-none outline-none"
+              placeholder="// Shared with the other participant in real time"
+            />
           </div>
         )}
-        <video
-          ref={localVideoRef}
-          autoPlay
-          playsInline
-          muted
-          className="absolute bottom-4 right-4 w-40 h-28 object-cover rounded-md border-2 border-gray-700 bg-black"
-        />
       </div>
+
       <div className="flex justify-center items-center gap-4 py-4 bg-gray-800">
         <button
           onClick={toggleMic}
@@ -272,6 +319,13 @@ const VideoInterviewRoom = () => {
         >
           {cameraOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
         </button>
+        <button
+          onClick={() => setShowEditor((prev) => !prev)}
+          aria-label={showEditor ? 'Hide code editor' : 'Show code editor'}
+          className={`p-3 rounded-full ${showEditor ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white'}`}
+        >
+          <Code className="h-5 w-5" />
+        </button>
         <button onClick={endCall} aria-label="End call" className="p-3 rounded-full bg-red-600 text-white">
           <PhoneOff className="h-5 w-5" />
         </button>
@@ -280,4 +334,4 @@ const VideoInterviewRoom = () => {
   );
 };
 
-export default VideoInterviewRoom;
+export default InterviewRoundRoom;

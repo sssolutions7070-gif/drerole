@@ -21,6 +21,7 @@ import com.jobera.repository.DreamRoleTestAssignmentRepository;
 import com.jobera.repository.DreamRoleTestRepository;
 import com.jobera.repository.ExternalCandidateRepository;
 import com.jobera.repository.ExternalJobPostingRepository;
+import com.jobera.repository.InterviewRoundRepository;
 import com.jobera.repository.JobPostingRepository;
 import com.jobera.repository.JobRatingRepository;
 import com.jobera.repository.RecruiterRepository;
@@ -67,6 +68,7 @@ public class AccessPolicy {
     private final DreamRoleTestAssignmentRepository dreamRoleAssignmentRepository;
     private final JobRatingRepository jobRatingRepository;
     private final ResumeRepository resumeRepository;
+    private final InterviewRoundRepository interviewRoundRepository;
 
     public AccessPolicy(RecruiterRepository recruiterRepository,
                         JobPostingRepository jobPostingRepository,
@@ -78,7 +80,8 @@ public class AccessPolicy {
                         TestAssignmentRepository assignmentRepository,
                         DreamRoleTestAssignmentRepository dreamRoleAssignmentRepository,
                         JobRatingRepository jobRatingRepository,
-                        ResumeRepository resumeRepository) {
+                        ResumeRepository resumeRepository,
+                        InterviewRoundRepository interviewRoundRepository) {
         this.recruiterRepository = recruiterRepository;
         this.jobPostingRepository = jobPostingRepository;
         this.externalJobRepository = externalJobRepository;
@@ -90,6 +93,7 @@ public class AccessPolicy {
         this.dreamRoleAssignmentRepository = dreamRoleAssignmentRepository;
         this.jobRatingRepository = jobRatingRepository;
         this.resumeRepository = resumeRepository;
+        this.interviewRoundRepository = interviewRoundRepository;
         registerRules();
     }
 
@@ -160,11 +164,19 @@ public class AccessPolicy {
         rule("PUT", "/api/applications/{applicationId}/messages/read", c -> participatesInApplication(c, "applicationId"));
         rule("GET", "/api/messages/unread-count/{userId}", self("userId"));
 
-        // Video interviews, scoped to one application - the recruiter schedules it, either side
-        // can join, check status or end it
-        rule("POST", "/api/applications/{applicationId}/video-interview", c -> recruiterManagesApplication(c, "applicationId"));
-        rule("GET", "/api/applications/{applicationId}/video-interview", c -> participatesInApplication(c, "applicationId"));
-        rule("PUT", "/api/applications/{applicationId}/video-interview/status", c -> participatesInApplication(c, "applicationId"));
+        // Interview pipeline, scoped to one application - the recruiter schedules each round,
+        // either side can list the pipeline, join a round or check its status
+        rule("POST", "/api/applications/{applicationId}/interview-rounds", c -> recruiterManagesApplication(c, "applicationId"));
+        rule("GET", "/api/applications/{applicationId}/interview-rounds", c -> participatesInApplication(c, "applicationId"));
+        rule("GET", "/api/interview-rounds/{roundId}/join", c -> participatesInRound(c, "roundId"));
+        rule("PUT", "/api/interview-rounds/{roundId}/status", c -> participatesInRound(c, "roundId"));
+        rule("PUT", "/api/interview-rounds/{roundId}/reschedule", c -> recruiterManagesRound(c, "roundId"));
+
+        // Structured interview scorecards - recruiter-only, a candidate never sees the internal
+        // rubric filled in about them
+        rule("PUT", "/api/interview-rounds/{roundId}/scorecard", c -> recruiterManagesRound(c, "roundId"));
+        rule("GET", "/api/interview-rounds/{roundId}/scorecard", c -> recruiterManagesRound(c, "roundId"));
+        rule("GET", "/api/applications/{applicationId}/scorecards", c -> recruiterManagesApplication(c, "applicationId"));
 
         // Aptitude tests
         rule("POST", "/api/aptitude-tests/create", recruiter);
@@ -409,6 +421,25 @@ public class AccessPolicy {
         Long id = c.var(var);
         return id != null && applicationRepository.findById(id)
             .map(app -> recruiterOwnsApplication(c.user(), app)).orElse(false);
+    }
+
+    private boolean recruiterManagesRound(AccessContext c, String var) {
+        Long id = c.var(var);
+        return id != null && interviewRoundRepository.findById(id)
+            .flatMap(round -> applicationRepository.findById(round.getApplicationId()))
+            .map(app -> recruiterOwnsApplication(c.user(), app)).orElse(false);
+    }
+
+    private boolean participatesInRound(AccessContext c, String var) {
+        Long id = c.var(var);
+        if (id == null) {
+            return false;
+        }
+        return isAdmin(c.user()) || interviewRoundRepository.findById(id)
+            .flatMap(round -> applicationRepository.findById(round.getApplicationId()))
+            .map(app -> (app.getUser() != null && Objects.equals(app.getUser().getId(), c.user().getId()))
+                || recruiterOwnsApplication(c.user(), app))
+            .orElse(false);
     }
 
     private boolean participatesInApplication(AccessContext c, String var) {
