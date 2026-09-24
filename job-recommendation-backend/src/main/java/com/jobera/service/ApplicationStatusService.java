@@ -25,13 +25,16 @@ public class ApplicationStatusService {
     private final ApplicationRepository applicationRepository;
     private final NotificationService notificationService;
     private final RealtimeNotifier realtimeNotifier;
+    private final NotificationFeedService notificationFeedService;
 
     public ApplicationStatusService(ApplicationRepository applicationRepository,
                                     NotificationService notificationService,
-                                    RealtimeNotifier realtimeNotifier) {
+                                    RealtimeNotifier realtimeNotifier,
+                                    NotificationFeedService notificationFeedService) {
         this.applicationRepository = applicationRepository;
         this.notificationService = notificationService;
         this.realtimeNotifier = realtimeNotifier;
+        this.notificationFeedService = notificationFeedService;
     }
 
     private String jobTitleOf(Application application) {
@@ -44,6 +47,12 @@ public class ApplicationStatusService {
             application.getSafeApplicantEmail(), application.getSafeApplicantName(), jobTitle, status);
         pushRealtime(application, "APPLICATION_STATUS_CHANGED", Map.of(
             "applicationId", application.getId(), "jobTitle", jobTitle, "status", status));
+        if (application.getUser() != null) {
+            notificationFeedService.record(application.getUser().getId(), "APPLICATION_STATUS_CHANGED",
+                "Update on " + jobTitle,
+                "Your application status is now: " + status.replace('_', ' ').toLowerCase() + ".",
+                "/dashboard");
+        }
     }
 
     private void pushRealtime(Application application, String type, Map<String, Object> data) {
@@ -112,6 +121,12 @@ public class ApplicationStatusService {
             saved.getSafeApplicantEmail(), saved.getSafeApplicantName(), jobTitle, dateText, locationText);
         pushRealtime(saved, "INTERVIEW_SCHEDULED", Map.of(
             "applicationId", saved.getId(), "jobTitle", jobTitle, "interviewDate", dateText, "interviewLocation", locationText));
+        if (saved.getUser() != null) {
+            notificationFeedService.record(saved.getUser().getId(), "INTERVIEW_SCHEDULED",
+                "Interview scheduled: " + jobTitle,
+                "When: " + dateText + " • Where: " + locationText,
+                "/dashboard");
+        }
         return saved;
     }
 

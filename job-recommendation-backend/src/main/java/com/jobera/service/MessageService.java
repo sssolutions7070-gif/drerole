@@ -32,13 +32,16 @@ public class MessageService {
     private final MessageRepository messageRepository;
     private final ApplicationRepository applicationRepository;
     private final RealtimeNotifier realtimeNotifier;
+    private final NotificationFeedService notificationFeedService;
 
     public MessageService(MessageRepository messageRepository,
                            ApplicationRepository applicationRepository,
-                           RealtimeNotifier realtimeNotifier) {
+                           RealtimeNotifier realtimeNotifier,
+                           NotificationFeedService notificationFeedService) {
         this.messageRepository = messageRepository;
         this.applicationRepository = applicationRepository;
         this.realtimeNotifier = realtimeNotifier;
+        this.notificationFeedService = notificationFeedService;
     }
 
     private Long candidateUserId(Application application) {
@@ -73,11 +76,14 @@ public class MessageService {
         Message saved = messageRepository.save(new Message(applicationId, senderId, recipientId, body));
 
         if (recipientId != null) {
+            String preview = body.length() > 120 ? body.substring(0, 120) + "..." : body;
             realtimeNotifier.notifyUser(recipientId, "NEW_MESSAGE", Map.of(
                 "applicationId", applicationId,
                 "senderId", senderId,
-                "preview", body.length() > 120 ? body.substring(0, 120) + "..." : body
+                "preview", preview
             ));
+            notificationFeedService.record(recipientId, "NEW_MESSAGE", "New message", preview,
+                recipientId.equals(recruiterId) ? "/recruiter/dashboard" : "/dashboard");
         }
 
         return saved;

@@ -52,12 +52,14 @@ public class OfferService {
     private final JobOfferRepository jobOfferRepository;
     private final ApplicationRepository applicationRepository;
     private final RealtimeNotifier realtimeNotifier;
+    private final NotificationFeedService notificationFeedService;
 
     public OfferService(JobOfferRepository jobOfferRepository, ApplicationRepository applicationRepository,
-                         RealtimeNotifier realtimeNotifier) {
+                         RealtimeNotifier realtimeNotifier, NotificationFeedService notificationFeedService) {
         this.jobOfferRepository = jobOfferRepository;
         this.applicationRepository = applicationRepository;
         this.realtimeNotifier = realtimeNotifier;
+        this.notificationFeedService = notificationFeedService;
     }
 
     private Long candidateUserId(Application application) {
@@ -104,6 +106,9 @@ public class OfferService {
 
         realtimeNotifier.notifyUser(candidateUserId(application), "OFFER_SENT", Map.of(
             "applicationId", applicationId, "title", title));
+        notificationFeedService.record(candidateUserId(application), "OFFER_SENT",
+            "You've received an offer: " + title,
+            "Review the offer details and respond.", "/dashboard");
 
         return saved;
     }
@@ -134,6 +139,9 @@ public class OfferService {
 
         realtimeNotifier.notifyUser(recruiterUserId(application), "OFFER_ACCEPTED", Map.of(
             "applicationId", applicationId, "signedBy", signatureName));
+        notificationFeedService.record(recruiterUserId(application), "OFFER_ACCEPTED",
+            "Offer accepted",
+            signatureName + " signed and accepted the offer.", "/recruiter/dashboard");
 
         return saved;
     }
@@ -157,6 +165,9 @@ public class OfferService {
 
         realtimeNotifier.notifyUser(recruiterUserId(application), "OFFER_DECLINED", Map.of(
             "applicationId", applicationId));
+        notificationFeedService.record(recruiterUserId(application), "OFFER_DECLINED",
+            "Offer declined",
+            "The candidate declined the offer.", "/recruiter/dashboard");
 
         return saved;
     }
@@ -169,9 +180,13 @@ public class OfferService {
         offer.setStatus("WITHDRAWN");
         JobOffer saved = jobOfferRepository.save(offer);
 
-        applicationRepository.findById(applicationId).ifPresent(application ->
+        applicationRepository.findById(applicationId).ifPresent(application -> {
             realtimeNotifier.notifyUser(candidateUserId(application), "OFFER_WITHDRAWN", Map.of(
-                "applicationId", applicationId)));
+                "applicationId", applicationId));
+            notificationFeedService.record(candidateUserId(application), "OFFER_WITHDRAWN",
+                "Offer withdrawn",
+                "The recruiter withdrew the offer.", "/dashboard");
+        });
 
         return saved;
     }

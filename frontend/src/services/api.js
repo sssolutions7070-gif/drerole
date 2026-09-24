@@ -198,6 +198,27 @@ export const skillBadgeAPI = {
     api.get(`/users/${userId}/badges`),
 };
 
+// Salary benchmarking from posted job ranges - public, no auth required
+export const salaryInsightsAPI = {
+  get: (title, location, experienceLevel) =>
+    api.get('/salary-insights', { params: { title, location, experienceLevel } }),
+};
+
+// Persisted notification feed backing the bell icon (separate from the transient toast socket)
+export const notificationAPI = {
+  list: (userId) =>
+    api.get(`/users/${userId}/notifications`),
+
+  unreadCount: (userId) =>
+    api.get(`/users/${userId}/notifications/unread-count`),
+
+  markRead: (userId, notificationId) =>
+    api.post(`/users/${userId}/notifications/${notificationId}/read`),
+
+  markAllRead: (userId) =>
+    api.post(`/users/${userId}/notifications/read-all`),
+};
+
 // Resume Matching API calls
 export const resumeMatchingAPI = {
   // Get applications sorted by match percentage

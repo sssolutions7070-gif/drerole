@@ -1,11 +1,12 @@
 // src/components/Navbar.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { 
-  Briefcase, Upload, Home, User, LogOut, Building, BarChart3, 
-  Calendar, UserCircle, LayoutDashboard, ChevronDown, GraduationCap
+import {
+  Briefcase, Upload, Home, User, LogOut, Building, BarChart3,
+  Calendar, UserCircle, LayoutDashboard, ChevronDown, GraduationCap, DollarSign
 } from 'lucide-react';
 import authService from '../services/auth';
+import NotificationBell from './NotificationBell';
 
 const isAdmin = (user) => user && user.role === 'ROLE_ADMIN';
 
@@ -29,6 +30,7 @@ const Navbar = ({ onAuthChange }) => {
     { path: '/jobs', icon: Briefcase, label: 'Jobs' },
     { path: '/companies', icon: Building, label: 'Companies' },
     { path: '/internships', icon: GraduationCap, label: 'Internships' },
+    { path: '/salary-insights', icon: DollarSign, label: 'Salary Insights' },
     { path: '/upload', icon: Upload, label: 'Upload Resume' },
   ];
 
@@ -46,6 +48,7 @@ const Navbar = ({ onAuthChange }) => {
     { path: '/jobs', icon: Briefcase, label: 'Jobs' },
     { path: '/companies', icon: Building, label: 'Companies' },
     { path: '/internships', icon: GraduationCap, label: 'Internships' },
+    { path: '/salary-insights', icon: DollarSign, label: 'Salary Insights' },
   ];
 
   // Determine which nav items to show based on user role
@@ -98,6 +101,8 @@ const Navbar = ({ onAuthChange }) => {
                 })}
               </div>
               
+              <NotificationBell />
+
               {/* Profile Dropdown */}
               <div className="relative" ref={menuRef}>
                 <button
@@ -202,6 +207,12 @@ const Navbar = ({ onAuthChange }) => {
                 className="px-3 py-2 text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors"
               >
                 Companies
+              </Link>
+              <Link
+                to="/salary-insights"
+                className="px-3 py-2 text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors"
+              >
+                Salary Insights
               </Link>
               <Link
                 to="/login"

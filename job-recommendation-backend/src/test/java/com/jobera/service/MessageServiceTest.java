@@ -32,6 +32,7 @@ class MessageServiceTest {
     @Mock MessageRepository messageRepository;
     @Mock ApplicationRepository applicationRepository;
     @Mock RealtimeNotifier realtimeNotifier;
+    @Mock NotificationFeedService notificationFeedService;
 
     MessageService service;
 
@@ -41,7 +42,7 @@ class MessageServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new MessageService(messageRepository, applicationRepository, realtimeNotifier);
+        service = new MessageService(messageRepository, applicationRepository, realtimeNotifier, notificationFeedService);
 
         candidate = new User("candidate@example.com", "hash", "Candidate");
         candidate.setId(1L);

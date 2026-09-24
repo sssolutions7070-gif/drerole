@@ -29,12 +29,14 @@ class ApplicationStatusServiceTest {
     @Mock ApplicationRepository applicationRepository;
     @Mock NotificationService notificationService;
     @Mock RealtimeNotifier realtimeNotifier;
+    @Mock NotificationFeedService notificationFeedService;
 
     ApplicationStatusService service;
 
     @BeforeEach
     void setUp() {
-        service = new ApplicationStatusService(applicationRepository, notificationService, realtimeNotifier);
+        service = new ApplicationStatusService(applicationRepository, notificationService, realtimeNotifier,
+            notificationFeedService);
     }
 
     private Application application(long id) {
