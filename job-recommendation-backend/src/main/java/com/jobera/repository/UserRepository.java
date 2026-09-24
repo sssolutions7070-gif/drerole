@@ -96,4 +96,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByReferralCode(String referralCode);
 
     boolean existsByReferralCode(String referralCode);
+
+    /**
+     * Candidates who've opted in to be discoverable by recruiters, independent of having
+     * applied to any job.
+     */
+    List<User> findByOpenToWorkTrueAndIsActiveTrue();
 }

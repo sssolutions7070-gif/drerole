@@ -74,6 +74,7 @@ const UserProfile = () => {
     linkedin: '',
     github: '',
     jobAlertsEnabled: false,
+    openToWork: false,
     skills: [],
     education: [],
     experience: [],
@@ -151,6 +152,7 @@ const UserProfile = () => {
         linkedin: userData.linkedin || '',
         github: userData.github || '',
         jobAlertsEnabled: userData.jobAlertsEnabled || false,
+        openToWork: userData.openToWork || false,
         skills: userData.skills || [],
         education: userData.education || [],
         experience: userData.experience || [],
@@ -653,6 +655,19 @@ const UserProfile = () => {
                       />
                       <span className="text-sm font-medium text-gray-700">
                         Email me when a new job posting matches the skills on my resume
+                      </span>
+                    </label>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={formData.openToWork}
+                        onChange={(e) => setFormData({ ...formData, openToWork: e.target.checked })}
+                        className="h-4 w-4 text-blue-600 rounded border-gray-300"
+                      />
+                      <span className="text-sm font-medium text-gray-700">
+                        Open to work - let recruiters discover me even if I haven't applied anywhere
                       </span>
                     </label>
                   </div>

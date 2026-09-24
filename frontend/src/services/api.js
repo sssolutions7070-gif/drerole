@@ -216,6 +216,12 @@ export const salaryInsightsAPI = {
     api.get('/salary-insights', { params: { title, location, experienceLevel } }),
 };
 
+// Browsing the open-to-work candidate pool - not scoped to one recruiter/company
+export const candidateDiscoveryAPI = {
+  discover: (skill, location) =>
+    api.get('/candidates/discover', { params: { skill, location } }),
+};
+
 // Persisted notification feed backing the bell icon (separate from the transient toast socket)
 export const notificationAPI = {
   list: (userId) =>

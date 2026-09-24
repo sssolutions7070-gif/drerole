@@ -53,6 +53,7 @@ public class UserProfileController {
     private static final String FIELD_LINKEDIN = "linkedin";
     private static final String FIELD_GITHUB = "github";
     private static final String FIELD_JOB_ALERTS_ENABLED = "jobAlertsEnabled";
+    private static final String FIELD_OPEN_TO_WORK = "openToWork";
     private static final String FIELD_TWO_FACTOR_ENABLED = "twoFactorEnabled";
     private static final String ERROR_KEY = "error";
     private static final String MESSAGE_KEY = "message";
@@ -110,6 +111,7 @@ public class UserProfileController {
             profile.put("profilePicture", user.getProfilePicture());
             profile.put(FIELD_JOB_ALERTS_ENABLED, user.getJobAlertsEnabled());
             profile.put(FIELD_TWO_FACTOR_ENABLED, user.getTwoFactorEnabled());
+            profile.put(FIELD_OPEN_TO_WORK, user.getOpenToWork());
             profile.put("skills", skills);
             profile.put("education", education);
             profile.put("experience", experience);
@@ -283,6 +285,9 @@ public class UserProfileController {
             if (profileData.containsKey(FIELD_JOB_ALERTS_ENABLED)) {
                 user.setJobAlertsEnabled(Boolean.TRUE.equals(profileData.get(FIELD_JOB_ALERTS_ENABLED)));
             }
+            if (profileData.containsKey(FIELD_OPEN_TO_WORK)) {
+                user.setOpenToWork(Boolean.TRUE.equals(profileData.get(FIELD_OPEN_TO_WORK)));
+            }
 
             User savedUser = userRepository.save(user);
 
@@ -300,6 +305,7 @@ public class UserProfileController {
             response.put(FIELD_GITHUB, savedUser.getGithub());
             response.put("profilePicture", savedUser.getProfilePicture());
             response.put(FIELD_JOB_ALERTS_ENABLED, savedUser.getJobAlertsEnabled());
+            response.put(FIELD_OPEN_TO_WORK, savedUser.getOpenToWork());
 
             return ResponseEntity.ok(response);
             

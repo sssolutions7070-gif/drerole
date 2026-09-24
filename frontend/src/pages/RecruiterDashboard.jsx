@@ -16,6 +16,7 @@ import ExternalJobResults from '../components/ExternalJobResults';
 import SubscriptionPanel from '../components/SubscriptionPanel';
 import TalentPoolPanel from '../components/TalentPoolPanel';
 import TeamPanel from '../components/TeamPanel';
+import CandidateDiscoveryPanel from '../components/CandidateDiscoveryPanel';
 
 const RecruiterDashboard = () => {
   const [jobs, setJobs] = useState([]);
@@ -399,6 +400,17 @@ const RecruiterDashboard = () => {
             >
               <UsersRound className="h-5 w-5 mr-2" />
               Team
+            </button>
+            <button
+              onClick={() => setActiveTab('discover')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center whitespace-nowrap ${
+                activeTab === 'discover'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <Sparkles className="h-5 w-5 mr-2" />
+              Discover Candidates
             </button>
           </nav>
         </div>
@@ -867,6 +879,10 @@ const RecruiterDashboard = () => {
 
       {activeTab === 'team' && recruiterProfile && (
         <TeamPanel recruiterId={recruiterProfile.id} />
+      )}
+
+      {activeTab === 'discover' && (
+        <CandidateDiscoveryPanel />
       )}
 
       {/* Job Form Modal */}

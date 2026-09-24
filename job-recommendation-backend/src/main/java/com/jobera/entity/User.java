@@ -90,6 +90,11 @@ public class User {
     @Column(name = "referral_code", unique = true, length = 12)
     private String referralCode;
 
+    // Opt-in: makes this candidate discoverable to recruiters browsing /api/candidates/discover
+    // even if they haven't applied to any job. Off by default - visibility is never automatic.
+    @Column(name = "open_to_work")
+    private Boolean openToWork = false;
+
     // Null for a normal password-based account. Set the first time someone signs in with that
     // provider; providerId is the provider's own stable user id (not email, which can change).
     @Column(name = "oauth_provider", length = 20)
@@ -208,6 +213,8 @@ public class User {
     public void setTwoFactorBackupCodes(String twoFactorBackupCodes) { this.twoFactorBackupCodes = twoFactorBackupCodes; }
     public String getReferralCode() { return referralCode; }
     public void setReferralCode(String referralCode) { this.referralCode = referralCode; }
+    public Boolean getOpenToWork() { return openToWork != null && openToWork; }
+    public void setOpenToWork(Boolean openToWork) { this.openToWork = openToWork; }
     public String getOauthProvider() { return oauthProvider; }
     public void setOauthProvider(String oauthProvider) { this.oauthProvider = oauthProvider; }
     public String getOauthProviderId() { return oauthProviderId; }

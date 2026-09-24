@@ -163,6 +163,13 @@ class AccessPolicyTest {
         assertTrue(allowed(recruiterUser, "POST", "/api/aptitude-tests/create"));
     }
 
+    @Test
+    void anyRecruiterCanBrowseOpenToWorkCandidatesButCandidatesCannot() {
+        assertTrue(allowed(recruiterUser, "GET", "/api/candidates/discover"));
+        assertTrue(allowed(otherRecruiterUser, "GET", "/api/candidates/discover"));
+        assertFalse(allowed(candidate, "GET", "/api/candidates/discover"));
+    }
+
     // ---------------------------------------------------------- "own data" rules
 
     @Test

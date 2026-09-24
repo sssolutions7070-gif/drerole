@@ -1,0 +1,100 @@
+import React, { useEffect, useState } from 'react';
+import { Search, MapPin, FileText } from 'lucide-react';
+import { candidateDiscoveryAPI } from '../services/api';
+
+/** Any recruiter's window into the "open to work" candidate pool - people who opted in to be
+ *  discoverable even if they've never applied to one of this recruiter's postings. */
+const CandidateDiscoveryPanel = () => {
+  const [candidates, setCandidates] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [skill, setSkill] = useState('');
+  const [location, setLocation] = useState('');
+
+  const fetchCandidates = async (skillFilter, locationFilter) => {
+    setLoading(true);
+    try {
+      const response = await candidateDiscoveryAPI.discover(skillFilter || undefined, locationFilter || undefined);
+      setCandidates(response.data);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to load candidates');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCandidates('', '');
+  }, []);
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    fetchCandidates(skill, location);
+  };
+
+  return (
+    <div>
+      <form onSubmit={handleSearch} className="flex flex-wrap gap-2 mb-4">
+        <input
+          type="text"
+          value={skill}
+          onChange={(e) => setSkill(e.target.value)}
+          placeholder="Skill (e.g. React)"
+          className="flex-1 min-w-[160px] border border-gray-300 rounded-md px-3 py-2"
+        />
+        <input
+          type="text"
+          value={location}
+          onChange={(e) => setLocation(e.target.value)}
+          placeholder="Location"
+          className="flex-1 min-w-[160px] border border-gray-300 rounded-md px-3 py-2"
+        />
+        <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2">
+          <Search className="h-4 w-4" />
+          Search
+        </button>
+      </form>
+
+      {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
+
+      {loading ? (
+        <p className="text-gray-500 text-sm">Loading...</p>
+      ) : candidates.length === 0 ? (
+        <p className="text-gray-500 text-sm">No open-to-work candidates match these filters.</p>
+      ) : (
+        <div className="space-y-3">
+          {candidates.map((candidate) => (
+            <div key={candidate.userId} className="bg-white border border-gray-200 rounded-lg p-4">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="font-medium text-gray-900">{candidate.fullName}</p>
+                  {candidate.headline && <p className="text-sm text-gray-600">{candidate.headline}</p>}
+                  {candidate.location && (
+                    <p className="text-xs text-gray-500 flex items-center gap-1 mt-1">
+                      <MapPin className="h-3 w-3" /> {candidate.location}
+                    </p>
+                  )}
+                </div>
+                {candidate.hasResume && (
+                  <span className="inline-flex items-center gap-1 text-xs text-green-700 bg-green-100 px-2 py-1 rounded-full">
+                    <FileText className="h-3 w-3" /> Resume on file
+                  </span>
+                )}
+              </div>
+              {candidate.bio && <p className="text-sm text-gray-600 mt-2">{candidate.bio}</p>}
+              {candidate.skills?.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {candidate.skills.map((s) => (
+                    <span key={s} className="px-2 py-0.5 rounded-full text-xs bg-indigo-100 text-indigo-700">{s}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default CandidateDiscoveryPanel;
