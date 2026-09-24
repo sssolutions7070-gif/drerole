@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Search, MapPin, FileText, MessageCircle } from 'lucide-react';
+import { Search, MapPin, FileText, MessageCircle, Sparkles } from 'lucide-react';
 import { candidateDiscoveryAPI } from '../services/api';
 import DirectMessageThread from './DirectMessageThread';
 
@@ -11,6 +11,8 @@ const CandidateDiscoveryPanel = ({ recruiterId }) => {
   const [error, setError] = useState('');
   const [skill, setSkill] = useState('');
   const [location, setLocation] = useState('');
+  const [aiQuery, setAiQuery] = useState('');
+  const [aiSearching, setAiSearching] = useState(false);
   const [messagingCandidate, setMessagingCandidate] = useState(null);
 
   const fetchCandidates = async (skillFilter, locationFilter) => {
@@ -34,8 +36,41 @@ const CandidateDiscoveryPanel = ({ recruiterId }) => {
     fetchCandidates(skill, location);
   };
 
+  const handleAiSearch = async (e) => {
+    e.preventDefault();
+    if (!aiQuery.trim()) return;
+    setAiSearching(true);
+    setError('');
+    try {
+      const response = await candidateDiscoveryAPI.aiSearch(aiQuery.trim());
+      setCandidates(response.data);
+    } catch (err) {
+      setError(err.response?.data?.error || 'AI search failed');
+    } finally {
+      setAiSearching(false);
+    }
+  };
+
   return (
     <div>
+      <form onSubmit={handleAiSearch} className="flex flex-wrap gap-2 mb-3">
+        <div className="flex-1 min-w-[240px] relative">
+          <Sparkles className="h-4 w-4 text-purple-500 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={aiQuery}
+            onChange={(e) => setAiQuery(e.target.value)}
+            placeholder="Ask in plain English, e.g. 'senior React dev in Pune'"
+            className="w-full border border-purple-300 rounded-md pl-9 pr-3 py-2 focus:ring-2 focus:ring-purple-500"
+          />
+        </div>
+        <button type="submit" disabled={aiSearching}
+          className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2">
+          <Sparkles className="h-4 w-4" />
+          {aiSearching ? 'Thinking...' : 'AI Search'}
+        </button>
+      </form>
+
       <form onSubmit={handleSearch} className="flex flex-wrap gap-2 mb-4">
         <input
           type="text"

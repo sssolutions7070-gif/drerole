@@ -226,6 +226,9 @@ export const salaryInsightsAPI = {
 export const candidateDiscoveryAPI = {
   discover: (skill, location) =>
     api.get('/candidates/discover', { params: { skill, location } }),
+
+  aiSearch: (query) =>
+    api.get('/candidates/discover/ai-search', { params: { query } }),
 };
 
 // Platform-wide growth and funnel metrics for the admin dashboard
