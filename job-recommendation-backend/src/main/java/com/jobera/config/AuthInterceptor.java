@@ -36,7 +36,8 @@ public class AuthInterceptor implements HandlerInterceptor {
         "/api/auth/login", "/api/auth/register", "/api/auth/logout",
         "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/login/2fa",
         "/api/auth/oauth/google", "/api/auth/oauth/google/callback",
-        "/api/auth/oauth/linkedin", "/api/auth/oauth/linkedin/callback"
+        "/api/auth/oauth/linkedin", "/api/auth/oauth/linkedin/callback",
+        "/api/webhooks/stripe"
     );
     private static final String PROCTORING_CALLBACK = "/api/aptitude-tests/*/violations";
 

@@ -30,13 +30,14 @@ class JobPostingServiceTest {
     @Mock UserRepository userRepository;
     @Mock RecruiterRepository recruiterRepository;
     @Mock SavedJobRepository savedJobRepository;
+    @Mock SubscriptionService subscriptionService;
 
     JobPostingService service;
 
     @BeforeEach
     void setUp() {
         service = new JobPostingService(jobPostingRepository, applicationRepository, userRepository,
-            recruiterRepository, savedJobRepository);
+            recruiterRepository, savedJobRepository, subscriptionService);
     }
 
     @Test
@@ -50,6 +51,21 @@ class JobPostingServiceTest {
             "[\"java\"]", "[]", "Remote", "$100k", "Full-time", "Mid");
 
         assertEquals(JobPosting.MODERATION_PENDING, created.getModerationStatus());
+    }
+
+    @Test
+    void creatingAJobIsBlockedWhenTheSubscriptionServiceRejectsIt() {
+        Recruiter recruiter = new Recruiter();
+        recruiter.setId(10L);
+        when(recruiterRepository.findById(10L)).thenReturn(Optional.of(recruiter));
+        org.mockito.Mockito.doThrow(new SubscriptionService.SubscriptionLimitException(3))
+            .when(subscriptionService).enforceActiveJobLimit(recruiter);
+
+        assertThrows(SubscriptionService.SubscriptionLimitException.class, () ->
+            service.createJobPosting(10L, "Backend Developer", "Acme", "desc",
+                "[\"java\"]", "[]", "Remote", "$100k", "Full-time", "Mid"));
+
+        org.mockito.Mockito.verify(jobPostingRepository, org.mockito.Mockito.never()).save(any());
     }
 
     @Test

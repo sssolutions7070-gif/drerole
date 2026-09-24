@@ -13,4 +13,5 @@ public interface RecruiterRepository extends JpaRepository<Recruiter, Long> {
     Optional<Recruiter> findByUserId(Long userId);
     Boolean existsByUserId(Long userId);
     Optional<Recruiter> findByCompanyName(String companyName);
+    Optional<Recruiter> findByStripeSubscriptionId(String stripeSubscriptionId);
 }

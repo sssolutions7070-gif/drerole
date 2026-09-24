@@ -31,18 +31,21 @@ public class JobPostingService {
     private final UserRepository userRepository;
     private final RecruiterRepository recruiterRepository;
     private final SavedJobRepository savedJobRepository;
+    private final SubscriptionService subscriptionService;
     private final ObjectMapper objectMapper;
 
     public JobPostingService(JobPostingRepository jobPostingRepository,
                            ApplicationRepository applicationRepository,
                            UserRepository userRepository,
                            RecruiterRepository recruiterRepository,
-                           SavedJobRepository savedJobRepository) {
+                           SavedJobRepository savedJobRepository,
+                           SubscriptionService subscriptionService) {
         this.jobPostingRepository = jobPostingRepository;
         this.applicationRepository = applicationRepository;
         this.userRepository = userRepository;
         this.recruiterRepository = recruiterRepository;
         this.savedJobRepository = savedJobRepository;
+        this.subscriptionService = subscriptionService;
         this.objectMapper = new ObjectMapper();
     }
     
@@ -407,7 +410,8 @@ public class JobPostingService {
         if (recruiter.isEmpty()) {
             throw new JobPostingException("Recruiter not found with ID: " + recruiterId);
         }
-        
+        subscriptionService.enforceActiveJobLimit(recruiter.get());
+
         JobPosting jobPosting = new JobPosting();
         jobPosting.setTitle(title);
         jobPosting.setCompany(company);

@@ -141,6 +141,9 @@ public class AccessPolicy {
         rule("PUT", "/api/recruiters/user/{userId}/profile", self("userId"));
         rule("POST", "/api/recruiters/jobs", recruiter);
         rule("GET", "/api/recruiters/jobs/recruiter/{recruiterId}", ownRecruiterId("recruiterId"));
+        rule("GET", "/api/recruiters/{recruiterId}/subscription", ownRecruiterId("recruiterId"));
+        rule("POST", "/api/recruiters/{recruiterId}/subscription/checkout", ownRecruiterId("recruiterId"));
+        rule("POST", "/api/recruiters/{recruiterId}/subscription/cancel", ownRecruiterId("recruiterId"));
         rule("PUT", "/api/recruiters/jobs/{jobId}", ownsJob("jobId"));
         rule("DELETE", "/api/recruiters/jobs/{jobId}", ownsJob("jobId"));
         rule("GET", "/api/recruiters/jobs/{jobId}/applications", ownsJob("jobId"));

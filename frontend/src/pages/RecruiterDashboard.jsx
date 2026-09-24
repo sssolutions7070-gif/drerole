@@ -5,7 +5,7 @@ import {
   Mail, Phone, Calendar, BookOpen, BarChart3, X, Upload,
   MapPin, CheckCircle, XCircle, Clock, TrendingUp, Award,
   Target, Send, Filter, Download, ChevronDown, ChevronUp,
-  Sparkles, UserCheck, Key, FileText, Loader, Star
+  Sparkles, UserCheck, Key, FileText, Loader, Star, CreditCard
 } from 'lucide-react';
 import api from '../services/api';
 import JobPostForm from '../components/JobPostForm';
@@ -13,6 +13,7 @@ import ApplicationsList from '../components/ApplicationsList';
 import TestManagement from '../components/TestManagement';
 import ExternalJobManagement from '../components/ExternalJobManagement';
 import ExternalJobResults from '../components/ExternalJobResults';
+import SubscriptionPanel from '../components/SubscriptionPanel';
 
 const RecruiterDashboard = () => {
   const [jobs, setJobs] = useState([]);
@@ -363,6 +364,17 @@ const RecruiterDashboard = () => {
             >
               <TrendingUp className="h-5 w-5 mr-2" />
               Analytics
+            </button>
+            <button
+              onClick={() => setActiveTab('billing')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center whitespace-nowrap ${
+                activeTab === 'billing'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <CreditCard className="h-5 w-5 mr-2" />
+              Billing
             </button>
           </nav>
         </div>
@@ -819,6 +831,10 @@ const RecruiterDashboard = () => {
             </>
           )}
         </div>
+      )}
+
+      {activeTab === 'billing' && recruiterProfile && (
+        <SubscriptionPanel recruiterId={recruiterProfile.id} />
       )}
 
       {/* Job Form Modal */}

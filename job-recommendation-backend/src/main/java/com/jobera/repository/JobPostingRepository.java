@@ -15,6 +15,7 @@ public interface JobPostingRepository extends JpaRepository<JobPosting, Long> {
     List<JobPosting> findByIsActiveTrue();
     List<JobPosting> findByIsActiveTrueOrderByPostedDateDesc();
     List<JobPosting> findByRecruiterIdAndIsActiveTrue(Long recruiterId);
+    long countByRecruiterIdAndIsActiveTrue(Long recruiterId);
 
     // A company's public profile page only shows its approved, active postings - same rule as
     // the general public listing, just scoped to one recruiter.
