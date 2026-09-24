@@ -20,6 +20,7 @@ import org.springframework.web.util.UriUtils;
 
 import com.jobera.entity.User;
 import com.jobera.security.AccessPolicy;
+import com.jobera.service.ApiKeyService;
 import com.jobera.service.AuthenticationService;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -30,6 +31,7 @@ public class AuthInterceptor implements HandlerInterceptor {
 
     public static final String AUTHENTICATED_USER = "authenticatedUser";
     public static final String PROCTORING_KEY_HEADER = "X-Proctoring-Key";
+    public static final String API_KEY_HEADER = "X-API-Key";
 
     private static final Set<String> PUBLIC_PATHS = Set.of(
         "/api", "/api/health",
@@ -61,13 +63,16 @@ public class AuthInterceptor implements HandlerInterceptor {
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
     private final AuthenticationService authenticationService;
     private final AccessPolicy accessPolicy;
+    private final ApiKeyService apiKeyService;
     private final String proctoringApiKey;
 
     public AuthInterceptor(AuthenticationService authenticationService,
                            AccessPolicy accessPolicy,
+                           ApiKeyService apiKeyService,
                            @Value("${proctoring.api-key:}") String proctoringApiKey) {
         this.authenticationService = authenticationService;
         this.accessPolicy = accessPolicy;
+        this.apiKeyService = apiKeyService;
         this.proctoringApiKey = proctoringApiKey;
     }
 
@@ -92,13 +97,24 @@ public class AuthInterceptor implements HandlerInterceptor {
         }
 
         String header = request.getHeader("Authorization");
-        if (header == null || !header.startsWith("Bearer ")) {
-            return reject(response, HttpServletResponse.SC_UNAUTHORIZED, "Authentication required");
-        }
+        String apiKeyHeader = request.getHeader(API_KEY_HEADER);
 
-        Optional<User> user = authenticationService.validateToken(header.substring(7));
-        if (user.isEmpty()) {
-            return reject(response, HttpServletResponse.SC_UNAUTHORIZED, "Invalid or expired token");
+        Optional<User> user;
+        if (header != null && header.startsWith("Bearer ")) {
+            user = authenticationService.validateToken(header.substring(7));
+            if (user.isEmpty()) {
+                return reject(response, HttpServletResponse.SC_UNAUTHORIZED, "Invalid or expired token");
+            }
+        } else if (apiKeyHeader != null && !apiKeyHeader.isBlank()) {
+            // Machine clients (a recruiter's own integration) authenticate with a generated API
+            // key instead of a bearer token - see ApiKeyService. It resolves to the same account
+            // a bearer token would, so every AccessPolicy rule below applies identically.
+            user = apiKeyService.authenticate(apiKeyHeader);
+            if (user.isEmpty()) {
+                return reject(response, HttpServletResponse.SC_UNAUTHORIZED, "Invalid or revoked API key");
+            }
+        } else {
+            return reject(response, HttpServletResponse.SC_UNAUTHORIZED, "Authentication required");
         }
 
         if (!accessPolicy.isAllowed(user.get(), request.getMethod(), path, queryParams(request))) {

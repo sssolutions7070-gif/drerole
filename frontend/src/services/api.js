@@ -228,6 +228,30 @@ export const platformAnalyticsAPI = {
     api.get('/admin/analytics/overview'),
 };
 
+// API keys - let a recruiter's own integration (script, ATS, Zapier) call the API as themselves
+export const apiKeyAPI = {
+  list: (recruiterId) =>
+    api.get(`/recruiters/${recruiterId}/api-keys`),
+
+  generate: (recruiterId, label) =>
+    api.post(`/recruiters/${recruiterId}/api-keys`, { label }),
+
+  revoke: (recruiterId, keyId) =>
+    api.delete(`/recruiters/${recruiterId}/api-keys/${keyId}`),
+};
+
+// Webhooks - an HMAC-signed POST to a recruiter's own URL when a chosen event happens
+export const webhookAPI = {
+  list: (recruiterId) =>
+    api.get(`/recruiters/${recruiterId}/webhooks`),
+
+  register: (recruiterId, url, eventType) =>
+    api.post(`/recruiters/${recruiterId}/webhooks`, { url, eventType }),
+
+  remove: (recruiterId, webhookId) =>
+    api.delete(`/recruiters/${recruiterId}/webhooks/${webhookId}`),
+};
+
 // Persisted notification feed backing the bell icon (separate from the transient toast socket)
 export const notificationAPI = {
   list: (userId) =>

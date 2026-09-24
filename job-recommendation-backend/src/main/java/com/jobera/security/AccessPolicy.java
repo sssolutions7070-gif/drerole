@@ -158,6 +158,12 @@ public class AccessPolicy {
         rule("GET", "/api/recruiters/{recruiterId}/team", ownRecruiterId("recruiterId"));
         rule("POST", "/api/recruiters/{recruiterId}/team", ownRecruiterId("recruiterId"));
         rule("DELETE", "/api/recruiters/{recruiterId}/team/{membershipId}", ownRecruiterId("recruiterId"));
+        rule("GET", "/api/recruiters/{recruiterId}/api-keys", ownRecruiterId("recruiterId"));
+        rule("POST", "/api/recruiters/{recruiterId}/api-keys", ownRecruiterId("recruiterId"));
+        rule("DELETE", "/api/recruiters/{recruiterId}/api-keys/{keyId}", ownRecruiterId("recruiterId"));
+        rule("GET", "/api/recruiters/{recruiterId}/webhooks", ownRecruiterId("recruiterId"));
+        rule("POST", "/api/recruiters/{recruiterId}/webhooks", ownRecruiterId("recruiterId"));
+        rule("DELETE", "/api/recruiters/{recruiterId}/webhooks/{webhookId}", ownRecruiterId("recruiterId"));
         rule("GET", "/api/recruiters/{recruiterId}/talent-pool", ownRecruiterId("recruiterId"));
         rule("PUT", "/api/recruiters/{recruiterId}/talent-pool/{candidateUserId}/note", ownRecruiterId("recruiterId"));
         rule("GET", "/api/recruiters/{recruiterId}/subscription", ownRecruiterId("recruiterId"));

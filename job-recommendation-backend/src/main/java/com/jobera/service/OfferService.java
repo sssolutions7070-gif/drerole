@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 
 import com.jobera.entity.Application;
 import com.jobera.entity.JobOffer;
+import com.jobera.entity.Webhook;
 import com.jobera.repository.ApplicationRepository;
 import com.jobera.repository.JobOfferRepository;
 
@@ -53,13 +54,16 @@ public class OfferService {
     private final ApplicationRepository applicationRepository;
     private final RealtimeNotifier realtimeNotifier;
     private final NotificationFeedService notificationFeedService;
+    private final WebhookService webhookService;
 
     public OfferService(JobOfferRepository jobOfferRepository, ApplicationRepository applicationRepository,
-                         RealtimeNotifier realtimeNotifier, NotificationFeedService notificationFeedService) {
+                         RealtimeNotifier realtimeNotifier, NotificationFeedService notificationFeedService,
+                         WebhookService webhookService) {
         this.jobOfferRepository = jobOfferRepository;
         this.applicationRepository = applicationRepository;
         this.realtimeNotifier = realtimeNotifier;
         this.notificationFeedService = notificationFeedService;
+        this.webhookService = webhookService;
     }
 
     private Long candidateUserId(Application application) {
@@ -142,6 +146,10 @@ public class OfferService {
         notificationFeedService.record(recruiterUserId(application), "OFFER_ACCEPTED",
             "Offer accepted",
             signatureName + " signed and accepted the offer.", "/recruiter/dashboard");
+        if (application.getJobPosting() != null && application.getJobPosting().getRecruiter() != null) {
+            webhookService.dispatch(application.getJobPosting().getRecruiter().getId(), Webhook.EVENT_OFFER_ACCEPTED, Map.of(
+                "applicationId", applicationId, "signedBy", signatureName));
+        }
 
         return saved;
     }

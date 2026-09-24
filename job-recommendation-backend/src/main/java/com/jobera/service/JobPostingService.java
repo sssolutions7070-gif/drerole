@@ -15,6 +15,7 @@ import com.jobera.entity.Application;
 import com.jobera.entity.JobPosting;
 import com.jobera.entity.Recruiter;
 import com.jobera.entity.User;
+import com.jobera.entity.Webhook;
 import com.jobera.repository.ApplicationRepository;
 import com.jobera.repository.JobPostingRepository;
 import com.jobera.repository.RecruiterRepository;
@@ -32,6 +33,7 @@ public class JobPostingService {
     private final RecruiterRepository recruiterRepository;
     private final SavedJobRepository savedJobRepository;
     private final SubscriptionService subscriptionService;
+    private final WebhookService webhookService;
     private final ObjectMapper objectMapper;
 
     public JobPostingService(JobPostingRepository jobPostingRepository,
@@ -39,14 +41,28 @@ public class JobPostingService {
                            UserRepository userRepository,
                            RecruiterRepository recruiterRepository,
                            SavedJobRepository savedJobRepository,
-                           SubscriptionService subscriptionService) {
+                           SubscriptionService subscriptionService,
+                           WebhookService webhookService) {
         this.jobPostingRepository = jobPostingRepository;
         this.applicationRepository = applicationRepository;
         this.userRepository = userRepository;
         this.recruiterRepository = recruiterRepository;
         this.savedJobRepository = savedJobRepository;
         this.subscriptionService = subscriptionService;
+        this.webhookService = webhookService;
         this.objectMapper = new ObjectMapper();
+    }
+
+    private void dispatchApplicationSubmitted(Application application, JobPosting job) {
+        if (job.getRecruiter() == null) {
+            return;
+        }
+        webhookService.dispatch(job.getRecruiter().getId(), Webhook.EVENT_APPLICATION_SUBMITTED, Map.of(
+            "applicationId", application.getId(),
+            "jobId", job.getId(),
+            "jobTitle", job.getTitle(),
+            "applicantName", application.getSafeApplicantName()
+        ));
     }
     
     public List<JobPosting> getActiveJobPostings() {
@@ -98,7 +114,8 @@ public class JobPostingService {
                 log.debug("✅ Applicant Email: " + savedApplication.getApplicantEmail());
                 log.debug("✅ Application Date: " + savedApplication.getApplicationDate());
                 log.debug("✅ Status: " + savedApplication.getStatus());
-                
+                dispatchApplicationSubmitted(savedApplication, job.get());
+
             } catch (Exception e) {
                 log.error("❌ Error saving application: " + e.getMessage());
                 log.error("Unexpected error", e);
@@ -163,7 +180,8 @@ public class JobPostingService {
                 log.debug("✅ Application saved successfully with ID: " + savedApplication.getId());
                 log.debug("✅ Match Percentage: " + savedApplication.getMatchPercentage() + "%");
                 log.debug("✅ Applicant Name: " + savedApplication.getApplicantName());
-                
+                dispatchApplicationSubmitted(savedApplication, job.get());
+
                 return savedApplication;
                 
             } catch (Exception e) {

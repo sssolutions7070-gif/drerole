@@ -33,6 +33,7 @@ class OfferServiceTest {
     @Mock ApplicationRepository applicationRepository;
     @Mock RealtimeNotifier realtimeNotifier;
     @Mock NotificationFeedService notificationFeedService;
+    @Mock WebhookService webhookService;
 
     OfferService service;
 
@@ -42,7 +43,7 @@ class OfferServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new OfferService(jobOfferRepository, applicationRepository, realtimeNotifier, notificationFeedService);
+        service = new OfferService(jobOfferRepository, applicationRepository, realtimeNotifier, notificationFeedService, webhookService);
 
         candidate = new User("candidate@example.com", "hash", "Candidate");
         candidate.setId(1L);

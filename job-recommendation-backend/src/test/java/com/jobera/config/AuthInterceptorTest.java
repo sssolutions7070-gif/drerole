@@ -22,6 +22,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
 
 import com.jobera.entity.User;
 import com.jobera.security.AccessPolicy;
+import com.jobera.service.ApiKeyService;
 import com.jobera.service.AuthenticationService;
 
 @ExtendWith(MockitoExtension.class)
@@ -29,13 +30,14 @@ class AuthInterceptorTest {
 
     @Mock AuthenticationService authenticationService;
     @Mock AccessPolicy accessPolicy;
+    @Mock ApiKeyService apiKeyService;
 
     AuthInterceptor interceptor;
     MockHttpServletResponse response;
 
     @BeforeEach
     void setUp() {
-        interceptor = new AuthInterceptor(authenticationService, accessPolicy, "");
+        interceptor = new AuthInterceptor(authenticationService, accessPolicy, apiKeyService, "");
         response = new MockHttpServletResponse();
     }
 
@@ -91,6 +93,41 @@ class AuthInterceptorTest {
 
         assertTrue(interceptor.preHandle(request, response, new Object()));
         assertSame(user, request.getAttribute(AuthInterceptor.AUTHENTICATED_USER));
+    }
+
+    @Test
+    void validApiKeyAllowedByThePolicyPassesAndExposesTheUser() throws Exception {
+        User user = user(5);
+        when(apiKeyService.authenticate("dr_live_good")).thenReturn(Optional.of(user));
+        when(accessPolicy.isAllowed(eq(user), eq("GET"), eq("/api/jobs/recommendations/skills"), any())).thenReturn(true);
+        MockHttpServletRequest request = request("GET", "/api/jobs/recommendations/skills");
+        request.addHeader("X-API-Key", "dr_live_good");
+
+        assertTrue(interceptor.preHandle(request, response, new Object()));
+        assertSame(user, request.getAttribute(AuthInterceptor.AUTHENTICATED_USER));
+    }
+
+    @Test
+    void invalidApiKeyIsRejectedWith401() throws Exception {
+        when(apiKeyService.authenticate("bad")).thenReturn(Optional.empty());
+        MockHttpServletRequest request = request("GET", "/api/jobs/recommendations/skills");
+        request.addHeader("X-API-Key", "bad");
+
+        assertFalse(interceptor.preHandle(request, response, new Object()));
+        assertEquals(401, response.getStatus());
+    }
+
+    @Test
+    void bearerTokenTakesPrecedenceOverAnApiKeyIfBothArePresent() throws Exception {
+        User user = user(5);
+        when(authenticationService.validateToken("good")).thenReturn(Optional.of(user));
+        when(accessPolicy.isAllowed(eq(user), eq("GET"), eq("/api/jobs/recommendations/skills"), any())).thenReturn(true);
+        MockHttpServletRequest request = request("GET", "/api/jobs/recommendations/skills");
+        request.addHeader("Authorization", "Bearer good");
+        request.addHeader("X-API-Key", "should-be-ignored");
+
+        assertTrue(interceptor.preHandle(request, response, new Object()));
+        verifyNoInteractions(apiKeyService);
     }
 
     @Test
@@ -157,7 +194,7 @@ class AuthInterceptorTest {
 
     @Test
     void proctoringCallbackRequiresTheSharedKeyWhenConfigured() throws Exception {
-        AuthInterceptor keyed = new AuthInterceptor(authenticationService, accessPolicy, "s3cr3t");
+        AuthInterceptor keyed = new AuthInterceptor(authenticationService, accessPolicy, apiKeyService, "s3cr3t");
 
         MockHttpServletRequest good = request("POST", "/api/aptitude-tests/12/violations");
         good.setRemoteAddr("10.0.0.5");
@@ -172,7 +209,7 @@ class AuthInterceptorTest {
 
     @Test
     void proctoringKeyDoesNotOpenOtherEndpoints() throws Exception {
-        AuthInterceptor keyed = new AuthInterceptor(authenticationService, accessPolicy, "s3cr3t");
+        AuthInterceptor keyed = new AuthInterceptor(authenticationService, accessPolicy, apiKeyService, "s3cr3t");
         MockHttpServletRequest request = request("POST", "/api/aptitude-tests/submit");
         request.addHeader(AuthInterceptor.PROCTORING_KEY_HEADER, "s3cr3t");
 

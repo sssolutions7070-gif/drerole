@@ -31,13 +31,14 @@ class JobPostingServiceTest {
     @Mock RecruiterRepository recruiterRepository;
     @Mock SavedJobRepository savedJobRepository;
     @Mock SubscriptionService subscriptionService;
+    @Mock WebhookService webhookService;
 
     JobPostingService service;
 
     @BeforeEach
     void setUp() {
         service = new JobPostingService(jobPostingRepository, applicationRepository, userRepository,
-            recruiterRepository, savedJobRepository, subscriptionService);
+            recruiterRepository, savedJobRepository, subscriptionService, webhookService);
     }
 
     @Test

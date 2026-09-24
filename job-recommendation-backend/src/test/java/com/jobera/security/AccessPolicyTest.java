@@ -259,6 +259,21 @@ class AccessPolicyTest {
     }
 
     @Test
+    void apiKeyAndWebhookRoutesAreScopedToTheOwningRecruiter() {
+        // Route-level access is the same ownRecruiterId check as everything else; the
+        // owner-only restriction on actually minting a key/webhook is enforced in the service.
+        assertTrue(allowed(recruiterUser, "GET", "/api/recruiters/200/api-keys"));
+        assertTrue(allowed(recruiterUser, "POST", "/api/recruiters/200/api-keys"));
+        assertTrue(allowed(recruiterUser, "DELETE", "/api/recruiters/200/api-keys/5"));
+        assertFalse(allowed(otherRecruiterUser, "GET", "/api/recruiters/200/api-keys"));
+
+        assertTrue(allowed(recruiterUser, "GET", "/api/recruiters/200/webhooks"));
+        assertTrue(allowed(recruiterUser, "POST", "/api/recruiters/200/webhooks"));
+        assertTrue(allowed(recruiterUser, "DELETE", "/api/recruiters/200/webhooks/5"));
+        assertFalse(allowed(otherRecruiterUser, "GET", "/api/recruiters/200/webhooks"));
+    }
+
+    @Test
     void onlyTheOwningRecruiterCanReadAptitudeTestQuestions() {
         aptitudeTestOwnedBy(3, recruiter);
 
