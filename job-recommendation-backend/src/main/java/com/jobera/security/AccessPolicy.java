@@ -165,6 +165,8 @@ public class AccessPolicy {
         rule("GET", "/api/recruiters/{recruiterId}/webhooks", ownRecruiterId("recruiterId"));
         rule("POST", "/api/recruiters/{recruiterId}/webhooks", ownRecruiterId("recruiterId"));
         rule("DELETE", "/api/recruiters/{recruiterId}/webhooks/{webhookId}", ownRecruiterId("recruiterId"));
+        rule("GET", "/api/recruiters/{recruiterId}/verification", ownRecruiterId("recruiterId"));
+        rule("POST", "/api/recruiters/{recruiterId}/verification", ownRecruiterId("recruiterId"));
         rule("GET", "/api/recruiters/{recruiterId}/direct-messages", ownRecruiterId("recruiterId"));
         rule("GET", "/api/recruiters/{recruiterId}/direct-messages/{candidateUserId}", participatesInDirectThread());
         rule("POST", "/api/recruiters/{recruiterId}/direct-messages/{candidateUserId}", participatesInDirectThread());

@@ -5,7 +5,7 @@ import {
   Mail, Phone, Calendar, BookOpen, BarChart3, X, Upload,
   MapPin, CheckCircle, XCircle, Clock, TrendingUp, Award,
   Target, Send, Filter, Download, ChevronDown, ChevronUp,
-  Sparkles, UserCheck, Key, FileText, Loader, Star, CreditCard, Users2, MessageSquare
+  Sparkles, UserCheck, Key, FileText, Loader, Star, CreditCard, Users2, MessageSquare, BadgeCheck
 } from 'lucide-react';
 import api from '../services/api';
 import JobPostForm from '../components/JobPostForm';
@@ -19,6 +19,7 @@ import TeamPanel from '../components/TeamPanel';
 import CandidateDiscoveryPanel from '../components/CandidateDiscoveryPanel';
 import IntegrationsPanel from '../components/IntegrationsPanel';
 import DirectMessagesInbox from '../components/DirectMessagesInbox';
+import VerificationPanel from '../components/VerificationPanel';
 
 const RecruiterDashboard = () => {
   const [jobs, setJobs] = useState([]);
@@ -435,6 +436,17 @@ const RecruiterDashboard = () => {
             >
               <MessageSquare className="h-5 w-5 mr-2" />
               Messages
+            </button>
+            <button
+              onClick={() => setActiveTab('verification')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center whitespace-nowrap ${
+                activeTab === 'verification'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <BadgeCheck className="h-5 w-5 mr-2" />
+              Verification
             </button>
           </nav>
         </div>
@@ -915,6 +927,10 @@ const RecruiterDashboard = () => {
 
       {activeTab === 'messages' && recruiterProfile && (
         <DirectMessagesInbox role="recruiter" id={recruiterProfile.id} />
+      )}
+
+      {activeTab === 'verification' && recruiterProfile && (
+        <VerificationPanel recruiterId={recruiterProfile.id} />
       )}
 
       {/* Job Form Modal */}

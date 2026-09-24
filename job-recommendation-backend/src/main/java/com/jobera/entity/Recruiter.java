@@ -57,12 +57,29 @@ public class Recruiter {
     @Column(name = "stripe_subscription_id")
     private String stripeSubscriptionId;
 
+    public static final String VERIFICATION_NONE = "NONE";
+    public static final String VERIFICATION_PENDING = "PENDING";
+    public static final String VERIFICATION_VERIFIED = "VERIFIED";
+    public static final String VERIFICATION_REJECTED = "REJECTED";
+
+    @Column(name = "verification_status", nullable = false, length = 20)
+    private String verificationStatus = VERIFICATION_NONE;
+
+    @Column(name = "verification_document_path")
+    private String verificationDocumentPath;
+
+    @Column(name = "verification_rejection_reason")
+    private String verificationRejectionReason;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
         if (subscriptionTier == null) {
             subscriptionTier = "FREE";
+        }
+        if (verificationStatus == null) {
+            verificationStatus = VERIFICATION_NONE;
         }
     }
 
@@ -73,6 +90,9 @@ public class Recruiter {
     protected void onLoad() {
         if (subscriptionTier == null || subscriptionTier.isBlank()) {
             subscriptionTier = "FREE";
+        }
+        if (verificationStatus == null || verificationStatus.isBlank()) {
+            verificationStatus = VERIFICATION_NONE;
         }
     }
 
@@ -120,4 +140,10 @@ public class Recruiter {
     public void setStripeCustomerId(String stripeCustomerId) { this.stripeCustomerId = stripeCustomerId; }
     public String getStripeSubscriptionId() { return stripeSubscriptionId; }
     public void setStripeSubscriptionId(String stripeSubscriptionId) { this.stripeSubscriptionId = stripeSubscriptionId; }
+    public String getVerificationStatus() { return verificationStatus; }
+    public void setVerificationStatus(String verificationStatus) { this.verificationStatus = verificationStatus; }
+    public String getVerificationDocumentPath() { return verificationDocumentPath; }
+    public void setVerificationDocumentPath(String verificationDocumentPath) { this.verificationDocumentPath = verificationDocumentPath; }
+    public String getVerificationRejectionReason() { return verificationRejectionReason; }
+    public void setVerificationRejectionReason(String verificationRejectionReason) { this.verificationRejectionReason = verificationRejectionReason; }
 }

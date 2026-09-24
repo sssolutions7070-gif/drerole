@@ -62,6 +62,20 @@ class CompanyServiceTest {
         assertEquals(1, companies.size());
         assertEquals("Acme", companies.get(0).get("companyName"));
         assertEquals(1, companies.get(0).get("openJobCount"));
+        assertEquals(false, companies.get(0).get("verified"));
+    }
+
+    @Test
+    void listCompaniesMarksAVerifiedRecruiterAsVerified() {
+        Recruiter verified = recruiter(1L, "Acme");
+        verified.setVerificationStatus(Recruiter.VERIFICATION_VERIFIED);
+        when(recruiterRepository.findAll()).thenReturn(List.of(verified));
+        when(jobPostingRepository.findByRecruiterIdAndIsActiveTrueAndModerationStatusOrderByPostedDateDesc(1L, "APPROVED"))
+            .thenReturn(List.of(new JobPosting()));
+
+        List<Map<String, Object>> companies = service.listCompanies();
+
+        assertEquals(true, companies.get(0).get("verified"));
     }
 
     @Test
@@ -76,6 +90,7 @@ class CompanyServiceTest {
         Map<String, Object> profile = service.getCompanyProfile(1L);
 
         assertEquals("Acme", profile.get("companyName"));
+        assertEquals(false, profile.get("verified"));
         assertEquals("Software", profile.get("industry"));
         assertTrue(profile.containsKey("jobs"));
         @SuppressWarnings("unchecked")

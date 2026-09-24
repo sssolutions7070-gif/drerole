@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Building, Globe, Users, Briefcase, MapPin, Clock, ArrowLeft, Star, MessageSquare } from 'lucide-react';
 import api from '../services/api';
+import VerifiedBadge from '../components/VerifiedBadge';
 
 const OUTCOME_LABELS = {
   OFFER: 'Got an offer', REJECTED: 'Rejected', NO_RESPONSE: 'No response', WITHDREW: 'Withdrew',
@@ -179,7 +180,10 @@ const CompanyProfile = () => {
             <Building className="h-8 w-8 text-blue-600" />
           </div>
           <div className="flex-1">
-            <h1 className="text-2xl font-bold text-gray-800">{company.companyName}</h1>
+            <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+              {company.companyName}
+              {company.verified && <VerifiedBadge />}
+            </h1>
             <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-gray-500">
               {company.industry && <span>{company.industry}</span>}
               {company.companySize && (

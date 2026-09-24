@@ -1,6 +1,7 @@
 // File: src/main/java/com/jobera/repository/RecruiterRepository.java
 package com.jobera.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -14,4 +15,5 @@ public interface RecruiterRepository extends JpaRepository<Recruiter, Long> {
     Boolean existsByUserId(Long userId);
     Optional<Recruiter> findByCompanyName(String companyName);
     Optional<Recruiter> findByStripeSubscriptionId(String stripeSubscriptionId);
+    List<Recruiter> findByVerificationStatus(String verificationStatus);
 }

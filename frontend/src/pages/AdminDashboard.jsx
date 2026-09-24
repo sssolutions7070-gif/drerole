@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Building, Briefcase, FileText, Trash2, ToggleLeft, ToggleRight, BarChart3, ScrollText, Clock, CheckCircle, XCircle, Star, MessageSquare, TrendingUp } from 'lucide-react';
+import { Users, Building, Briefcase, FileText, Trash2, ToggleLeft, ToggleRight, BarChart3, ScrollText, Clock, CheckCircle, XCircle, Star, MessageSquare, TrendingUp, BadgeCheck } from 'lucide-react';
 import api from '../services/api';
 import PlatformAnalyticsPanel from '../components/PlatformAnalyticsPanel';
+import PendingVerificationsPanel from '../components/PendingVerificationsPanel';
 
 const AdminDashboard = () => {
   const [stats, setStats] = useState({});
@@ -272,6 +273,7 @@ const AdminDashboard = () => {
             { id: 'pending-jobs', name: `Pending Jobs${pendingJobs.length > 0 ? ` (${pendingJobs.length})` : ''}`, icon: Clock },
             { id: 'pending-reviews', name: `Pending Reviews${pendingReviews.length > 0 ? ` (${pendingReviews.length})` : ''}`, icon: Star },
             { id: 'pending-experiences', name: `Pending Interview Reports${pendingExperiences.length > 0 ? ` (${pendingExperiences.length})` : ''}`, icon: MessageSquare },
+            { id: 'pending-verifications', name: 'Pending Verifications', icon: BadgeCheck },
             { id: 'applications', name: 'Applications', icon: FileText },
             { id: 'audit-log', name: 'Audit Log', icon: ScrollText }
           ].map((tab) => {
@@ -723,6 +725,10 @@ const AdminDashboard = () => {
             </div>
           )}
         </div>
+      )}
+
+      {activeTab === 'pending-verifications' && (
+        <PendingVerificationsPanel />
       )}
 
       {/* Applications Tab */}

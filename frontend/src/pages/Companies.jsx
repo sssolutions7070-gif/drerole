@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Building, Briefcase, Users } from 'lucide-react';
 import api from '../services/api';
+import VerifiedBadge from '../components/VerifiedBadge';
 
 const Companies = () => {
   const [companies, setCompanies] = useState([]);
@@ -66,7 +67,10 @@ const Companies = () => {
                   <Building className="h-6 w-6 text-blue-600" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-800">{company.companyName}</h3>
+                  <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                    {company.companyName}
+                    {company.verified && <VerifiedBadge />}
+                  </h3>
                   <div className="flex flex-wrap gap-3 mt-1 text-sm text-gray-500">
                     {company.industry && <span>{company.industry}</span>}
                     {company.companySize && (

@@ -282,6 +282,10 @@ class AccessPolicyTest {
         assertTrue(allowed(recruiterUser, "POST", "/api/recruiters/200/webhooks"));
         assertTrue(allowed(recruiterUser, "DELETE", "/api/recruiters/200/webhooks/5"));
         assertFalse(allowed(otherRecruiterUser, "GET", "/api/recruiters/200/webhooks"));
+
+        assertTrue(allowed(recruiterUser, "GET", "/api/recruiters/200/verification"));
+        assertTrue(allowed(recruiterUser, "POST", "/api/recruiters/200/verification"));
+        assertFalse(allowed(otherRecruiterUser, "GET", "/api/recruiters/200/verification"));
     }
 
     @Test

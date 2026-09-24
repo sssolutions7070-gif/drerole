@@ -277,6 +277,34 @@ export const directMessageAPI = {
     api.get(`/users/${userId}/direct-messages`),
 };
 
+// "Verified Employer" - a recruiter submits proof of their business, an admin reviews it
+export const recruiterVerificationAPI = {
+  getStatus: (recruiterId) =>
+    api.get(`/recruiters/${recruiterId}/verification`),
+
+  submit: (recruiterId, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post(`/recruiters/${recruiterId}/verification`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+};
+
+export const adminVerificationAPI = {
+  listPending: () =>
+    api.get('/admin/verifications/pending'),
+
+  downloadDocument: (recruiterId) =>
+    api.get(`/admin/verifications/${recruiterId}/document`, { responseType: 'blob' }),
+
+  approve: (recruiterId) =>
+    api.post(`/admin/verifications/${recruiterId}/approve`),
+
+  reject: (recruiterId, reason) =>
+    api.post(`/admin/verifications/${recruiterId}/reject`, { reason }),
+};
+
 // Persisted notification feed backing the bell icon (separate from the transient toast socket)
 export const notificationAPI = {
   list: (userId) =>
