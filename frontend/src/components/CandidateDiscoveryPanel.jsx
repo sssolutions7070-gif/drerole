@@ -1,15 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { Search, MapPin, FileText } from 'lucide-react';
+import { Search, MapPin, FileText, MessageCircle } from 'lucide-react';
 import { candidateDiscoveryAPI } from '../services/api';
+import DirectMessageThread from './DirectMessageThread';
 
 /** Any recruiter's window into the "open to work" candidate pool - people who opted in to be
  *  discoverable even if they've never applied to one of this recruiter's postings. */
-const CandidateDiscoveryPanel = () => {
+const CandidateDiscoveryPanel = ({ recruiterId }) => {
   const [candidates, setCandidates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [skill, setSkill] = useState('');
   const [location, setLocation] = useState('');
+  const [messagingCandidate, setMessagingCandidate] = useState(null);
 
   const fetchCandidates = async (skillFilter, locationFilter) => {
     setLoading(true);
@@ -75,11 +77,19 @@ const CandidateDiscoveryPanel = () => {
                     </p>
                   )}
                 </div>
-                {candidate.hasResume && (
-                  <span className="inline-flex items-center gap-1 text-xs text-green-700 bg-green-100 px-2 py-1 rounded-full">
-                    <FileText className="h-3 w-3" /> Resume on file
-                  </span>
-                )}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {candidate.hasResume && (
+                    <span className="inline-flex items-center gap-1 text-xs text-green-700 bg-green-100 px-2 py-1 rounded-full">
+                      <FileText className="h-3 w-3" /> Resume on file
+                    </span>
+                  )}
+                  <button
+                    onClick={() => setMessagingCandidate(candidate)}
+                    className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 border border-blue-200 rounded-full px-2 py-1"
+                  >
+                    <MessageCircle className="h-3 w-3" /> Message
+                  </button>
+                </div>
               </div>
               {candidate.bio && <p className="text-sm text-gray-600 mt-2">{candidate.bio}</p>}
               {candidate.skills?.length > 0 && (
@@ -92,6 +102,15 @@ const CandidateDiscoveryPanel = () => {
             </div>
           ))}
         </div>
+      )}
+
+      {messagingCandidate && (
+        <DirectMessageThread
+          recruiterId={recruiterId}
+          candidateUserId={messagingCandidate.userId}
+          title={messagingCandidate.fullName}
+          onClose={() => setMessagingCandidate(null)}
+        />
       )}
     </div>
   );

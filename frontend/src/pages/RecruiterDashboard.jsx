@@ -5,7 +5,7 @@ import {
   Mail, Phone, Calendar, BookOpen, BarChart3, X, Upload,
   MapPin, CheckCircle, XCircle, Clock, TrendingUp, Award,
   Target, Send, Filter, Download, ChevronDown, ChevronUp,
-  Sparkles, UserCheck, Key, FileText, Loader, Star, CreditCard, UsersRound
+  Sparkles, UserCheck, Key, FileText, Loader, Star, CreditCard, Users2, MessageSquare
 } from 'lucide-react';
 import api from '../services/api';
 import JobPostForm from '../components/JobPostForm';
@@ -18,6 +18,7 @@ import TalentPoolPanel from '../components/TalentPoolPanel';
 import TeamPanel from '../components/TeamPanel';
 import CandidateDiscoveryPanel from '../components/CandidateDiscoveryPanel';
 import IntegrationsPanel from '../components/IntegrationsPanel';
+import DirectMessagesInbox from '../components/DirectMessagesInbox';
 
 const RecruiterDashboard = () => {
   const [jobs, setJobs] = useState([]);
@@ -399,7 +400,7 @@ const RecruiterDashboard = () => {
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
-              <UsersRound className="h-5 w-5 mr-2" />
+              <Users2 className="h-5 w-5 mr-2" />
               Team
             </button>
             <button
@@ -423,6 +424,17 @@ const RecruiterDashboard = () => {
             >
               <Key className="h-5 w-5 mr-2" />
               Integrations
+            </button>
+            <button
+              onClick={() => setActiveTab('messages')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center whitespace-nowrap ${
+                activeTab === 'messages'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <MessageSquare className="h-5 w-5 mr-2" />
+              Messages
             </button>
           </nav>
         </div>
@@ -893,12 +905,16 @@ const RecruiterDashboard = () => {
         <TeamPanel recruiterId={recruiterProfile.id} />
       )}
 
-      {activeTab === 'discover' && (
-        <CandidateDiscoveryPanel />
+      {activeTab === 'discover' && recruiterProfile && (
+        <CandidateDiscoveryPanel recruiterId={recruiterProfile.id} />
       )}
 
       {activeTab === 'integrations' && recruiterProfile && (
         <IntegrationsPanel recruiterId={recruiterProfile.id} />
+      )}
+
+      {activeTab === 'messages' && recruiterProfile && (
+        <DirectMessagesInbox role="recruiter" id={recruiterProfile.id} />
       )}
 
       {/* Job Form Modal */}

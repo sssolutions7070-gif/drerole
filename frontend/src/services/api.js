@@ -252,6 +252,22 @@ export const webhookAPI = {
     api.delete(`/recruiters/${recruiterId}/webhooks/${webhookId}`),
 };
 
+// Chat between a recruiter and a candidate outside of any application - reaching out to someone
+// found via candidateDiscoveryAPI, before any application exists
+export const directMessageAPI = {
+  getThread: (recruiterId, candidateUserId) =>
+    api.get(`/recruiters/${recruiterId}/direct-messages/${candidateUserId}`),
+
+  send: (recruiterId, candidateUserId, body) =>
+    api.post(`/recruiters/${recruiterId}/direct-messages/${candidateUserId}`, { body }),
+
+  listForRecruiter: (recruiterId) =>
+    api.get(`/recruiters/${recruiterId}/direct-messages`),
+
+  listForCandidate: (userId) =>
+    api.get(`/users/${userId}/direct-messages`),
+};
+
 // Persisted notification feed backing the bell icon (separate from the transient toast socket)
 export const notificationAPI = {
   list: (userId) =>

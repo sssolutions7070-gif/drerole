@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import CandidateDiscoveryPanel from './CandidateDiscoveryPanel';
-import { candidateDiscoveryAPI } from '../services/api';
+import { candidateDiscoveryAPI, directMessageAPI } from '../services/api';
 
 vi.mock('../services/api');
 
@@ -54,5 +54,17 @@ describe('CandidateDiscoveryPanel', () => {
     render(<CandidateDiscoveryPanel />);
 
     expect(await screen.findByText('boom')).toBeInTheDocument();
+  });
+
+  it('opens a direct-message thread for a candidate', async () => {
+    candidateDiscoveryAPI.discover.mockResolvedValue({ data: [candidate()] });
+    directMessageAPI.getThread.mockResolvedValue({ data: [] });
+    const user = userEvent.setup();
+
+    render(<CandidateDiscoveryPanel recruiterId={100} />);
+    await user.click(await screen.findByRole('button', { name: /message/i }));
+
+    expect(await screen.findByText(/no messages yet/i)).toBeInTheDocument();
+    expect(directMessageAPI.getThread).toHaveBeenCalledWith(100, 1);
   });
 });

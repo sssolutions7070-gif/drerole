@@ -274,6 +274,20 @@ class AccessPolicyTest {
     }
 
     @Test
+    void directMessageThreadsAreLimitedToTheRecruiterAndTheNamedCandidate() {
+        assertTrue(allowed(recruiterUser, "GET", "/api/recruiters/200/direct-messages/10"));
+        assertTrue(allowed(recruiterUser, "POST", "/api/recruiters/200/direct-messages/10"));
+        assertTrue(allowed(candidate, "GET", "/api/recruiters/200/direct-messages/10"));
+        assertTrue(allowed(candidate, "POST", "/api/recruiters/200/direct-messages/10"));
+
+        assertFalse(allowed(otherRecruiterUser, "GET", "/api/recruiters/200/direct-messages/10"));
+        assertFalse(allowed(otherCandidate, "GET", "/api/recruiters/200/direct-messages/10"));
+
+        assertTrue(allowed(recruiterUser, "GET", "/api/recruiters/200/direct-messages"));
+        assertFalse(allowed(otherRecruiterUser, "GET", "/api/recruiters/200/direct-messages"));
+    }
+
+    @Test
     void onlyTheOwningRecruiterCanReadAptitudeTestQuestions() {
         aptitudeTestOwnedBy(3, recruiter);
 

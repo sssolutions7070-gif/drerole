@@ -164,6 +164,9 @@ public class AccessPolicy {
         rule("GET", "/api/recruiters/{recruiterId}/webhooks", ownRecruiterId("recruiterId"));
         rule("POST", "/api/recruiters/{recruiterId}/webhooks", ownRecruiterId("recruiterId"));
         rule("DELETE", "/api/recruiters/{recruiterId}/webhooks/{webhookId}", ownRecruiterId("recruiterId"));
+        rule("GET", "/api/recruiters/{recruiterId}/direct-messages", ownRecruiterId("recruiterId"));
+        rule("GET", "/api/recruiters/{recruiterId}/direct-messages/{candidateUserId}", participatesInDirectThread());
+        rule("POST", "/api/recruiters/{recruiterId}/direct-messages/{candidateUserId}", participatesInDirectThread());
         rule("GET", "/api/recruiters/{recruiterId}/talent-pool", ownRecruiterId("recruiterId"));
         rule("PUT", "/api/recruiters/{recruiterId}/talent-pool/{candidateUserId}/note", ownRecruiterId("recruiterId"));
         rule("GET", "/api/recruiters/{recruiterId}/subscription", ownRecruiterId("recruiterId"));
@@ -359,6 +362,14 @@ public class AccessPolicy {
 
     private Check ownRecruiterId(String var) {
         return c -> ownsRecruiterId(c.user(), c.var(var));
+    }
+
+    /** Either side of a direct-message thread: the recruiter (owner or team member) or the
+     *  candidate the thread is with - nobody else. */
+    private Check participatesInDirectThread() {
+        Check recruiterSide = ownRecruiterId("recruiterId");
+        Check candidateSide = self("candidateUserId");
+        return c -> recruiterSide.allow(c) || candidateSide.allow(c);
     }
 
     private Check ownsJob(String var) {
