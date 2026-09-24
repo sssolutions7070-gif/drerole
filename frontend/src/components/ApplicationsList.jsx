@@ -177,6 +177,10 @@ const ApplicationsList = ({ job, onClose }) => {
         return 'bg-red-100 text-red-800';
       case 'OFFER_SENT':
         return 'bg-emerald-100 text-emerald-800';
+      case 'OFFER_ACCEPTED':
+        return 'bg-green-100 text-green-800';
+      case 'OFFER_DECLINED':
+        return 'bg-gray-100 text-gray-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -213,6 +217,10 @@ const ApplicationsList = ({ job, onClose }) => {
         return <XCircle className="h-4 w-4" />;
       case 'OFFER_SENT':
         return <Star className="h-4 w-4" />;
+      case 'OFFER_ACCEPTED':
+        return <CheckCircle className="h-4 w-4" />;
+      case 'OFFER_DECLINED':
+        return <XCircle className="h-4 w-4" />;
       default:
         return <Clock className="h-4 w-4" />;
     }

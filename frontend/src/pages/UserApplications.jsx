@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Briefcase, Calendar, Clock, Eye, CheckCircle, XCircle, Star, MapPin, ChevronDown, ChevronUp, RefreshCw, AlertCircle, MessageCircle, Video, FileCheck } from 'lucide-react';
+import { Briefcase, Calendar, Clock, Eye, CheckCircle, XCircle, Star, MapPin, ChevronDown, ChevronUp, RefreshCw, AlertCircle, MessageCircle, Video, FileCheck, BookOpen, Award } from 'lucide-react';
 import api from '../services/api';
 import MessageThread from '../components/MessageThread';
 import InterviewPipelinePanel from '../components/InterviewPipelinePanel';
@@ -70,6 +70,16 @@ const UserApplications = () => {
         return 'bg-red-100 text-red-800 border-red-200';
       case 'OFFER_SENT':
         return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+      case 'TEST_ASSIGNED':
+        return 'bg-indigo-100 text-indigo-800 border-indigo-200';
+      case 'TEST_PASSED':
+        return 'bg-teal-100 text-teal-800 border-teal-200';
+      case 'TEST_FAILED':
+        return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'OFFER_ACCEPTED':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'OFFER_DECLINED':
+        return 'bg-gray-100 text-gray-800 border-gray-200';
       default:
         return 'bg-gray-100 text-gray-800 border-gray-200';
     }
@@ -89,6 +99,16 @@ const UserApplications = () => {
         return <XCircle className="h-4 w-4" />;
       case 'OFFER_SENT':
         return <Star className="h-4 w-4" />;
+      case 'TEST_ASSIGNED':
+        return <BookOpen className="h-4 w-4" />;
+      case 'TEST_PASSED':
+        return <Award className="h-4 w-4" />;
+      case 'TEST_FAILED':
+        return <AlertCircle className="h-4 w-4" />;
+      case 'OFFER_ACCEPTED':
+        return <CheckCircle className="h-4 w-4" />;
+      case 'OFFER_DECLINED':
+        return <XCircle className="h-4 w-4" />;
       default:
         return <Clock className="h-4 w-4" />;
     }
@@ -108,6 +128,16 @@ const UserApplications = () => {
         return 'Unfortunately, your application was not selected.';
       case 'OFFER_SENT':
         return 'Congratulations! An offer has been sent to you.';
+      case 'TEST_ASSIGNED':
+        return 'You\'ve been assigned a test. Complete it before the deadline.';
+      case 'TEST_PASSED':
+        return 'You passed the assigned test - the recruiter has been notified.';
+      case 'TEST_FAILED':
+        return 'You didn\'t pass the assigned test this time.';
+      case 'OFFER_ACCEPTED':
+        return 'You accepted the offer. Congratulations on your new role!';
+      case 'OFFER_DECLINED':
+        return 'You declined the offer.';
       default:
         return 'Application status unknown.';
     }
