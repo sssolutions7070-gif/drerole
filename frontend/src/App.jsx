@@ -33,6 +33,7 @@ const RecruiterDashboard = lazy(() => import('./pages/RecruiterDashboard'));
 const OAuthCallback = lazy(() => import('./pages/OAuthCallback'));
 const InterviewRoundRoom = lazy(() => import('./pages/InterviewRoundRoom'));
 const MockInterviewPractice = lazy(() => import('./pages/MockInterviewPractice'));
+const SalaryInsights = lazy(() => import('./pages/SalaryInsights'));
 
 function App() {
   const [user, setUser] = useState(null);
@@ -190,6 +191,9 @@ function App() {
             {/* Public: company profiles are just as browsable as job listings themselves. */}
             <Route path="/companies" element={<Companies />} />
             <Route path="/companies/:recruiterId" element={<CompanyProfile />} />
+
+            {/* Public: salary benchmarking is market data, browsable without an account. */}
+            <Route path="/salary-insights" element={<SalaryInsights />} />
 
             <Route path="/upload" element={
               <ProtectedRoute user={user}>

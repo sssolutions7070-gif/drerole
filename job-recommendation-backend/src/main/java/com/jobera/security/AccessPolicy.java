@@ -131,6 +131,7 @@ public class AccessPolicy {
         rule("GET", "/api/companies/{recruiterId}/reviews", authenticated);
         rule("GET", "/api/companies/{recruiterId}/interview-experiences", authenticated);
         rule("GET", "/api/jobs/{jobId}", authenticated);
+        rule("GET", "/api/salary-insights", authenticated);
 
         // Internships
         rule("GET", "/api/internships", authenticated);
