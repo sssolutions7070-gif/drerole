@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Briefcase, Calendar, Clock, Eye, CheckCircle, XCircle, Star, MapPin, ChevronDown, ChevronUp, RefreshCw, AlertCircle, MessageCircle, Video } from 'lucide-react';
+import { Briefcase, Calendar, Clock, Eye, CheckCircle, XCircle, Star, MapPin, ChevronDown, ChevronUp, RefreshCw, AlertCircle, MessageCircle, Video, FileCheck } from 'lucide-react';
 import api from '../services/api';
 import MessageThread from '../components/MessageThread';
 import InterviewPipelinePanel from '../components/InterviewPipelinePanel';
+import OfferPanel from '../components/OfferPanel';
 
 const UserApplications = () => {
   const [applications, setApplications] = useState([]);
@@ -12,6 +13,7 @@ const UserApplications = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [messageThreadApplication, setMessageThreadApplication] = useState(null);
   const [pipelineApplicationId, setPipelineApplicationId] = useState(null);
+  const [offerApplicationId, setOfferApplicationId] = useState(null);
 
   useEffect(() => {
     fetchUserApplications();
@@ -268,6 +270,15 @@ const UserApplications = () => {
                         Interview Pipeline
                       </button>
                     )}
+                    {application.status !== 'REJECTED' && (
+                      <button
+                        onClick={() => setOfferApplicationId(application.id)}
+                        className="text-green-600 hover:text-green-800 text-sm font-medium flex items-center"
+                      >
+                        <FileCheck className="h-4 w-4 mr-1" />
+                        Offer
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -402,6 +413,13 @@ const UserApplications = () => {
           applicationId={pipelineApplicationId}
           isRecruiter={false}
           onClose={() => setPipelineApplicationId(null)}
+        />
+      )}
+      {offerApplicationId && (
+        <OfferPanel
+          applicationId={offerApplicationId}
+          isRecruiter={false}
+          onClose={() => setOfferApplicationId(null)}
         />
       )}
     </div>

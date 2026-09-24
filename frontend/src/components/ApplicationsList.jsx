@@ -4,11 +4,12 @@ import {
   X, Mail, Phone, Calendar, Download, Star, BookOpen, User,
   Briefcase, RefreshCw, Eye, Clock, CheckCircle, XCircle,
   Calendar as CalendarIcon, MapPin, MessageCircle, TrendingUp,
-  FileText, Percent, Target, Award, Sparkles, Video
+  FileText, Percent, Target, Award, Sparkles, Video, FileCheck
 } from 'lucide-react';
 import api from '../services/api';
 import MessageThread from './MessageThread';
 import InterviewPipelinePanel from './InterviewPipelinePanel';
+import OfferPanel from './OfferPanel';
 
 const ApplicationsList = ({ job, onClose }) => {
   const [applications, setApplications] = useState([]);
@@ -17,6 +18,7 @@ const ApplicationsList = ({ job, onClose }) => {
   const [selectedApplication, setSelectedApplication] = useState(null);
   const [messageThreadApplication, setMessageThreadApplication] = useState(null);
   const [pipelineApplicationId, setPipelineApplicationId] = useState(null);
+  const [offerApplicationId, setOfferApplicationId] = useState(null);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showInterviewModal, setShowInterviewModal] = useState(false);
   const [showTestModal, setShowTestModal] = useState(false);
@@ -1279,6 +1281,16 @@ const ApplicationsList = ({ job, onClose }) => {
                       </button>
                     )}
 
+                    {application.status !== 'REJECTED' && (
+                      <button
+                        onClick={() => setOfferApplicationId(application.id)}
+                        className="inline-flex items-center px-3 py-2 border border-green-300 text-green-700 rounded-md text-sm font-medium hover:bg-green-50"
+                      >
+                        <FileCheck className="h-4 w-4 mr-1" />
+                        Offer
+                      </button>
+                    )}
+
                     {application.status === 'SHORTLISTED' && (
                       <button
                         onClick={() => handleAssignTest(application)}
@@ -1346,6 +1358,13 @@ const ApplicationsList = ({ job, onClose }) => {
             applicationId={pipelineApplicationId}
             isRecruiter={true}
             onClose={() => setPipelineApplicationId(null)}
+          />
+        )}
+        {offerApplicationId && (
+          <OfferPanel
+            applicationId={offerApplicationId}
+            isRecruiter={true}
+            onClose={() => setOfferApplicationId(null)}
           />
         )}
         {showStatusModal && <StatusUpdateModal />}

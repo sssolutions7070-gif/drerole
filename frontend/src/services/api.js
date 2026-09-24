@@ -147,6 +147,24 @@ export const talentPoolAPI = {
     api.put(`/recruiters/${recruiterId}/talent-pool/${candidateUserId}/note`, { notes, tags }),
 };
 
+// Job offer API calls - the terminal step of the hiring pipeline
+export const offerAPI = {
+  send: (applicationId, title, salaryOffered, startDate, additionalTerms) =>
+    api.post(`/applications/${applicationId}/offer`, { title, salaryOffered, startDate, additionalTerms }),
+
+  get: (applicationId) =>
+    api.get(`/applications/${applicationId}/offer`),
+
+  accept: (applicationId, signatureName) =>
+    api.post(`/applications/${applicationId}/offer/accept`, { signatureName }),
+
+  decline: (applicationId, reason) =>
+    api.post(`/applications/${applicationId}/offer/decline`, { reason }),
+
+  withdraw: (applicationId) =>
+    api.post(`/applications/${applicationId}/offer/withdraw`),
+};
+
 // Resume Matching API calls
 export const resumeMatchingAPI = {
   // Get applications sorted by match percentage

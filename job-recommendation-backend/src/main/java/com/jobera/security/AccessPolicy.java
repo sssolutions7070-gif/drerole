@@ -180,6 +180,15 @@ public class AccessPolicy {
         rule("GET", "/api/interview-rounds/{roundId}/scorecard", c -> recruiterManagesRound(c, "roundId"));
         rule("GET", "/api/applications/{applicationId}/scorecards", c -> recruiterManagesApplication(c, "applicationId"));
 
+        // Job offers, scoped to one application - the recruiter sends/withdraws it, either
+        // participant can view it, and the service layer double-checks that only the candidate
+        // themselves can accept or decline (not the recruiter who sent it)
+        rule("POST", "/api/applications/{applicationId}/offer", c -> recruiterManagesApplication(c, "applicationId"));
+        rule("GET", "/api/applications/{applicationId}/offer", c -> participatesInApplication(c, "applicationId"));
+        rule("POST", "/api/applications/{applicationId}/offer/accept", c -> participatesInApplication(c, "applicationId"));
+        rule("POST", "/api/applications/{applicationId}/offer/decline", c -> participatesInApplication(c, "applicationId"));
+        rule("POST", "/api/applications/{applicationId}/offer/withdraw", c -> recruiterManagesApplication(c, "applicationId"));
+
         // Aptitude tests
         rule("POST", "/api/aptitude-tests/create", recruiter);
         rule("GET", "/api/aptitude-tests/recruiter/{recruiterId}", ownRecruiterId("recruiterId"));
