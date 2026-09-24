@@ -137,6 +137,16 @@ export const scorecardAPI = {
     api.get(`/applications/${applicationId}/scorecards`),
 };
 
+// Talent pool API calls - every candidate a recruiter has ever received an application from,
+// searchable, with private notes/tags independent of any one job posting
+export const talentPoolAPI = {
+  search: (recruiterId, search) =>
+    api.get(`/recruiters/${recruiterId}/talent-pool`, { params: search ? { search } : {} }),
+
+  upsertNote: (recruiterId, candidateUserId, notes, tags) =>
+    api.put(`/recruiters/${recruiterId}/talent-pool/${candidateUserId}/note`, { notes, tags }),
+};
+
 // Resume Matching API calls
 export const resumeMatchingAPI = {
   // Get applications sorted by match percentage

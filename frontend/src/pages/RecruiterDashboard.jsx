@@ -14,6 +14,7 @@ import TestManagement from '../components/TestManagement';
 import ExternalJobManagement from '../components/ExternalJobManagement';
 import ExternalJobResults from '../components/ExternalJobResults';
 import SubscriptionPanel from '../components/SubscriptionPanel';
+import TalentPoolPanel from '../components/TalentPoolPanel';
 
 const RecruiterDashboard = () => {
   const [jobs, setJobs] = useState([]);
@@ -375,6 +376,17 @@ const RecruiterDashboard = () => {
             >
               <CreditCard className="h-5 w-5 mr-2" />
               Billing
+            </button>
+            <button
+              onClick={() => setActiveTab('talent-pool')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center whitespace-nowrap ${
+                activeTab === 'talent-pool'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <Users className="h-5 w-5 mr-2" />
+              Talent Pool
             </button>
           </nav>
         </div>
@@ -835,6 +847,10 @@ const RecruiterDashboard = () => {
 
       {activeTab === 'billing' && recruiterProfile && (
         <SubscriptionPanel recruiterId={recruiterProfile.id} />
+      )}
+
+      {activeTab === 'talent-pool' && recruiterProfile && (
+        <TalentPoolPanel recruiterId={recruiterProfile.id} />
       )}
 
       {/* Job Form Modal */}
