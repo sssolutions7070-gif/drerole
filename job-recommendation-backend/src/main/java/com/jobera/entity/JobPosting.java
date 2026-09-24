@@ -15,8 +15,10 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.PostLoad;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import java.util.Map;
 
 @Entity
 @Table(name = "job_postings")
@@ -96,8 +98,34 @@ public class JobPosting {
         if (totalRatings == null) {
             totalRatings = 0;
         }
+        experienceLevel = canonicalizeExperienceLevel(experienceLevel);
     }
-    
+
+    // Older rows and direct API calls have written this field with inconsistent casing
+    // ("SENIOR", "Mid-level", "mid level", ...) - this normalizes every row to the same
+    // labels the job-post form uses, purely in memory, without a destructive data migration.
+    private static final Map<String, String> EXPERIENCE_LEVEL_ALIASES = Map.of(
+        "entry", "Entry", "entrylevel", "Entry",
+        "junior", "Junior",
+        "mid", "Mid-level", "midlevel", "Mid-level",
+        "senior", "Senior",
+        "lead", "Lead",
+        "principal", "Principal"
+    );
+
+    static String canonicalizeExperienceLevel(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return raw;
+        }
+        String key = raw.trim().toLowerCase().replaceAll("[\\s_-]+", "");
+        return EXPERIENCE_LEVEL_ALIASES.getOrDefault(key, raw.trim());
+    }
+
+    @PostLoad
+    protected void onLoad() {
+        experienceLevel = canonicalizeExperienceLevel(experienceLevel);
+    }
+
     // Constructors
     public JobPosting() {}
     
@@ -127,7 +155,7 @@ public class JobPosting {
     public String getJobType() { return jobType; }
     public void setJobType(String jobType) { this.jobType = jobType; }
     public String getExperienceLevel() { return experienceLevel; }
-    public void setExperienceLevel(String experienceLevel) { this.experienceLevel = experienceLevel; }
+    public void setExperienceLevel(String experienceLevel) { this.experienceLevel = canonicalizeExperienceLevel(experienceLevel); }
     public LocalDateTime getPostedDate() { return postedDate; }
     public void setPostedDate(LocalDateTime postedDate) { this.postedDate = postedDate; }
     public Boolean getIsActive() { return isActive; }

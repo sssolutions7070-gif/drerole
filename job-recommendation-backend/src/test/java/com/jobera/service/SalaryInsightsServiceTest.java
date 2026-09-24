@@ -97,6 +97,25 @@ class SalaryInsightsServiceTest {
     }
 
     @Test
+    void groupsDifferentlyCasedExperienceLevelsIntoOneBucket() {
+        // JobPosting.setExperienceLevel canonicalizes casing, so postings written as "SENIOR"
+        // by older/raw-API code and "Senior" by the job-post form land in the same bucket here.
+        List<JobPosting> postings = List.of(
+            posting("Backend Engineer", "Remote", "SENIOR", "$100,000 - $140,000"),
+            posting("Backend Engineer", "Remote", "Senior", "$120,000 - $160,000")
+        );
+        when(jobPostingRepository.findByIsActiveTrueAndModerationStatusOrderByPostedDateDesc(JobPosting.MODERATION_APPROVED))
+            .thenReturn(postings);
+
+        Map<String, Object> insights = service.getInsights(null, null, null);
+
+        Map<String, Object> byLevel = (Map<String, Object>) insights.get("byExperienceLevel");
+        assertEquals(1, byLevel.size());
+        Map<String, Object> senior = (Map<String, Object>) byLevel.get("Senior");
+        assertEquals(2, senior.get("count"));
+    }
+
+    @Test
     void ignoresPostingsWithUnparseableSalaryRanges() {
         when(jobPostingRepository.findByIsActiveTrueAndModerationStatusOrderByPostedDateDesc(JobPosting.MODERATION_APPROVED))
             .thenReturn(List.of(posting("Designer", "Remote", "Mid", "Negotiable")));
