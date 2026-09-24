@@ -112,6 +112,12 @@ export const interviewRoundsAPI = {
   schedule: (applicationId, title, roundType, scheduledAt) =>
     api.post(`/applications/${applicationId}/interview-rounds`, { title, roundType, scheduledAt }),
 
+  propose: (applicationId, title, roundType, slots) =>
+    api.post(`/applications/${applicationId}/interview-rounds/propose`, { title, roundType, slots }),
+
+  confirmSlot: (roundId, scheduledAt) =>
+    api.post(`/interview-rounds/${roundId}/confirm-slot`, { scheduledAt }),
+
   list: (applicationId) =>
     api.get(`/applications/${applicationId}/interview-rounds`),
 

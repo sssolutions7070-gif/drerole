@@ -115,6 +115,88 @@ class InterviewRoundServiceTest {
             () -> service.scheduleRound(1000L, "Round", "TECHNICAL", LocalDateTime.now()));
     }
 
+    // ------------------------------------------------------- proposeSlots / confirmSlot
+
+    @Test
+    void proposingSlotsCreatesAPendingRoundAndNotifiesTheCandidate() {
+        when(interviewRoundRepository.countByApplicationId(1000L)).thenReturn(0L);
+        LocalDateTime slotA = LocalDateTime.of(2026, 5, 1, 10, 0);
+        LocalDateTime slotB = LocalDateTime.of(2026, 5, 1, 14, 0);
+
+        InterviewRound round = service.proposeSlots(1000L, "Phone screen", "PHONE_SCREEN", List.of(slotA, slotB));
+
+        assertEquals("PROPOSED", round.getStatus());
+        assertEquals(null, round.getScheduledAt());
+        assertTrue(round.getProposedSlots().contains("2026-05-01T10:00"));
+        verify(realtimeNotifier).notifyUser(anyLong(), org.mockito.ArgumentMatchers.eq("INTERVIEW_ROUND_PROPOSED"), any());
+    }
+
+    @Test
+    void proposingFewerThanTwoSlotsFails() {
+        assertThrows(InterviewRoundService.InvalidSlotCountException.class,
+            () -> service.proposeSlots(1000L, "Phone screen", "PHONE_SCREEN", List.of(LocalDateTime.now())));
+    }
+
+    @Test
+    void proposingTooManySlotsFails() {
+        List<LocalDateTime> tooMany = List.of(
+            LocalDateTime.now(), LocalDateTime.now().plusDays(1), LocalDateTime.now().plusDays(2),
+            LocalDateTime.now().plusDays(3), LocalDateTime.now().plusDays(4), LocalDateTime.now().plusDays(5));
+
+        assertThrows(InterviewRoundService.InvalidSlotCountException.class,
+            () -> service.proposeSlots(1000L, "Phone screen", "PHONE_SCREEN", tooMany));
+    }
+
+    @Test
+    void candidateConfirmingAnOfferedSlotSchedulesTheRound() {
+        when(interviewRoundRepository.countByApplicationId(1000L)).thenReturn(0L);
+        LocalDateTime slotA = LocalDateTime.of(2026, 5, 1, 10, 0);
+        LocalDateTime slotB = LocalDateTime.of(2026, 5, 1, 14, 0);
+        InterviewRound proposed = service.proposeSlots(1000L, "Phone screen", "PHONE_SCREEN", List.of(slotA, slotB));
+        when(interviewRoundRepository.findById(5000L)).thenReturn(Optional.of(proposed));
+
+        InterviewRound confirmed = service.confirmSlot(5000L, 1L, slotB);
+
+        assertEquals("SCHEDULED", confirmed.getStatus());
+        assertEquals(slotB, confirmed.getScheduledAt());
+        verify(realtimeNotifier).notifyUser(2L, "INTERVIEW_ROUND_SLOT_CONFIRMED", Map.of(
+            "applicationId", 1000L, "roundId", 5000L, "scheduledAt", String.valueOf(slotB)));
+    }
+
+    @Test
+    void confirmingASlotNotInTheProposedListFails() {
+        when(interviewRoundRepository.countByApplicationId(1000L)).thenReturn(0L);
+        LocalDateTime slotA = LocalDateTime.of(2026, 5, 1, 10, 0);
+        LocalDateTime slotB = LocalDateTime.of(2026, 5, 1, 14, 0);
+        InterviewRound proposed = service.proposeSlots(1000L, "Phone screen", "PHONE_SCREEN", List.of(slotA, slotB));
+        when(interviewRoundRepository.findById(5000L)).thenReturn(Optional.of(proposed));
+
+        assertThrows(InterviewRoundService.InvalidSlotChoiceException.class,
+            () -> service.confirmSlot(5000L, 1L, LocalDateTime.of(2026, 5, 2, 9, 0)));
+    }
+
+    @Test
+    void onlyTheCandidateCanConfirmASlot() {
+        when(interviewRoundRepository.countByApplicationId(1000L)).thenReturn(0L);
+        LocalDateTime slotA = LocalDateTime.of(2026, 5, 1, 10, 0);
+        LocalDateTime slotB = LocalDateTime.of(2026, 5, 1, 14, 0);
+        InterviewRound proposed = service.proposeSlots(1000L, "Phone screen", "PHONE_SCREEN", List.of(slotA, slotB));
+        when(interviewRoundRepository.findById(5000L)).thenReturn(Optional.of(proposed));
+
+        assertThrows(InterviewRoundService.NotTheCandidateException.class,
+            () -> service.confirmSlot(5000L, 2L, slotA));
+    }
+
+    @Test
+    void confirmingASlotOnAnAlreadyScheduledRoundFails() {
+        when(interviewRoundRepository.countByApplicationId(1000L)).thenReturn(0L);
+        InterviewRound scheduled = service.scheduleRound(1000L, "Phone screen", "PHONE_SCREEN", LocalDateTime.now());
+        when(interviewRoundRepository.findById(5000L)).thenReturn(Optional.of(scheduled));
+
+        assertThrows(InterviewRoundService.RoundNotAwaitingSelectionException.class,
+            () -> service.confirmSlot(5000L, 1L, LocalDateTime.now()));
+    }
+
     @Test
     void listingRoundsReturnsThemInOrder() {
         InterviewRound r1 = new InterviewRound(1000L, 1, "Phone screen", "PHONE_SCREEN", "room-1", LocalDateTime.now());

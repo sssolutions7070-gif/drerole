@@ -1,8 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Plus, Video, Calendar, Award, Download, CalendarPlus } from 'lucide-react';
+import { X, Plus, Video, Calendar, Award, Download, CalendarPlus, Clock, Trash2 } from 'lucide-react';
 import { interviewRoundsAPI, scorecardAPI } from '../services/api';
 import ScorecardForm from './ScorecardForm';
+
+const parseSlots = (json) => {
+  if (!json) return [];
+  try {
+    const parsed = JSON.parse(json);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+};
 
 const ROUND_TYPES = [
   { value: 'PHONE_SCREEN', label: 'Phone screen' },
@@ -13,6 +23,7 @@ const ROUND_TYPES = [
 ];
 
 const STATUS_STYLES = {
+  PROPOSED: 'bg-purple-100 text-purple-800',
   SCHEDULED: 'bg-yellow-100 text-yellow-800',
   IN_PROGRESS: 'bg-blue-100 text-blue-800',
   COMPLETED: 'bg-green-100 text-green-800',
@@ -34,11 +45,14 @@ const InterviewPipelinePanel = ({ applicationId, isRecruiter, onClose }) => {
   const [error, setError] = useState('');
 
   const [showScheduleForm, setShowScheduleForm] = useState(false);
+  const [offerChoice, setOfferChoice] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newRoundType, setNewRoundType] = useState('PHONE_SCREEN');
   const [newDate, setNewDate] = useState('');
   const [newTime, setNewTime] = useState('');
+  const [slotInputs, setSlotInputs] = useState([{ date: '', time: '' }, { date: '', time: '' }]);
   const [scheduling, setScheduling] = useState(false);
+  const [confirmingRoundId, setConfirmingRoundId] = useState(null);
 
   const [reschedulingRoundId, setReschedulingRoundId] = useState(null);
   const [rescheduleDate, setRescheduleDate] = useState('');
@@ -89,6 +103,49 @@ const InterviewPipelinePanel = ({ applicationId, isRecruiter, onClose }) => {
       setScheduling(false);
     }
   };
+
+  const handlePropose = async () => {
+    const validSlots = slotInputs.filter((s) => s.date && s.time);
+    if (!newTitle.trim() || validSlots.length < 2) {
+      setError('Give the round a title and at least two time options');
+      return;
+    }
+    setScheduling(true);
+    setError('');
+    try {
+      const isoSlots = validSlots.map((s) => `${s.date}T${s.time}:00`);
+      await interviewRoundsAPI.propose(applicationId, newTitle.trim(), newRoundType, isoSlots);
+      setShowScheduleForm(false);
+      setOfferChoice(false);
+      setNewTitle('');
+      setSlotInputs([{ date: '', time: '' }, { date: '', time: '' }]);
+      await fetchAll();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to propose the time slots');
+    } finally {
+      setScheduling(false);
+    }
+  };
+
+  const handleConfirmSlot = async (roundId, isoSlot) => {
+    setConfirmingRoundId(roundId);
+    setError('');
+    try {
+      await interviewRoundsAPI.confirmSlot(roundId, isoSlot);
+      await fetchAll();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to confirm that time');
+    } finally {
+      setConfirmingRoundId(null);
+    }
+  };
+
+  const updateSlotInput = (index, field, value) => {
+    setSlotInputs((prev) => prev.map((slot, i) => (i === index ? { ...slot, [field]: value } : slot)));
+  };
+
+  const addSlotInput = () => setSlotInputs((prev) => [...prev, { date: '', time: '' }]);
+  const removeSlotInput = (index) => setSlotInputs((prev) => prev.filter((_, i) => i !== index));
 
   const handleReschedule = async (roundId) => {
     if (!rescheduleDate || !rescheduleTime) {
@@ -166,13 +223,41 @@ const InterviewPipelinePanel = ({ applicationId, isRecruiter, onClose }) => {
                   </span>
                 </div>
 
+                {round.status === 'PROPOSED' && (
+                  <div className="mt-3 bg-purple-50 border border-purple-200 rounded-md p-3">
+                    <p className="text-sm text-purple-800 mb-2">
+                      {isRecruiter ? 'Awaiting the candidate\'s choice of time:' : 'Pick a time that works for you:'}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {parseSlots(round.proposedSlots).map((slot) => (
+                        isRecruiter ? (
+                          <span key={slot} className="inline-flex items-center px-3 py-1.5 bg-white border border-purple-200 text-purple-700 rounded-md text-sm">
+                            <Clock className="h-4 w-4 mr-1" /> {new Date(slot).toLocaleString()}
+                          </span>
+                        ) : (
+                          <button
+                            key={slot}
+                            onClick={() => handleConfirmSlot(round.id, slot)}
+                            disabled={confirmingRoundId === round.id}
+                            className="inline-flex items-center px-3 py-1.5 bg-purple-600 text-white rounded-md text-sm font-medium hover:bg-purple-700 disabled:opacity-50"
+                          >
+                            <Clock className="h-4 w-4 mr-1" /> {new Date(slot).toLocaleString()}
+                          </button>
+                        )
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex flex-wrap gap-2 mt-3">
-                  <button
-                    onClick={() => navigate(`/interview-rounds/${round.id}`)}
-                    className="inline-flex items-center px-3 py-1.5 border border-teal-300 text-teal-700 rounded-md text-sm font-medium hover:bg-teal-50"
-                  >
-                    <Video className="h-4 w-4 mr-1" /> Join
-                  </button>
+                  {round.status !== 'PROPOSED' && (
+                    <button
+                      onClick={() => navigate(`/interview-rounds/${round.id}`)}
+                      className="inline-flex items-center px-3 py-1.5 border border-teal-300 text-teal-700 rounded-md text-sm font-medium hover:bg-teal-50"
+                    >
+                      <Video className="h-4 w-4 mr-1" /> Join
+                    </button>
+                  )}
 
                   {round.scheduledAt && (
                     <button
@@ -273,25 +358,60 @@ const InterviewPipelinePanel = ({ applicationId, isRecruiter, onClose }) => {
                   {ROUND_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
               </div>
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                  <input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2" />
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input type="checkbox" checked={offerChoice} onChange={(e) => setOfferChoice(e.target.checked)} />
+                Offer the candidate a choice of times instead of one fixed time
+              </label>
+
+              {offerChoice ? (
+                <div className="space-y-2">
+                  {slotInputs.map((slot, index) => (
+                    <div key={index} className="flex gap-2 items-end">
+                      <div className="flex-1">
+                        <label className="block text-xs text-gray-500">Date</label>
+                        <input type="date" value={slot.date} onChange={(e) => updateSlotInput(index, 'date', e.target.value)}
+                          className="w-full border border-gray-300 rounded-md px-3 py-2" />
+                      </div>
+                      <div className="flex-1">
+                        <label className="block text-xs text-gray-500">Time</label>
+                        <input type="time" value={slot.time} onChange={(e) => updateSlotInput(index, 'time', e.target.value)}
+                          className="w-full border border-gray-300 rounded-md px-3 py-2" />
+                      </div>
+                      {slotInputs.length > 2 && (
+                        <button onClick={() => removeSlotInput(index)} aria-label="Remove time option" className="text-red-500 hover:text-red-700 pb-2">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  {slotInputs.length < 5 && (
+                    <button onClick={addSlotInput} className="text-sm text-teal-700 hover:text-teal-900 flex items-center gap-1">
+                      <Plus className="h-4 w-4" /> Add another time
+                    </button>
+                  )}
                 </div>
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Time</label>
-                  <input type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2" />
+              ) : (
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                    <input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2" />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Time</label>
+                    <input type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2" />
+                  </div>
                 </div>
-              </div>
+              )}
+
               <div className="flex justify-end gap-2">
                 <button onClick={() => setShowScheduleForm(false)} className="px-4 py-2 border border-gray-300 rounded-md text-sm">
                   Cancel
                 </button>
-                <button onClick={handleSchedule} disabled={scheduling}
+                <button onClick={offerChoice ? handlePropose : handleSchedule} disabled={scheduling}
                   className="px-4 py-2 bg-teal-600 text-white rounded-md text-sm font-medium hover:bg-teal-700 disabled:opacity-50">
-                  {scheduling ? 'Scheduling...' : 'Schedule Round'}
+                  {scheduling ? 'Sending...' : offerChoice ? 'Send Time Options' : 'Schedule Round'}
                 </button>
               </div>
             </div>

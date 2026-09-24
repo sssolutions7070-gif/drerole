@@ -114,6 +114,14 @@ class AccessPolicyTest {
         return application;
     }
 
+    com.jobera.entity.InterviewRound roundFor(long id, long applicationId) {
+        com.jobera.entity.InterviewRound round = new com.jobera.entity.InterviewRound(
+            applicationId, 1, "Phone screen", "PHONE_SCREEN", "room-" + id, null);
+        round.setId(id);
+        lenient().when(interviewRoundRepository.findById(id)).thenReturn(Optional.of(round));
+        return round;
+    }
+
     AptitudeTest aptitudeTestOwnedBy(long id, Recruiter owner) {
         AptitudeTest test = new AptitudeTest();
         test.setId(id);
@@ -271,6 +279,21 @@ class AccessPolicyTest {
         assertTrue(allowed(recruiterUser, "POST", "/api/recruiters/200/webhooks"));
         assertTrue(allowed(recruiterUser, "DELETE", "/api/recruiters/200/webhooks/5"));
         assertFalse(allowed(otherRecruiterUser, "GET", "/api/recruiters/200/webhooks"));
+    }
+
+    @Test
+    void proposingInterviewSlotsIsRecruiterOnlyAndConfirmingIsOpenToBothParticipants() {
+        JobPosting job = jobOwnedBy(5, recruiter);
+        applicationFor(9, candidate, job);
+        roundFor(7, 9);
+
+        assertTrue(allowed(recruiterUser, "POST", "/api/applications/9/interview-rounds/propose"));
+        assertFalse(allowed(candidate, "POST", "/api/applications/9/interview-rounds/propose"));
+        assertFalse(allowed(otherRecruiterUser, "POST", "/api/applications/9/interview-rounds/propose"));
+
+        assertTrue(allowed(candidate, "POST", "/api/interview-rounds/7/confirm-slot"));
+        assertTrue(allowed(recruiterUser, "POST", "/api/interview-rounds/7/confirm-slot"));
+        assertFalse(allowed(otherCandidate, "POST", "/api/interview-rounds/7/confirm-slot"));
     }
 
     @Test

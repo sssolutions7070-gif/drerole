@@ -1,6 +1,7 @@
 package com.jobera.controller;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -61,6 +62,58 @@ public class InterviewRoundController {
             return ResponseEntity.ok(round);
         } catch (InterviewRoundService.ApplicationNotFoundException | InterviewRoundService.InvalidRoundTypeException e) {
             return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, e.getMessage()));
+        }
+    }
+
+    @PostMapping("/api/applications/{applicationId}/interview-rounds/propose")
+    public ResponseEntity<?> propose(@PathVariable Long applicationId, @RequestBody Map<String, Object> payload) {
+        String title = (String) payload.get("title");
+        String roundType = (String) payload.get("roundType");
+        Object slotsRaw = payload.get("slots");
+        if (title == null || title.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "title is required"));
+        }
+        if (!(slotsRaw instanceof List<?> slotsList)) {
+            return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "slots must be a list of ISO-8601 date-times"));
+        }
+        List<LocalDateTime> slots = new ArrayList<>();
+        try {
+            for (Object slot : slotsList) {
+                slots.add(LocalDateTime.parse(String.valueOf(slot)));
+            }
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "Each slot must be an ISO-8601 date-time"));
+        }
+        try {
+            InterviewRound round = interviewRoundService.proposeSlots(applicationId, title, roundType, slots);
+            return ResponseEntity.ok(round);
+        } catch (InterviewRoundService.ApplicationNotFoundException | InterviewRoundService.InvalidRoundTypeException
+                 | InterviewRoundService.InvalidSlotCountException e) {
+            return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, e.getMessage()));
+        }
+    }
+
+    @PostMapping("/api/interview-rounds/{roundId}/confirm-slot")
+    public ResponseEntity<?> confirmSlot(@PathVariable Long roundId, @RequestBody Map<String, String> payload,
+                                          HttpServletRequest request) {
+        String scheduledAtRaw = payload.get("scheduledAt");
+        if (scheduledAtRaw == null || scheduledAtRaw.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "scheduledAt is required"));
+        }
+        LocalDateTime scheduledAt;
+        try {
+            scheduledAt = LocalDateTime.parse(scheduledAtRaw);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "scheduledAt must be an ISO-8601 date-time"));
+        }
+        try {
+            InterviewRound round = interviewRoundService.confirmSlot(roundId, callingUser(request).getId(), scheduledAt);
+            return ResponseEntity.ok(round);
+        } catch (InterviewRoundService.RoundNotFoundException | InterviewRoundService.ApplicationNotFoundException
+                 | InterviewRoundService.RoundNotAwaitingSelectionException | InterviewRoundService.InvalidSlotChoiceException e) {
+            return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, e.getMessage()));
+        } catch (InterviewRoundService.NotTheCandidateException e) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.FORBIDDEN).body(Map.of(ERROR_KEY, e.getMessage()));
         }
     }
 

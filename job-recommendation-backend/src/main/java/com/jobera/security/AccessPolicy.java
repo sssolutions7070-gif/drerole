@@ -191,6 +191,8 @@ public class AccessPolicy {
         // Interview pipeline, scoped to one application - the recruiter schedules each round,
         // either side can list the pipeline, join a round or check its status
         rule("POST", "/api/applications/{applicationId}/interview-rounds", c -> recruiterManagesApplication(c, "applicationId"));
+        rule("POST", "/api/applications/{applicationId}/interview-rounds/propose", c -> recruiterManagesApplication(c, "applicationId"));
+        rule("POST", "/api/interview-rounds/{roundId}/confirm-slot", c -> participatesInRound(c, "roundId"));
         rule("GET", "/api/applications/{applicationId}/interview-rounds", c -> participatesInApplication(c, "applicationId"));
         rule("GET", "/api/interview-rounds/{roundId}/join", c -> participatesInRound(c, "roundId"));
         rule("GET", "/api/interview-rounds/{roundId}/calendar.ics", c -> participatesInRound(c, "roundId"));

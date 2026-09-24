@@ -152,4 +152,65 @@ describe('InterviewPipelinePanel', () => {
       expect(link.href).toContain('interview-rounds%2F5000');
     });
   });
+
+  describe('proposing a choice of times', () => {
+    it('sends multiple time options instead of scheduling a fixed one', async () => {
+      interviewRoundsAPI.list.mockResolvedValueOnce({ data: [] }).mockResolvedValueOnce({ data: [round({ status: 'PROPOSED', scheduledAt: null })] });
+      scorecardAPI.getForApplication.mockResolvedValue({ data: [] });
+      interviewRoundsAPI.propose.mockResolvedValue({ data: round({ status: 'PROPOSED', scheduledAt: null }) });
+      const user = userEvent.setup();
+
+      renderPanel({ isRecruiter: true });
+      await screen.findByText(/no interview rounds scheduled yet/i);
+      await user.click(screen.getByRole('button', { name: /add round/i }));
+      await user.type(screen.getByPlaceholderText(/technical round with backend team/i), 'Phone screen');
+      await user.click(screen.getByLabelText(/offer the candidate a choice of times/i));
+
+      const dateInputs = document.querySelectorAll('input[type="date"]');
+      const timeInputs = document.querySelectorAll('input[type="time"]');
+      await user.type(dateInputs[0], '2026-05-01');
+      await user.type(timeInputs[0], '10:00');
+      await user.type(dateInputs[1], '2026-05-01');
+      await user.type(timeInputs[1], '14:00');
+      await user.click(screen.getByRole('button', { name: /send time options/i }));
+
+      expect(interviewRoundsAPI.propose).toHaveBeenCalledWith(
+        1000, 'Phone screen', 'PHONE_SCREEN', ['2026-05-01T10:00:00', '2026-05-01T14:00:00']);
+    });
+
+    it('shows each proposed time to the candidate as a choosable button', async () => {
+      const proposedRound = round({ status: 'PROPOSED', scheduledAt: null, proposedSlots: JSON.stringify(['2026-05-01T10:00:00', '2026-05-01T14:00:00']) });
+      interviewRoundsAPI.list.mockResolvedValue({ data: [proposedRound] });
+
+      renderPanel({ isRecruiter: false });
+
+      expect(await screen.findByText(/pick a time that works for you/i)).toBeInTheDocument();
+      expect(screen.getAllByRole('button', { name: /2026/i })).toHaveLength(2);
+      expect(screen.queryByRole('button', { name: /^join$/i })).not.toBeInTheDocument();
+    });
+
+    it('shows the recruiter a read-only list while awaiting the candidate', async () => {
+      const proposedRound = round({ status: 'PROPOSED', scheduledAt: null, proposedSlots: JSON.stringify(['2026-05-01T10:00:00']) });
+      interviewRoundsAPI.list.mockResolvedValue({ data: [proposedRound] });
+      scorecardAPI.getForApplication.mockResolvedValue({ data: [] });
+
+      renderPanel({ isRecruiter: true });
+
+      expect(await screen.findByText(/awaiting the candidate's choice/i)).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /2026/i })).not.toBeInTheDocument();
+    });
+
+    it('confirms the chosen slot when the candidate clicks it', async () => {
+      const proposedRound = round({ status: 'PROPOSED', scheduledAt: null, proposedSlots: JSON.stringify(['2026-05-01T10:00:00']) });
+      interviewRoundsAPI.list.mockResolvedValueOnce({ data: [proposedRound] })
+        .mockResolvedValueOnce({ data: [round({ status: 'SCHEDULED', scheduledAt: '2026-05-01T10:00:00' })] });
+      interviewRoundsAPI.confirmSlot.mockResolvedValue({ data: {} });
+      const user = userEvent.setup();
+
+      renderPanel({ isRecruiter: false });
+      await user.click(await screen.findByRole('button', { name: /2026/i }));
+
+      expect(interviewRoundsAPI.confirmSlot).toHaveBeenCalledWith(5000, '2026-05-01T10:00:00');
+    });
+  });
 });

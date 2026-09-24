@@ -12,6 +12,8 @@ import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jobera.entity.Application;
 import com.jobera.entity.InterviewRound;
 import com.jobera.repository.ApplicationRepository;
@@ -27,6 +29,8 @@ public class InterviewRoundService {
     public static final Set<String> ROUND_TYPES = Set.of(
         "PHONE_SCREEN", "TECHNICAL", "CULTURE_FIT", "FINAL", "OTHER");
     private static final Set<String> VALID_STATUSES = Set.of("SCHEDULED", "IN_PROGRESS", "COMPLETED", "CANCELLED");
+    private static final String STATUS_PROPOSED = "PROPOSED";
+    private static final int MAX_PROPOSED_SLOTS = 5;
 
     public static class ApplicationNotFoundException extends RuntimeException {
         public ApplicationNotFoundException(Long applicationId) {
@@ -52,6 +56,30 @@ public class InterviewRoundService {
         }
     }
 
+    public static class InvalidSlotCountException extends RuntimeException {
+        public InvalidSlotCountException() {
+            super("Propose between 2 and " + MAX_PROPOSED_SLOTS + " time slots for the candidate to choose from");
+        }
+    }
+
+    public static class RoundNotAwaitingSelectionException extends RuntimeException {
+        public RoundNotAwaitingSelectionException() {
+            super("This round isn't awaiting a slot selection");
+        }
+    }
+
+    public static class InvalidSlotChoiceException extends RuntimeException {
+        public InvalidSlotChoiceException() {
+            super("That time wasn't one of the proposed slots");
+        }
+    }
+
+    public static class NotTheCandidateException extends RuntimeException {
+        public NotTheCandidateException() {
+            super("Only the candidate for this application can confirm an interview slot");
+        }
+    }
+
     private final InterviewRoundRepository interviewRoundRepository;
     private final ApplicationRepository applicationRepository;
     private final RealtimeNotifier realtimeNotifier;
@@ -61,6 +89,7 @@ public class InterviewRoundService {
     private final String turnUsername;
     private final String turnCredential;
     private final String frontendUrl;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public InterviewRoundService(InterviewRoundRepository interviewRoundRepository,
                                   ApplicationRepository applicationRepository,
@@ -119,6 +148,94 @@ public class InterviewRoundService {
             "/dashboard");
 
         return saved;
+    }
+
+    /** Offers the candidate a choice of times instead of dictating one - an alternative to
+     *  scheduleRound(), not a replacement. The round sits in status PROPOSED with no scheduledAt
+     *  until confirmSlot() picks one. */
+    public InterviewRound proposeSlots(Long applicationId, String title, String roundType, List<LocalDateTime> slots) {
+        Application application = applicationRepository.findById(applicationId)
+            .orElseThrow(() -> new ApplicationNotFoundException(applicationId));
+        if (!ROUND_TYPES.contains(roundType)) {
+            throw new InvalidRoundTypeException(roundType);
+        }
+        if (slots == null || slots.size() < 2 || slots.size() > MAX_PROPOSED_SLOTS) {
+            throw new InvalidSlotCountException();
+        }
+
+        int nextRoundNumber = (int) interviewRoundRepository.countByApplicationId(applicationId) + 1;
+        InterviewRound round = new InterviewRound(applicationId, nextRoundNumber, title, roundType,
+            UUID.randomUUID().toString(), null);
+        round.setStatus(STATUS_PROPOSED);
+        round.setProposedSlots(writeSlots(slots));
+        InterviewRound saved = interviewRoundRepository.save(round);
+
+        realtimeNotifier.notifyUser(candidateUserId(application), "INTERVIEW_ROUND_PROPOSED", Map.of(
+            "applicationId", applicationId, "roundId", saved.getId(), "title", title
+        ));
+        notificationFeedService.record(candidateUserId(application), "INTERVIEW_ROUND_PROPOSED",
+            "Pick a time for: " + title,
+            "The recruiter offered " + slots.size() + " possible times - choose one that works for you.",
+            "/dashboard");
+
+        return saved;
+    }
+
+    /** The candidate's response to proposeSlots(): locks in one of the offered times. Only the
+     *  candidate on this application may call this - not the recruiter, and not participatesInRound's
+     *  usual "either side" rule, since only the candidate has an opinion on which time works for them. */
+    public InterviewRound confirmSlot(Long roundId, Long callerId, LocalDateTime chosenSlot) {
+        InterviewRound round = requireRound(roundId);
+        Application application = applicationRepository.findById(round.getApplicationId())
+            .orElseThrow(() -> new ApplicationNotFoundException(round.getApplicationId()));
+
+        if (!callerId.equals(candidateUserId(application))) {
+            throw new NotTheCandidateException();
+        }
+        if (!STATUS_PROPOSED.equals(round.getStatus())) {
+            throw new RoundNotAwaitingSelectionException();
+        }
+        if (!readSlots(round.getProposedSlots()).contains(chosenSlot)) {
+            throw new InvalidSlotChoiceException();
+        }
+
+        round.setScheduledAt(chosenSlot);
+        round.setStatus("SCHEDULED");
+        round.setUpdatedAt(LocalDateTime.now());
+        InterviewRound saved = interviewRoundRepository.save(round);
+
+        Long recruiterId = recruiterUserId(application);
+        realtimeNotifier.notifyUser(recruiterId, "INTERVIEW_ROUND_SLOT_CONFIRMED", Map.of(
+            "applicationId", round.getApplicationId(), "roundId", roundId, "scheduledAt", String.valueOf(chosenSlot)
+        ));
+        if (recruiterId != null) {
+            notificationFeedService.record(recruiterId, "INTERVIEW_ROUND_SLOT_CONFIRMED",
+                "Interview time confirmed: " + round.getTitle(),
+                "The candidate picked " + chosenSlot + ".",
+                "/recruiter/dashboard");
+        }
+
+        return saved;
+    }
+
+    private String writeSlots(List<LocalDateTime> slots) {
+        try {
+            return objectMapper.writeValueAsString(slots.stream().map(String::valueOf).toList());
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to serialize proposed slots", e);
+        }
+    }
+
+    private List<LocalDateTime> readSlots(String json) {
+        if (json == null || json.isBlank()) {
+            return List.of();
+        }
+        try {
+            List<String> raw = objectMapper.readValue(json, new TypeReference<List<String>>() {});
+            return raw.stream().map(LocalDateTime::parse).toList();
+        } catch (Exception e) {
+            return List.of();
+        }
     }
 
     public List<InterviewRound> listRounds(Long applicationId) {

@@ -38,6 +38,12 @@ public class InterviewRound {
     @Column(name = "scheduled_at")
     private LocalDateTime scheduledAt;
 
+    // Set instead of scheduledAt when a recruiter offers the candidate a choice of times rather
+    // than dictating one - a JSON array of ISO-8601 date-times. Cleared once the candidate picks
+    // one (InterviewRoundService.confirmSlot moves that choice into scheduledAt).
+    @Column(name = "proposed_slots", columnDefinition = "TEXT")
+    private String proposedSlots;
+
     @Column(nullable = false, length = 20)
     private String status = "SCHEDULED";
 
@@ -82,6 +88,8 @@ public class InterviewRound {
     public void setRoomId(String roomId) { this.roomId = roomId; }
     public LocalDateTime getScheduledAt() { return scheduledAt; }
     public void setScheduledAt(LocalDateTime scheduledAt) { this.scheduledAt = scheduledAt; }
+    public String getProposedSlots() { return proposedSlots; }
+    public void setProposedSlots(String proposedSlots) { this.proposedSlots = proposedSlots; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
     public LocalDateTime getCreatedAt() { return createdAt; }
