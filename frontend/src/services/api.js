@@ -222,6 +222,12 @@ export const candidateDiscoveryAPI = {
     api.get('/candidates/discover', { params: { skill, location } }),
 };
 
+// Platform-wide growth and funnel metrics for the admin dashboard
+export const platformAnalyticsAPI = {
+  getOverview: () =>
+    api.get('/admin/analytics/overview'),
+};
+
 // Persisted notification feed backing the bell icon (separate from the transient toast socket)
 export const notificationAPI = {
   list: (userId) =>

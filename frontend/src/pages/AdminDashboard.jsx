@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Building, Briefcase, FileText, Trash2, ToggleLeft, ToggleRight, BarChart3, ScrollText, Clock, CheckCircle, XCircle, Star, MessageSquare } from 'lucide-react';
+import { Users, Building, Briefcase, FileText, Trash2, ToggleLeft, ToggleRight, BarChart3, ScrollText, Clock, CheckCircle, XCircle, Star, MessageSquare, TrendingUp } from 'lucide-react';
 import api from '../services/api';
+import PlatformAnalyticsPanel from '../components/PlatformAnalyticsPanel';
 
 const AdminDashboard = () => {
   const [stats, setStats] = useState({});
@@ -264,6 +265,7 @@ const AdminDashboard = () => {
         <nav className="-mb-px flex space-x-8">
           {[
             { id: 'dashboard', name: 'Dashboard', icon: BarChart3 },
+            { id: 'analytics', name: 'Analytics', icon: TrendingUp },
             { id: 'users', name: 'Users', icon: Users },
             { id: 'recruiters', name: 'Recruiters', icon: Building },
             { id: 'jobs', name: 'Jobs', icon: Briefcase },
@@ -335,6 +337,10 @@ const AdminDashboard = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {activeTab === 'analytics' && (
+        <PlatformAnalyticsPanel />
       )}
 
       {/* Users Tab */}
