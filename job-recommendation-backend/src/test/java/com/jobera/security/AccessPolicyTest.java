@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.util.List;
 import java.util.Map;
@@ -33,6 +34,7 @@ import com.jobera.repository.InterviewRoundRepository;
 import com.jobera.repository.JobPostingRepository;
 import com.jobera.repository.JobRatingRepository;
 import com.jobera.repository.RecruiterRepository;
+import com.jobera.repository.RecruiterTeamMemberRepository;
 import com.jobera.repository.ResumeRepository;
 import com.jobera.repository.TestAssignmentRepository;
 
@@ -52,6 +54,7 @@ class AccessPolicyTest {
     JobRatingRepository ratingRepository = mock(JobRatingRepository.class);
     ResumeRepository resumeRepository = mock(ResumeRepository.class);
     InterviewRoundRepository interviewRoundRepository = mock(InterviewRoundRepository.class);
+    RecruiterTeamMemberRepository recruiterTeamMemberRepository = mock(RecruiterTeamMemberRepository.class);
 
     AccessPolicy policy;
 
@@ -81,7 +84,8 @@ class AccessPolicyTest {
     void setUp() {
         policy = new AccessPolicy(recruiterRepository, jobRepository, externalJobRepository, externalCandidateRepository,
             aptitudeTestRepository, dreamRoleTestRepository, applicationRepository, assignmentRepository,
-            dreamRoleAssignmentRepository, ratingRepository, resumeRepository, interviewRoundRepository);
+            dreamRoleAssignmentRepository, ratingRepository, resumeRepository, interviewRoundRepository,
+            recruiterTeamMemberRepository);
         lenient().when(recruiterRepository.findByUserId(20L)).thenReturn(Optional.of(recruiter));
         lenient().when(recruiterRepository.findByUserId(21L)).thenReturn(Optional.of(otherRecruiter));
         lenient().when(recruiterRepository.findByUserId(10L)).thenReturn(Optional.empty());
@@ -227,6 +231,24 @@ class AccessPolicyTest {
         assertFalse(allowed(candidate, "GET", "/api/recruiters/jobs/5/applications"));
         assertTrue(allowed(recruiterUser, "GET", "/api/resume-matching/job/5/applications/sorted"));
         assertFalse(allowed(otherRecruiterUser, "GET", "/api/resume-matching/job/5/applications/sorted"));
+    }
+
+    @Test
+    void aTeamMemberGetsTheSameAccessAsTheOwningRecruiter() {
+        // ownsRecruiterId is the single chokepoint every recruiter-owned-resource check funnels
+        // through, so a team member should pass everywhere the owner does - jobs, talent pool,
+        // subscription, tests - without any of those routes needing to know team accounts exist.
+        jobOwnedBy(5, recruiter);
+        when(recruiterTeamMemberRepository.existsByRecruiterIdAndUserId(200L, 30L)).thenReturn(true);
+        User teamMember = user(30, 3);
+
+        assertTrue(allowed(teamMember, "PUT", "/api/recruiters/jobs/5"));
+        assertTrue(allowed(teamMember, "GET", "/api/recruiters/200/talent-pool"));
+        assertTrue(allowed(teamMember, "GET", "/api/recruiters/200/team"));
+        assertFalse(allowed(teamMember, "GET", "/api/recruiters/201/talent-pool"));
+
+        User nonMember = user(31, 3);
+        assertFalse(allowed(nonMember, "GET", "/api/recruiters/200/talent-pool"));
     }
 
     @Test

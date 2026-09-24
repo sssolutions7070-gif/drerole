@@ -150,6 +150,18 @@ export const talentPoolAPI = {
     api.put(`/recruiters/${recruiterId}/talent-pool/${candidateUserId}/note`, { notes, tags }),
 };
 
+// A company's hiring team - teammates get the same access as the account owner
+export const recruiterTeamAPI = {
+  list: (recruiterId) =>
+    api.get(`/recruiters/${recruiterId}/team`),
+
+  invite: (recruiterId, email, role) =>
+    api.post(`/recruiters/${recruiterId}/team`, { email, role }),
+
+  remove: (recruiterId, membershipId) =>
+    api.delete(`/recruiters/${recruiterId}/team/${membershipId}`),
+};
+
 // Job offer API calls - the terminal step of the hiring pipeline
 export const offerAPI = {
   send: (applicationId, title, salaryOffered, startDate, additionalTerms) =>

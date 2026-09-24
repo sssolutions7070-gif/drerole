@@ -25,6 +25,7 @@ import com.jobera.repository.InterviewRoundRepository;
 import com.jobera.repository.JobPostingRepository;
 import com.jobera.repository.JobRatingRepository;
 import com.jobera.repository.RecruiterRepository;
+import com.jobera.repository.RecruiterTeamMemberRepository;
 import com.jobera.repository.ResumeRepository;
 import com.jobera.repository.TestAssignmentRepository;
 
@@ -69,6 +70,7 @@ public class AccessPolicy {
     private final JobRatingRepository jobRatingRepository;
     private final ResumeRepository resumeRepository;
     private final InterviewRoundRepository interviewRoundRepository;
+    private final RecruiterTeamMemberRepository recruiterTeamMemberRepository;
 
     public AccessPolicy(RecruiterRepository recruiterRepository,
                         JobPostingRepository jobPostingRepository,
@@ -81,7 +83,8 @@ public class AccessPolicy {
                         DreamRoleTestAssignmentRepository dreamRoleAssignmentRepository,
                         JobRatingRepository jobRatingRepository,
                         ResumeRepository resumeRepository,
-                        InterviewRoundRepository interviewRoundRepository) {
+                        InterviewRoundRepository interviewRoundRepository,
+                        RecruiterTeamMemberRepository recruiterTeamMemberRepository) {
         this.recruiterRepository = recruiterRepository;
         this.jobPostingRepository = jobPostingRepository;
         this.externalJobRepository = externalJobRepository;
@@ -94,6 +97,7 @@ public class AccessPolicy {
         this.jobRatingRepository = jobRatingRepository;
         this.resumeRepository = resumeRepository;
         this.interviewRoundRepository = interviewRoundRepository;
+        this.recruiterTeamMemberRepository = recruiterTeamMemberRepository;
         registerRules();
     }
 
@@ -147,6 +151,9 @@ public class AccessPolicy {
         rule("PUT", "/api/recruiters/user/{userId}/profile", self("userId"));
         rule("POST", "/api/recruiters/jobs", recruiter);
         rule("GET", "/api/recruiters/jobs/recruiter/{recruiterId}", ownRecruiterId("recruiterId"));
+        rule("GET", "/api/recruiters/{recruiterId}/team", ownRecruiterId("recruiterId"));
+        rule("POST", "/api/recruiters/{recruiterId}/team", ownRecruiterId("recruiterId"));
+        rule("DELETE", "/api/recruiters/{recruiterId}/team/{membershipId}", ownRecruiterId("recruiterId"));
         rule("GET", "/api/recruiters/{recruiterId}/talent-pool", ownRecruiterId("recruiterId"));
         rule("PUT", "/api/recruiters/{recruiterId}/talent-pool/{candidateUserId}/note", ownRecruiterId("recruiterId"));
         rule("GET", "/api/recruiters/{recruiterId}/subscription", ownRecruiterId("recruiterId"));
@@ -326,7 +333,8 @@ public class AccessPolicy {
         if (recruiterId == null) {
             return false;
         }
-        return isAdmin(user) || recruiterOf(user).map(r -> r.getId().equals(recruiterId)).orElse(false);
+        return isAdmin(user) || recruiterOf(user).map(r -> r.getId().equals(recruiterId)).orElse(false)
+            || (user != null && recruiterTeamMemberRepository.existsByRecruiterIdAndUserId(recruiterId, user.getId()));
     }
 
     private boolean isRecruiterEntity(User user, Recruiter owner) {
