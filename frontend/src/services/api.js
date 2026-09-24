@@ -165,6 +165,21 @@ export const offerAPI = {
     api.post(`/applications/${applicationId}/offer/withdraw`),
 };
 
+// AI mock-interview practice API calls
+export const mockInterviewAPI = {
+  start: (userId, jobId) =>
+    api.post(`/users/${userId}/mock-interviews`, { jobId }),
+
+  list: (userId) =>
+    api.get(`/users/${userId}/mock-interviews`),
+
+  get: (userId, sessionId) =>
+    api.get(`/users/${userId}/mock-interviews/${sessionId}`),
+
+  answer: (userId, sessionId, questionId, answer) =>
+    api.put(`/users/${userId}/mock-interviews/${sessionId}/questions/${questionId}/answer`, { answer }),
+};
+
 // Resume Matching API calls
 export const resumeMatchingAPI = {
   // Get applications sorted by match percentage

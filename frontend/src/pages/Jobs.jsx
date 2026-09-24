@@ -1,8 +1,8 @@
 // src/pages/Jobs.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { Search, MapPin, DollarSign, Calendar, Star, TrendingUp, Clock, AlertCircle, Briefcase, Filter, X, Bookmark, BookmarkCheck } from 'lucide-react';
-import api, { savedJobsAPI } from '../services/api';
+import { Search, MapPin, DollarSign, Calendar, Star, TrendingUp, Clock, AlertCircle, Briefcase, Filter, X, Bookmark, BookmarkCheck, Sparkles } from 'lucide-react';
+import api, { savedJobsAPI, mockInterviewAPI } from '../services/api';
 import JobApplicationModal from '../components/JobApplicationModal';
 import JobRatingModal from '../components/JobRatingModal';
 import { isSkillMatch } from '../utils/skillMatching';
@@ -33,6 +33,8 @@ const Jobs = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [savedJobIds, setSavedJobIds] = useState(new Set());
   const [showSavedOnly, setShowSavedOnly] = useState(false);
+  const [startingPractice, setStartingPractice] = useState(false);
+  const [practiceError, setPracticeError] = useState('');
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -355,6 +357,23 @@ const Jobs = () => {
     }
     setSelectedJobForApplication(job);
     setShowApplicationModal(true);
+  };
+
+  const startMockInterview = async (job) => {
+    if (!currentUser) {
+      navigate('/login');
+      return;
+    }
+    setStartingPractice(true);
+    setPracticeError('');
+    try {
+      const response = await mockInterviewAPI.start(currentUser.id, job.id);
+      navigate(`/mock-interviews/${response.data.sessionId}`);
+    } catch (err) {
+      setPracticeError(err.response?.data?.error || 'Failed to start the practice interview');
+    } finally {
+      setStartingPractice(false);
+    }
   };
 
   const rateJob = (job) => {
@@ -1027,12 +1046,21 @@ const Jobs = () => {
               </div>
             </div>
             
-            <div className="sticky bottom-0 bg-white pt-4 border-t border-gray-200">
-              <button 
-                onClick={() => applyForJob(selectedJob)} 
+            {practiceError && <p className="text-red-600 text-sm mb-2">{practiceError}</p>}
+            <div className="sticky bottom-0 bg-white pt-4 border-t border-gray-200 space-y-2">
+              <button
+                onClick={() => applyForJob(selectedJob)}
                 className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors"
               >
                 Apply Now
+              </button>
+              <button
+                onClick={() => startMockInterview(selectedJob)}
+                disabled={startingPractice}
+                className="w-full flex items-center justify-center bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50"
+              >
+                <Sparkles className="h-5 w-5 mr-2" />
+                {startingPractice ? 'Preparing questions...' : 'Practice Interview (AI)'}
               </button>
             </div>
           </div>
