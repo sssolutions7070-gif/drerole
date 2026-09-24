@@ -4,6 +4,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -69,6 +71,18 @@ public class InterviewRoundController {
             return ResponseEntity.ok(rounds);
         } catch (InterviewRoundService.ApplicationNotFoundException e) {
             return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, e.getMessage()));
+        }
+    }
+
+    @GetMapping("/api/interview-rounds/{roundId}/calendar.ics")
+    public ResponseEntity<String> downloadCalendarInvite(@PathVariable Long roundId) {
+        try {
+            String ics = interviewRoundService.generateIcs(roundId);
+            HttpHeaders headers = new HttpHeaders();
+            headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"interview-" + roundId + ".ics\"");
+            return ResponseEntity.ok().headers(headers).contentType(MediaType.parseMediaType("text/calendar")).body(ics);
+        } catch (InterviewRoundService.RoundNotFoundException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 

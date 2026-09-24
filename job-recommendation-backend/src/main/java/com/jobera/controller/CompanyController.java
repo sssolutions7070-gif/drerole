@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.jobera.service.CompanyReviewService;
 import com.jobera.service.CompanyService;
+import com.jobera.service.InterviewExperienceService;
 
 /** Public company browsing - built from a recruiter's own profile fields and their approved
  *  postings, not a separate Company entity. See CompanyService for why. All routes here are
@@ -21,10 +22,13 @@ public class CompanyController {
 
     private final CompanyService companyService;
     private final CompanyReviewService companyReviewService;
+    private final InterviewExperienceService interviewExperienceService;
 
-    public CompanyController(CompanyService companyService, CompanyReviewService companyReviewService) {
+    public CompanyController(CompanyService companyService, CompanyReviewService companyReviewService,
+                              InterviewExperienceService interviewExperienceService) {
         this.companyService = companyService;
         this.companyReviewService = companyReviewService;
+        this.interviewExperienceService = interviewExperienceService;
     }
 
     @GetMapping
@@ -44,5 +48,10 @@ public class CompanyController {
     @GetMapping("/{recruiterId}/reviews")
     public ResponseEntity<Map<String, Object>> getCompanyReviews(@PathVariable Long recruiterId) {
         return ResponseEntity.ok(companyReviewService.getPublicReviews(recruiterId));
+    }
+
+    @GetMapping("/{recruiterId}/interview-experiences")
+    public ResponseEntity<Map<String, Object>> getInterviewExperiences(@PathVariable Long recruiterId) {
+        return ResponseEntity.ok(interviewExperienceService.getPublicExperiences(recruiterId));
     }
 }

@@ -46,7 +46,7 @@ class InterviewRoundServiceTest {
     @BeforeEach
     void setUp() {
         service = new InterviewRoundService(interviewRoundRepository, applicationRepository, realtimeNotifier,
-            "stun:stun.l.google.com:19302", "", "", "");
+            "stun:stun.l.google.com:19302", "", "", "", "http://localhost:3000");
 
         candidate = new User("candidate@example.com", "hash", "Candidate");
         candidate.setId(1L);
@@ -221,5 +221,29 @@ class InterviewRoundServiceTest {
         when(interviewRoundRepository.findByRoomId("unknown")).thenReturn(Optional.empty());
 
         assertEquals(false, service.isParticipant("unknown", candidate.getId()));
+    }
+
+    @Test
+    void generatingAnIcsFileIncludesTheTitleAndAJoinLink() {
+        InterviewRound round = new InterviewRound(1000L, 1, "Technical round", "TECHNICAL", "room-1",
+            LocalDateTime.of(2026, 6, 1, 10, 0));
+        round.setId(5000L);
+        when(interviewRoundRepository.findById(5000L)).thenReturn(Optional.of(round));
+
+        String ics = service.generateIcs(5000L);
+
+        assertTrue(ics.startsWith("BEGIN:VCALENDAR"));
+        assertTrue(ics.contains("SUMMARY:Technical round"));
+        assertTrue(ics.contains("DTSTART:20260601T100000"));
+        assertTrue(ics.contains("DTEND:20260601T110000"));
+        assertTrue(ics.contains("http://localhost:3000/interview-rounds/5000"));
+        assertTrue(ics.trim().endsWith("END:VCALENDAR"));
+    }
+
+    @Test
+    void generatingAnIcsFileForAnUnknownRoundFails() {
+        when(interviewRoundRepository.findById(5000L)).thenReturn(Optional.empty());
+
+        assertThrows(InterviewRoundService.RoundNotFoundException.class, () -> service.generateIcs(5000L));
     }
 }

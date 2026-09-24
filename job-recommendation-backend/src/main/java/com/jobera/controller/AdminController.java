@@ -29,6 +29,7 @@ import com.jobera.repository.ResumeRepository;
 import com.jobera.repository.UserRepository;
 import com.jobera.service.AdminAuditService;
 import com.jobera.service.CompanyReviewService;
+import com.jobera.service.InterviewExperienceService;
 import com.jobera.service.JobPostingService;
 import com.jobera.service.NotificationService;
 
@@ -54,6 +55,7 @@ public class AdminController {
     private final JobPostingService jobPostingService;
     private final NotificationService notificationService;
     private final CompanyReviewService companyReviewService;
+    private final InterviewExperienceService interviewExperienceService;
 
     public AdminController(UserRepository userRepository,
                          RecruiterRepository recruiterRepository,
@@ -63,7 +65,8 @@ public class AdminController {
                          AdminAuditService adminAuditService,
                          JobPostingService jobPostingService,
                          NotificationService notificationService,
-                         CompanyReviewService companyReviewService) {
+                         CompanyReviewService companyReviewService,
+                         InterviewExperienceService interviewExperienceService) {
         this.userRepository = userRepository;
         this.recruiterRepository = recruiterRepository;
         this.jobPostingRepository = jobPostingRepository;
@@ -73,6 +76,7 @@ public class AdminController {
         this.jobPostingService = jobPostingService;
         this.notificationService = notificationService;
         this.companyReviewService = companyReviewService;
+        this.interviewExperienceService = interviewExperienceService;
     }
 
     private User actingAdmin(HttpServletRequest request) {
@@ -392,6 +396,38 @@ public class AdminController {
             return ResponseEntity.ok(Map.of(MESSAGE_KEY, "Review rejected", "moderationStatus", review.getModerationStatus()));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "Failed to reject review: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/interview-experiences/pending")
+    public ResponseEntity<List<com.jobera.entity.InterviewExperience>> getPendingInterviewExperiences() {
+        return ResponseEntity.ok(interviewExperienceService.getPendingExperiences());
+    }
+
+    @PutMapping("/interview-experiences/{experienceId}/approve")
+    public ResponseEntity<Map<String, Object>> approveInterviewExperience(@PathVariable Long experienceId, HttpServletRequest request) {
+        try {
+            com.jobera.entity.InterviewExperience experience = interviewExperienceService.approveExperience(experienceId);
+            adminAuditService.record(actingAdmin(request), "INTERVIEW_EXPERIENCE_APPROVED", "INTERVIEW_EXPERIENCE", experienceId,
+                experience.getRecruiter().getCompanyName());
+            return ResponseEntity.ok(Map.of(MESSAGE_KEY, "Interview experience approved", "moderationStatus", experience.getModerationStatus()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "Failed to approve interview experience: " + e.getMessage()));
+        }
+    }
+
+    @PutMapping("/interview-experiences/{experienceId}/reject")
+    public ResponseEntity<Map<String, Object>> rejectInterviewExperience(@PathVariable Long experienceId,
+                                                                          @RequestBody Map<String, String> payload,
+                                                                          HttpServletRequest request) {
+        try {
+            String reason = payload.get("reason");
+            com.jobera.entity.InterviewExperience experience = interviewExperienceService.rejectExperience(experienceId, reason);
+            adminAuditService.record(actingAdmin(request), "INTERVIEW_EXPERIENCE_REJECTED", "INTERVIEW_EXPERIENCE", experienceId,
+                experience.getRecruiter().getCompanyName());
+            return ResponseEntity.ok(Map.of(MESSAGE_KEY, "Interview experience rejected", "moderationStatus", experience.getModerationStatus()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "Failed to reject interview experience: " + e.getMessage()));
         }
     }
 

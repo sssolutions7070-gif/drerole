@@ -59,6 +59,7 @@ public class InterviewRoundService {
     private final String turnUrl;
     private final String turnUsername;
     private final String turnCredential;
+    private final String frontendUrl;
 
     public InterviewRoundService(InterviewRoundRepository interviewRoundRepository,
                                   ApplicationRepository applicationRepository,
@@ -66,7 +67,8 @@ public class InterviewRoundService {
                                   @Value("${app.webrtc.stun-urls:stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302}") String stunUrls,
                                   @Value("${app.webrtc.turn-url:}") String turnUrl,
                                   @Value("${app.webrtc.turn-username:}") String turnUsername,
-                                  @Value("${app.webrtc.turn-credential:}") String turnCredential) {
+                                  @Value("${app.webrtc.turn-credential:}") String turnCredential,
+                                  @Value("${app.frontend-url:http://localhost:3000}") String frontendUrl) {
         this.interviewRoundRepository = interviewRoundRepository;
         this.applicationRepository = applicationRepository;
         this.realtimeNotifier = realtimeNotifier;
@@ -74,6 +76,7 @@ public class InterviewRoundService {
         this.turnUrl = turnUrl;
         this.turnUsername = turnUsername;
         this.turnCredential = turnCredential;
+        this.frontendUrl = frontendUrl;
     }
 
     private Long candidateUserId(Application application) {
@@ -208,6 +211,39 @@ public class InterviewRoundService {
             )));
 
         return saved;
+    }
+
+    /** A minimal, hand-built .ics file (RFC 5545) for one round - no library needed for a format
+     *  this small. Times are written "floating" (no timezone/UTC suffix), same simplification the
+     *  rest of this codebase already makes by storing every date as a plain LocalDateTime; a
+     *  calendar app interprets a floating time in the viewer's own local timezone. */
+    public String generateIcs(Long roundId) {
+        InterviewRound round = requireRound(roundId);
+        LocalDateTime start = round.getScheduledAt() != null ? round.getScheduledAt() : LocalDateTime.now();
+        LocalDateTime end = start.plusHours(1);
+        java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss");
+        String joinUrl = frontendUrl + "/interview-rounds/" + roundId;
+
+        return "BEGIN:VCALENDAR\r\n"
+            + "VERSION:2.0\r\n"
+            + "PRODID:-//DreamRole//Interview Pipeline//EN\r\n"
+            + "BEGIN:VEVENT\r\n"
+            + "UID:interview-round-" + roundId + "@dreamrole\r\n"
+            + "DTSTAMP:" + LocalDateTime.now().format(fmt) + "\r\n"
+            + "DTSTART:" + start.format(fmt) + "\r\n"
+            + "DTEND:" + end.format(fmt) + "\r\n"
+            + "SUMMARY:" + escapeIcsText(round.getTitle()) + "\r\n"
+            + "DESCRIPTION:" + escapeIcsText("Join the interview: " + joinUrl) + "\r\n"
+            + "URL:" + joinUrl + "\r\n"
+            + "END:VEVENT\r\n"
+            + "END:VCALENDAR\r\n";
+    }
+
+    private String escapeIcsText(String text) {
+        if (text == null) {
+            return "";
+        }
+        return text.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n");
     }
 
     /** Used by the WebSocket handshake to check whether a given user may join a given room's

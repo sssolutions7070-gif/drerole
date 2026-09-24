@@ -13,6 +13,7 @@ import { BACKEND_ORIGIN } from '../config';
 import DeleteAccountModal from '../components/DeleteAccountModal';
 import TwoFactorSetupModal from '../components/TwoFactorSetupModal';
 import DisableTwoFactorModal from '../components/DisableTwoFactorModal';
+import SkillBadgesPanel from '../components/SkillBadgesPanel';
 
 const UserProfile = () => {
   const [profile, setProfile] = useState(null);
@@ -895,6 +896,8 @@ const UserProfile = () => {
                 )}
               </div>
             )}
+
+            <SkillBadgesPanel userId={currentUser.id} />
 
             {/* Security Section */}
             <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-6">

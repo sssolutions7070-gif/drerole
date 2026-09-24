@@ -33,6 +33,7 @@ import com.jobera.entity.DreamRoleTestAssignment;
 import com.jobera.repository.RecruiterRepository;
 import com.jobera.repository.TestAssignmentRepository;
 import com.jobera.repository.TestQuestionRepository;
+import com.jobera.service.SkillBadgeService;
 
 @RestController
 @RequestMapping("/api/aptitude-tests")
@@ -67,6 +68,7 @@ public class AptitudeTestController {
     private final RecruiterRepository recruiterRepository;
     private final ProctoringViolationRepository violationRepository;
     private final DreamRoleTestAssignmentRepository dreamRoleAssignmentRepository;
+    private final SkillBadgeService skillBadgeService;
     private final ObjectMapper objectMapper;
 
     public AptitudeTestController(
@@ -76,7 +78,8 @@ public class AptitudeTestController {
             ApplicationRepository applicationRepository,
             RecruiterRepository recruiterRepository,
             ProctoringViolationRepository violationRepository,
-            DreamRoleTestAssignmentRepository dreamRoleAssignmentRepository) {
+            DreamRoleTestAssignmentRepository dreamRoleAssignmentRepository,
+            SkillBadgeService skillBadgeService) {
         this.testRepository = testRepository;
         this.questionRepository = questionRepository;
         this.assignmentRepository = assignmentRepository;
@@ -84,6 +87,7 @@ public class AptitudeTestController {
         this.recruiterRepository = recruiterRepository;
         this.violationRepository = violationRepository;
         this.dreamRoleAssignmentRepository = dreamRoleAssignmentRepository;
+        this.skillBadgeService = skillBadgeService;
         this.objectMapper = new ObjectMapper();
     }
 
@@ -411,6 +415,11 @@ public class AptitudeTestController {
                     application.setStatus(APPLICATION_STATUS_TEST_FAILED);
                 }
                 applicationRepository.save(application);
+
+                if (passed && application.getUser() != null) {
+                    skillBadgeService.awardBadge(application.getUser().getId(), com.jobera.entity.SkillBadge.SOURCE_APTITUDE_TEST,
+                        assignment.getTest().getId(), assignment.getTest().getTestName(), percentage);
+                }
             }
             
             Map<String, Object> response = new HashMap<>();

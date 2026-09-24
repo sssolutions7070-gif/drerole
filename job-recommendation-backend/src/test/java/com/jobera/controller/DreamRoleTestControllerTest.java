@@ -25,6 +25,7 @@ import com.jobera.repository.DreamRoleTestQuestionRepository;
 import com.jobera.repository.DreamRoleTestRepository;
 import com.jobera.repository.QuestionBankRepository;
 import com.jobera.repository.RecruiterRepository;
+import com.jobera.service.SkillBadgeService;
 
 @ExtendWith(MockitoExtension.class)
 class DreamRoleTestControllerTest {
@@ -35,13 +36,15 @@ class DreamRoleTestControllerTest {
     @Mock QuestionBankRepository questionBankRepository;
     @Mock ApplicationRepository applicationRepository;
     @Mock RecruiterRepository recruiterRepository;
+    @Mock SkillBadgeService skillBadgeService;
 
     DreamRoleTestController controller;
 
     @BeforeEach
     void setUp() {
         controller = new DreamRoleTestController(dreamRoleTestRepository, questionRepository,
-            assignmentRepository, questionBankRepository, applicationRepository, recruiterRepository);
+            assignmentRepository, questionBankRepository, applicationRepository, recruiterRepository,
+            skillBadgeService);
     }
 
     private Application application(long id, String status, String name) {

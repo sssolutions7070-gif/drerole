@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Plus, Video, Calendar, Award } from 'lucide-react';
+import { X, Plus, Video, Calendar, Award, Download, CalendarPlus } from 'lucide-react';
 import { interviewRoundsAPI, scorecardAPI } from '../services/api';
 import ScorecardForm from './ScorecardForm';
 
@@ -103,6 +103,38 @@ const InterviewPipelinePanel = ({ applicationId, isRecruiter, onClose }) => {
     }
   };
 
+  const handleDownloadIcs = async (roundId) => {
+    try {
+      const response = await interviewRoundsAPI.downloadCalendarInvite(roundId);
+      const blob = new Blob([response.data], { type: 'text/calendar' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `interview-${roundId}.ics`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError('Failed to download the calendar invite');
+    }
+  };
+
+  const googleCalendarUrl = (round) => {
+    if (!round.scheduledAt) return null;
+    const start = new Date(round.scheduledAt);
+    const end = new Date(start.getTime() + 60 * 60 * 1000);
+    const fmt = (d) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    const joinUrl = `${window.location.origin}/interview-rounds/${round.id}`;
+    const params = new URLSearchParams({
+      action: 'TEMPLATE',
+      text: round.title,
+      dates: `${fmt(start)}/${fmt(end)}`,
+      details: `Join the interview: ${joinUrl}`,
+    });
+    return `https://calendar.google.com/calendar/render?${params.toString()}`;
+  };
+
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl max-h-[85vh] flex flex-col">
@@ -141,6 +173,26 @@ const InterviewPipelinePanel = ({ applicationId, isRecruiter, onClose }) => {
                   >
                     <Video className="h-4 w-4 mr-1" /> Join
                   </button>
+
+                  {round.scheduledAt && (
+                    <button
+                      onClick={() => handleDownloadIcs(round.id)}
+                      className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-50"
+                    >
+                      <Download className="h-4 w-4 mr-1" /> .ics
+                    </button>
+                  )}
+
+                  {round.scheduledAt && (
+                    <a
+                      href={googleCalendarUrl(round)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-50"
+                    >
+                      <CalendarPlus className="h-4 w-4 mr-1" /> Google Calendar
+                    </a>
+                  )}
 
                   {isRecruiter && (
                     <button

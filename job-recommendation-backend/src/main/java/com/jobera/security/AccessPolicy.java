@@ -129,6 +129,7 @@ public class AccessPolicy {
         rule("GET", "/api/companies", authenticated);
         rule("GET", "/api/companies/{recruiterId}", authenticated);
         rule("GET", "/api/companies/{recruiterId}/reviews", authenticated);
+        rule("GET", "/api/companies/{recruiterId}/interview-experiences", authenticated);
         rule("GET", "/api/jobs/{jobId}", authenticated);
 
         // Internships
@@ -171,6 +172,7 @@ public class AccessPolicy {
         rule("POST", "/api/applications/{applicationId}/interview-rounds", c -> recruiterManagesApplication(c, "applicationId"));
         rule("GET", "/api/applications/{applicationId}/interview-rounds", c -> participatesInApplication(c, "applicationId"));
         rule("GET", "/api/interview-rounds/{roundId}/join", c -> participatesInRound(c, "roundId"));
+        rule("GET", "/api/interview-rounds/{roundId}/calendar.ics", c -> participatesInRound(c, "roundId"));
         rule("PUT", "/api/interview-rounds/{roundId}/status", c -> participatesInRound(c, "roundId"));
         rule("PUT", "/api/interview-rounds/{roundId}/reschedule", c -> recruiterManagesRound(c, "roundId"));
 

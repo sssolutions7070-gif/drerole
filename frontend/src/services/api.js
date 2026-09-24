@@ -123,6 +123,9 @@ export const interviewRoundsAPI = {
 
   reschedule: (roundId, scheduledAt) =>
     api.put(`/interview-rounds/${roundId}/reschedule`, { scheduledAt }),
+
+  downloadCalendarInvite: (roundId) =>
+    api.get(`/interview-rounds/${roundId}/calendar.ics`, { responseType: 'blob' }),
 };
 
 // Structured interview scorecards - recruiter-only
@@ -178,6 +181,21 @@ export const mockInterviewAPI = {
 
   answer: (userId, sessionId, questionId, answer) =>
     api.put(`/users/${userId}/mock-interviews/${sessionId}/questions/${questionId}/answer`, { answer }),
+};
+
+// Interview experience reports - what interviewing at a company was actually like
+export const interviewExperienceAPI = {
+  submit: (userId, recruiterId, difficultyRating, outcome, processDescription) =>
+    api.post(`/users/${userId}/interview-experiences/${recruiterId}`, { difficultyRating, outcome, processDescription }),
+
+  getMine: (userId, recruiterId) =>
+    api.get(`/users/${userId}/interview-experiences/${recruiterId}`),
+};
+
+// A candidate's verified skill badges - public/shareable
+export const skillBadgeAPI = {
+  list: (userId) =>
+    api.get(`/users/${userId}/badges`),
 };
 
 // Resume Matching API calls

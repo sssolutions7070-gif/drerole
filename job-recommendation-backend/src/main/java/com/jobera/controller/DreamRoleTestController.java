@@ -55,6 +55,7 @@ public class DreamRoleTestController {
     private final QuestionBankRepository questionBankRepository;
     private final ApplicationRepository applicationRepository;
     private final RecruiterRepository recruiterRepository;
+    private final com.jobera.service.SkillBadgeService skillBadgeService;
     private final ObjectMapper objectMapper;
 
     public DreamRoleTestController(
@@ -63,13 +64,15 @@ public class DreamRoleTestController {
             DreamRoleTestAssignmentRepository assignmentRepository,
             QuestionBankRepository questionBankRepository,
             ApplicationRepository applicationRepository,
-            RecruiterRepository recruiterRepository) {
+            RecruiterRepository recruiterRepository,
+            com.jobera.service.SkillBadgeService skillBadgeService) {
         this.dreamRoleTestRepository = dreamRoleTestRepository;
         this.questionRepository = questionRepository;
         this.assignmentRepository = assignmentRepository;
         this.questionBankRepository = questionBankRepository;
         this.applicationRepository = applicationRepository;
         this.recruiterRepository = recruiterRepository;
+        this.skillBadgeService = skillBadgeService;
         this.objectMapper = new ObjectMapper();
     }
 
@@ -478,6 +481,11 @@ public class DreamRoleTestController {
             if (application != null) {
                 application.setStatus(passed ? "TEST_PASSED" : "TEST_FAILED");
                 applicationRepository.save(application);
+
+                if (passed && application.getUser() != null) {
+                    skillBadgeService.awardBadge(application.getUser().getId(), com.jobera.entity.SkillBadge.SOURCE_DREAM_ROLE_TEST,
+                        assignment.getDreamRoleTest().getId(), assignment.getDreamRoleTest().getTestName(), percentage);
+                }
             }
             
             return ResponseEntity.ok(Map.of(

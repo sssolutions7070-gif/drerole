@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Building, Briefcase, FileText, Trash2, ToggleLeft, ToggleRight, BarChart3, ScrollText, Clock, CheckCircle, XCircle, Star } from 'lucide-react';
+import { Users, Building, Briefcase, FileText, Trash2, ToggleLeft, ToggleRight, BarChart3, ScrollText, Clock, CheckCircle, XCircle, Star, MessageSquare } from 'lucide-react';
 import api from '../services/api';
 
 const AdminDashboard = () => {
@@ -10,6 +10,7 @@ const AdminDashboard = () => {
   const [jobs, setJobs] = useState([]);
   const [pendingJobs, setPendingJobs] = useState([]);
   const [pendingReviews, setPendingReviews] = useState([]);
+  const [pendingExperiences, setPendingExperiences] = useState([]);
   const [applications, setApplications] = useState([]);
   const [auditLog, setAuditLog] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -18,6 +19,7 @@ const AdminDashboard = () => {
     fetchDashboardStats();
     fetchPendingJobs();
     fetchPendingReviews();
+    fetchPendingExperiences();
   }, []);
 
   useEffect(() => {
@@ -26,6 +28,7 @@ const AdminDashboard = () => {
     if (activeTab === 'jobs') fetchJobs();
     if (activeTab === 'pending-jobs') fetchPendingJobs();
     if (activeTab === 'pending-reviews') fetchPendingReviews();
+    if (activeTab === 'pending-experiences') fetchPendingExperiences();
     if (activeTab === 'applications') fetchApplications();
     if (activeTab === 'audit-log') fetchAuditLog();
   }, [activeTab]);
@@ -204,6 +207,36 @@ const AdminDashboard = () => {
     }
   };
 
+  const fetchPendingExperiences = async () => {
+    try {
+      const response = await api.get('/admin/interview-experiences/pending');
+      setPendingExperiences(response.data);
+    } catch (error) {
+      console.error('Error fetching pending interview experiences:', error);
+    }
+  };
+
+  const approveExperience = async (experienceId) => {
+    try {
+      await api.put(`/admin/interview-experiences/${experienceId}/approve`);
+      fetchPendingExperiences();
+    } catch (error) {
+      alert('Failed to approve interview experience: ' + (error.response?.data?.error || error.message));
+    }
+  };
+
+  const rejectExperience = async (experienceId) => {
+    const reason = window.prompt('Reason for rejecting this report (shown to the candidate):');
+    if (reason === null) return; // cancelled
+
+    try {
+      await api.put(`/admin/interview-experiences/${experienceId}/reject`, { reason });
+      fetchPendingExperiences();
+    } catch (error) {
+      alert('Failed to reject interview experience: ' + (error.response?.data?.error || error.message));
+    }
+  };
+
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto py-8 px-4">
@@ -236,6 +269,7 @@ const AdminDashboard = () => {
             { id: 'jobs', name: 'Jobs', icon: Briefcase },
             { id: 'pending-jobs', name: `Pending Jobs${pendingJobs.length > 0 ? ` (${pendingJobs.length})` : ''}`, icon: Clock },
             { id: 'pending-reviews', name: `Pending Reviews${pendingReviews.length > 0 ? ` (${pendingReviews.length})` : ''}`, icon: Star },
+            { id: 'pending-experiences', name: `Pending Interview Reports${pendingExperiences.length > 0 ? ` (${pendingExperiences.length})` : ''}`, icon: MessageSquare },
             { id: 'applications', name: 'Applications', icon: FileText },
             { id: 'audit-log', name: 'Audit Log', icon: ScrollText }
           ].map((tab) => {
@@ -625,6 +659,53 @@ const AdminDashboard = () => {
                     </button>
                     <button
                       onClick={() => rejectReview(review.id)}
+                      className="inline-flex items-center px-3 py-2 border border-red-300 text-red-700 rounded-md text-sm font-medium hover:bg-red-50"
+                    >
+                      <XCircle className="h-4 w-4 mr-1" />
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'pending-experiences' && (
+        <div className="bg-white rounded-lg shadow-lg border border-gray-200">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-800">Pending Interview Experience Reports ({pendingExperiences.length})</h3>
+            <p className="text-sm text-gray-500 mt-1">A new or edited report waits here until approved, so nothing unreviewed reaches a company's public profile.</p>
+          </div>
+          {pendingExperiences.length === 0 ? (
+            <div className="text-center py-12 text-gray-500">
+              <MessageSquare className="mx-auto h-12 w-12 text-gray-300 mb-3" />
+              Nothing waiting for review.
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-200">
+              {pendingExperiences.map((experience) => (
+                <div key={experience.id} className="px-6 py-4 flex items-start justify-between">
+                  <div>
+                    <div className="text-sm font-medium text-gray-900">
+                      {experience.recruiter?.companyName || 'Unknown company'} - difficulty {experience.difficultyRating}/5 - {experience.outcome}
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      by {experience.user?.email || 'unknown reporter'}
+                    </div>
+                    <p className="text-sm text-gray-600 mt-2 max-w-xl">{experience.processDescription}</p>
+                  </div>
+                  <div className="flex items-center space-x-3 flex-shrink-0 ml-4">
+                    <button
+                      onClick={() => approveExperience(experience.id)}
+                      className="inline-flex items-center px-3 py-2 border border-green-300 text-green-700 rounded-md text-sm font-medium hover:bg-green-50"
+                    >
+                      <CheckCircle className="h-4 w-4 mr-1" />
+                      Approve
+                    </button>
+                    <button
+                      onClick={() => rejectExperience(experience.id)}
                       className="inline-flex items-center px-3 py-2 border border-red-300 text-red-700 rounded-md text-sm font-medium hover:bg-red-50"
                     >
                       <XCircle className="h-4 w-4 mr-1" />

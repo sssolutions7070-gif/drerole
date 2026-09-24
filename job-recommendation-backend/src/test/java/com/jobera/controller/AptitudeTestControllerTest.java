@@ -36,6 +36,7 @@ import com.jobera.repository.ProctoringViolationRepository;
 import com.jobera.repository.RecruiterRepository;
 import com.jobera.repository.TestAssignmentRepository;
 import com.jobera.repository.TestQuestionRepository;
+import com.jobera.service.SkillBadgeService;
 
 @ExtendWith(MockitoExtension.class)
 class AptitudeTestControllerTest {
@@ -47,13 +48,15 @@ class AptitudeTestControllerTest {
     @Mock RecruiterRepository recruiterRepository;
     @Mock ProctoringViolationRepository violationRepository;
     @Mock DreamRoleTestAssignmentRepository dreamRoleAssignmentRepository;
+    @Mock SkillBadgeService skillBadgeService;
 
     AptitudeTestController controller;
 
     @BeforeEach
     void setUp() {
         controller = new AptitudeTestController(testRepository, questionRepository, assignmentRepository,
-            applicationRepository, recruiterRepository, violationRepository, dreamRoleAssignmentRepository);
+            applicationRepository, recruiterRepository, violationRepository, dreamRoleAssignmentRepository,
+            skillBadgeService);
     }
 
     private AptitudeTest test() {

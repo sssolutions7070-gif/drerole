@@ -1,8 +1,23 @@
 // src/pages/CompanyProfile.jsx
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Building, Globe, Users, Briefcase, MapPin, Clock, ArrowLeft, Star } from 'lucide-react';
+import { Building, Globe, Users, Briefcase, MapPin, Clock, ArrowLeft, Star, MessageSquare } from 'lucide-react';
 import api from '../services/api';
+
+const OUTCOME_LABELS = {
+  OFFER: 'Got an offer', REJECTED: 'Rejected', NO_RESPONSE: 'No response', WITHDREW: 'Withdrew',
+};
+
+const DifficultyRow = ({ rating }) => (
+  <div className="flex items-center">
+    {[1, 2, 3, 4, 5].map((n) => (
+      <div
+        key={n}
+        className={`w-2.5 h-2.5 rounded-full mr-0.5 ${n <= Math.round(rating) ? 'bg-orange-500' : 'bg-gray-200'}`}
+      />
+    ))}
+  </div>
+);
 
 const StarRow = ({ rating, size = 'h-4 w-4' }) => (
   <div className="flex items-center">
@@ -31,16 +46,26 @@ const CompanyProfile = () => {
   const [submitting, setSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
 
+  const [experiences, setExperiences] = useState({ averageDifficulty: 0, totalExperiences: 0, experiences: [] });
+  const [myExperience, setMyExperience] = useState(null);
+  const [experienceDifficulty, setExperienceDifficulty] = useState(0);
+  const [experienceOutcome, setExperienceOutcome] = useState('');
+  const [experienceDescription, setExperienceDescription] = useState('');
+  const [submittingExperience, setSubmittingExperience] = useState(false);
+  const [experienceSubmitMessage, setExperienceSubmitMessage] = useState('');
+
   const fetchAll = async () => {
     setIsLoading(true);
     setError('');
     try {
-      const [companyRes, reviewsRes] = await Promise.all([
+      const [companyRes, reviewsRes, experiencesRes] = await Promise.all([
         api.get(`/companies/${recruiterId}`),
         api.get(`/companies/${recruiterId}/reviews`),
+        api.get(`/companies/${recruiterId}/interview-experiences`),
       ]);
       setCompany(companyRes.data);
       setReviews(reviewsRes.data);
+      setExperiences(experiencesRes.data);
 
       if (currentUser?.id) {
         try {
@@ -52,6 +77,17 @@ const CompanyProfile = () => {
           }
         } catch {
           // No existing review - fine, the form just starts blank.
+        }
+        try {
+          const mine = await api.get(`/users/${currentUser.id}/interview-experiences/${recruiterId}`);
+          if (mine.status === 200) {
+            setMyExperience(mine.data);
+            setExperienceDifficulty(mine.data.difficultyRating);
+            setExperienceOutcome(mine.data.outcome);
+            setExperienceDescription(mine.data.processDescription || '');
+          }
+        } catch {
+          // No existing report - fine, the form just starts blank.
         }
       }
     } catch (err) {
@@ -86,6 +122,29 @@ const CompanyProfile = () => {
       setSubmitMessage(err.response?.data?.error || 'Failed to submit review');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleSubmitExperience = async (e) => {
+    e.preventDefault();
+    if (!currentUser) {
+      navigate('/login');
+      return;
+    }
+    setSubmittingExperience(true);
+    setExperienceSubmitMessage('');
+    try {
+      await api.post(`/users/${currentUser.id}/interview-experiences/${recruiterId}`, {
+        difficultyRating: experienceDifficulty,
+        outcome: experienceOutcome,
+        processDescription: experienceDescription,
+      });
+      setExperienceSubmitMessage('Thanks! Your report is awaiting approval before it appears publicly.');
+      fetchAll();
+    } catch (err) {
+      setExperienceSubmitMessage(err.response?.data?.error || 'Failed to submit your report');
+    } finally {
+      setSubmittingExperience(false);
     }
   };
 
@@ -250,6 +309,94 @@ const CompanyProfile = () => {
                 <span className="text-xs text-gray-400">{formatDate(review.createdAt)}</span>
               </div>
               {review.comment && <p className="text-gray-700 text-sm">{review.comment}</p>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <h2 className="text-xl font-semibold text-gray-800 mb-4 mt-8 flex items-center">
+        <MessageSquare className="h-5 w-5 mr-2" />
+        Interview Experiences ({experiences.totalExperiences})
+      </h2>
+
+      <div className="bg-white rounded-lg shadow border border-gray-200 p-6 mb-6">
+        <h3 className="font-semibold text-gray-800 mb-3">
+          {myExperience ? 'Update your interview report' : 'Share what interviewing here was like'}
+        </h3>
+        {myExperience?.moderationStatus === 'PENDING' && (
+          <p className="text-sm text-yellow-700 bg-yellow-50 rounded px-3 py-2 mb-3">
+            Your report is awaiting approval.
+          </p>
+        )}
+        {myExperience?.moderationStatus === 'REJECTED' && (
+          <p className="text-sm text-red-700 bg-red-50 rounded px-3 py-2 mb-3">
+            Your report wasn't approved{myExperience.rejectionReason ? `: ${myExperience.rejectionReason}` : '.'} You can edit and resubmit it below.
+          </p>
+        )}
+        <form onSubmit={handleSubmitExperience} className="space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">How difficult was it?</label>
+            <div className="flex items-center space-x-1">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button
+                  type="button"
+                  key={n}
+                  onClick={() => setExperienceDifficulty(n)}
+                  aria-label={`Difficulty ${n}`}
+                  className={`w-8 h-8 rounded-md text-sm font-medium border ${
+                    n <= experienceDifficulty ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-gray-600 border-gray-300'
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Outcome</label>
+            <select
+              value={experienceOutcome}
+              onChange={(e) => setExperienceOutcome(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2"
+            >
+              <option value="">Select...</option>
+              {Object.entries(OUTCOME_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </div>
+          <textarea
+            value={experienceDescription}
+            onChange={(e) => setExperienceDescription(e.target.value)}
+            placeholder="What was the process like? How many rounds, what kind of questions..."
+            rows={3}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2"
+          />
+          {experienceSubmitMessage && <p className="text-sm text-gray-600">{experienceSubmitMessage}</p>}
+          <button
+            type="submit"
+            disabled={submittingExperience || experienceDifficulty === 0 || !experienceOutcome}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {submittingExperience ? 'Submitting...' : myExperience ? 'Update Report' : 'Submit Report'}
+          </button>
+        </form>
+      </div>
+
+      {experiences.experiences.length === 0 ? (
+        <p className="text-gray-500 text-center py-6">No interview experiences shared yet.</p>
+      ) : (
+        <div className="space-y-3">
+          {experiences.experiences.map((experience) => (
+            <div key={experience.id} className="bg-white rounded-lg shadow border border-gray-200 p-4">
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-3">
+                  <DifficultyRow rating={experience.difficultyRating} />
+                  <span className="text-xs font-medium text-gray-600">{OUTCOME_LABELS[experience.outcome]}</span>
+                </div>
+                <span className="text-xs text-gray-400">{formatDate(experience.createdAt)}</span>
+              </div>
+              {experience.processDescription && <p className="text-gray-700 text-sm">{experience.processDescription}</p>}
             </div>
           ))}
         </div>
