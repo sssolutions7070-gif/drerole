@@ -181,6 +181,8 @@ const ApplicationsList = ({ job, onClose }) => {
         return 'bg-green-100 text-green-800';
       case 'OFFER_DECLINED':
         return 'bg-gray-100 text-gray-800';
+      case 'WITHDRAWN':
+        return 'bg-gray-100 text-gray-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -220,6 +222,8 @@ const ApplicationsList = ({ job, onClose }) => {
       case 'OFFER_ACCEPTED':
         return <CheckCircle className="h-4 w-4" />;
       case 'OFFER_DECLINED':
+        return <XCircle className="h-4 w-4" />;
+      case 'WITHDRAWN':
         return <XCircle className="h-4 w-4" />;
       default:
         return <Clock className="h-4 w-4" />;

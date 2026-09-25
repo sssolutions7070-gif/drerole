@@ -397,6 +397,11 @@ export const applicationStatusAPI = {
   // Send offer
   sendOffer: (applicationId, recruiterId, offerDetails) =>
     api.put(`/applications/${applicationId}/send-offer?recruiterId=${recruiterId}`, { offerDetails }),
+
+  // Candidate withdraws their own application - distinct from offerAPI.withdraw, which
+  // withdraws an already-sent offer
+  withdrawApplication: (applicationId) =>
+    api.post(`/applications/${applicationId}/withdraw`),
 };
 
 // Enhanced Job Management API calls

@@ -9,19 +9,25 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.jobera.config.AuthInterceptor;
 import com.jobera.entity.Application;
 import com.jobera.entity.JobPosting;
+import com.jobera.entity.User;
 import com.jobera.service.ApplicationStatusService;
 import com.jobera.service.JobPostingService;
+
+import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
 @RequestMapping("/api/applications")
@@ -427,6 +433,29 @@ public class ApplicationStatusController {
         }
     }
     
+    // POST, not PUT under /api/applications/{applicationId}/*, since that PUT wildcard in
+    // AccessPolicy is recruiter-only - this is the one status change only the candidate can make.
+    @PostMapping("/{applicationId}/withdraw")
+    public ResponseEntity<Map<String, Object>> withdrawApplication(
+            @PathVariable Long applicationId, HttpServletRequest request) {
+        try {
+            User caller = (User) request.getAttribute(AuthInterceptor.AUTHENTICATED_USER);
+            Application application = applicationStatusService.withdrawApplication(applicationId, caller.getId());
+
+            Map<String, Object> response = new HashMap<>();
+            response.put(RESPONSE_KEY_MESSAGE, "Application withdrawn");
+            response.put("application", createApplicationResponse(application));
+
+            return ResponseEntity.ok(response);
+        } catch (ApplicationStatusService.NotTheApplicantException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(RESPONSE_KEY_ERROR, e.getMessage()));
+        } catch (ApplicationStatusService.CannotWithdrawException e) {
+            return ResponseEntity.badRequest().body(Map.of(RESPONSE_KEY_ERROR, e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(RESPONSE_KEY_ERROR, "Failed to withdraw application: " + e.getMessage()));
+        }
+    }
+
     private Map<String, Object> createApplicationResponse(Application application) {
         Map<String, Object> response = new HashMap<>();
         response.put("id", application.getId());

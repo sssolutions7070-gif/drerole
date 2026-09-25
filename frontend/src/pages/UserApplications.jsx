@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Briefcase, Calendar, Clock, Eye, CheckCircle, XCircle, Star, MapPin, ChevronDown, ChevronUp, RefreshCw, AlertCircle, MessageCircle, Video, FileCheck, BookOpen, Award } from 'lucide-react';
-import api from '../services/api';
+import { Briefcase, Calendar, Clock, Eye, CheckCircle, XCircle, Star, MapPin, ChevronDown, ChevronUp, RefreshCw, AlertCircle, MessageCircle, Video, FileCheck, BookOpen, Award, Ban } from 'lucide-react';
+import api, { applicationStatusAPI } from '../services/api';
 import MessageThread from '../components/MessageThread';
 import InterviewPipelinePanel from '../components/InterviewPipelinePanel';
 import OfferPanel from '../components/OfferPanel';
@@ -56,6 +56,21 @@ const UserApplications = () => {
     fetchUserApplications();
   };
 
+  const NON_WITHDRAWABLE_STATUSES = ['REJECTED', 'OFFER_ACCEPTED', 'OFFER_DECLINED', 'WITHDRAWN'];
+  const canWithdraw = (status) => !NON_WITHDRAWABLE_STATUSES.includes(status);
+
+  const handleWithdraw = async (applicationId) => {
+    if (!window.confirm('Withdraw this application? This cannot be undone.')) {
+      return;
+    }
+    try {
+      await applicationStatusAPI.withdrawApplication(applicationId);
+      await fetchUserApplications();
+    } catch (error) {
+      setError(error.response?.data?.error || 'Failed to withdraw application');
+    }
+  };
+
   const getStatusColor = (status) => {
     switch (status) {
       case 'APPLICATION_SUBMITTED':
@@ -79,6 +94,8 @@ const UserApplications = () => {
       case 'OFFER_ACCEPTED':
         return 'bg-green-100 text-green-800 border-green-200';
       case 'OFFER_DECLINED':
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'WITHDRAWN':
         return 'bg-gray-100 text-gray-800 border-gray-200';
       default:
         return 'bg-gray-100 text-gray-800 border-gray-200';
@@ -109,6 +126,8 @@ const UserApplications = () => {
         return <CheckCircle className="h-4 w-4" />;
       case 'OFFER_DECLINED':
         return <XCircle className="h-4 w-4" />;
+      case 'WITHDRAWN':
+        return <XCircle className="h-4 w-4" />;
       default:
         return <Clock className="h-4 w-4" />;
     }
@@ -138,6 +157,8 @@ const UserApplications = () => {
         return 'You accepted the offer. Congratulations on your new role!';
       case 'OFFER_DECLINED':
         return 'You declined the offer.';
+      case 'WITHDRAWN':
+        return 'You withdrew this application.';
       default:
         return 'Application status unknown.';
     }
@@ -307,6 +328,15 @@ const UserApplications = () => {
                       >
                         <FileCheck className="h-4 w-4 mr-1" />
                         Offer
+                      </button>
+                    )}
+                    {canWithdraw(application.status) && (
+                      <button
+                        onClick={() => handleWithdraw(application.id)}
+                        className="text-red-600 hover:text-red-800 text-sm font-medium flex items-center"
+                      >
+                        <Ban className="h-4 w-4 mr-1" />
+                        Withdraw
                       </button>
                     )}
                   </div>

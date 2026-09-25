@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import org.springframework.stereotype.Service;
 
@@ -53,6 +54,15 @@ public class ApplicationStatusService {
                 "Your application status is now: " + status.replace('_', ' ').toLowerCase() + ".",
                 "/dashboard");
         }
+    }
+
+    private Long recruiterUserId(Application application) {
+        if (application.getJobPosting() == null || application.getJobPosting().getRecruiter() == null) {
+            return null;
+        }
+        return Optional.ofNullable(application.getJobPosting().getRecruiter().getUser())
+            .map(u -> u.getId())
+            .orElse(null);
     }
 
     private void pushRealtime(Application application, String type, Map<String, Object> data) {
@@ -159,7 +169,53 @@ public class ApplicationStatusService {
         notifyStatusChanged(saved, saved.getStatus());
         return saved;
     }
-    
+
+    // An accepted offer is a done deal - withdrawing from there means declining the offer
+    // instead (OfferService.declineOffer), not silently pulling the application. WITHDRAWN
+    // itself isn't in here so a second withdraw attempt fails cleanly rather than double-firing.
+    private static final Set<String> WITHDRAWABLE_STATUSES = Set.of(
+        "APPLICATION_SUBMITTED", "VIEWED_BY_RECRUITER", "TEST_ASSIGNED", "TEST_IN_PROGRESS",
+        "TEST_COMPLETED", "TEST_PASSED", "TEST_FAILED", "SHORTLISTED", "INTERVIEW_SCHEDULED", "OFFER_SENT");
+
+    public static class NotTheApplicantException extends RuntimeException {
+        public NotTheApplicantException() {
+            super("Only the candidate who submitted this application can withdraw it");
+        }
+    }
+
+    public static class CannotWithdrawException extends RuntimeException {
+        public CannotWithdrawException(String status) {
+            super("An application can't be withdrawn once it's " + status.replace('_', ' ').toLowerCase());
+        }
+    }
+
+    public Application withdrawApplication(Long applicationId, Long callerId) {
+        Application application = applicationRepository.findById(applicationId)
+            .orElseThrow(() -> new ApplicationStatusException("Application not found with ID: " + applicationId));
+
+        if (application.getUser() == null || !application.getUser().getId().equals(callerId)) {
+            throw new NotTheApplicantException();
+        }
+        if (!WITHDRAWABLE_STATUSES.contains(application.getStatus())) {
+            throw new CannotWithdrawException(application.getStatus());
+        }
+
+        application.withdraw();
+        Application saved = applicationRepository.save(application);
+
+        String jobTitle = jobTitleOf(saved);
+        Long recruiterId = recruiterUserId(saved);
+        if (recruiterId != null) {
+            realtimeNotifier.notifyUser(recruiterId, "APPLICATION_WITHDRAWN", Map.of(
+                "applicationId", saved.getId(), "jobTitle", jobTitle));
+            notificationFeedService.record(recruiterId, "APPLICATION_WITHDRAWN",
+                "Application withdrawn: " + jobTitle,
+                saved.getSafeApplicantName() + " withdrew their application.",
+                "/recruiter/dashboard");
+        }
+        return saved;
+    }
+
     public List<Application> getUserApplications(Long userId) {
         try {
             log.debug("=== GETTING APPLICATIONS FOR USER: " + userId + " ===");

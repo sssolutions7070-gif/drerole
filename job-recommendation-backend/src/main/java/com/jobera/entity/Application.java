@@ -312,6 +312,11 @@ public class Application {
         this.status = "OFFER_SENT";
         this.statusUpdatedAt = LocalDateTime.now();
     }
+
+    public void withdraw() {
+        this.status = "WITHDRAWN";
+        this.statusUpdatedAt = LocalDateTime.now();
+    }
     
     @Override
     public String toString() {

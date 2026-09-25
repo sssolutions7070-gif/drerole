@@ -397,6 +397,19 @@ class AccessPolicyTest {
     }
 
     @Test
+    void withdrawingAnApplicationIsOpenToBothParticipantsAtTheRouteLevel() {
+        // The service enforces "candidate only"; the route itself allows either participant,
+        // same layering as offer accept/decline and interview-round slot confirmation.
+        JobPosting job = jobOwnedBy(5, recruiter);
+        applicationFor(9, candidate, job);
+
+        assertTrue(allowed(candidate, "POST", "/api/applications/9/withdraw"));
+        assertTrue(allowed(recruiterUser, "POST", "/api/applications/9/withdraw"));
+        assertFalse(allowed(otherCandidate, "POST", "/api/applications/9/withdraw"));
+        assertFalse(allowed(otherRecruiterUser, "POST", "/api/applications/9/withdraw"));
+    }
+
+    @Test
     void recruitersOwnExternalApplicationsThroughTheTestsTheyAssigned() {
         Application external = applicationFor(30, candidate, null);
         AptitudeTest test = aptitudeTestOwnedBy(3, recruiter);

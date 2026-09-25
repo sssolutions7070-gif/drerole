@@ -241,4 +241,77 @@ class ApplicationStatusServiceTest {
         assertEquals("Big Job", perJob.get(0).get("jobTitle"));
         assertEquals("Small Job", perJob.get(1).get("jobTitle"));
     }
+
+    // ----------------------------------------------------------------- withdrawApplication
+
+    private Application applicationWithRecruiter(long id, long candidateUserId, long recruiterUserId, String status) {
+        Application application = new Application();
+        application.setId(id);
+        application.setApplicantName("Asha Rao");
+        application.setApplicantEmail("asha@example.com");
+        application.setStatus(status);
+        User candidate = new User();
+        candidate.setId(candidateUserId);
+        application.setUser(candidate);
+
+        User recruiterUser = new User();
+        recruiterUser.setId(recruiterUserId);
+        com.jobera.entity.Recruiter recruiter = new com.jobera.entity.Recruiter();
+        recruiter.setUser(recruiterUser);
+        JobPosting job = new JobPosting();
+        job.setTitle("Backend Developer");
+        job.setRecruiter(recruiter);
+        application.setJobPosting(job);
+
+        org.mockito.Mockito.lenient().when(applicationRepository.save(application)).thenReturn(application);
+        return application;
+    }
+
+    @Test
+    void candidateCanWithdrawASubmittedApplication() {
+        Application application = applicationWithRecruiter(1L, 10L, 20L, "APPLICATION_SUBMITTED");
+        when(applicationRepository.findById(1L)).thenReturn(Optional.of(application));
+
+        Application result = service.withdrawApplication(1L, 10L);
+
+        assertEquals("WITHDRAWN", result.getStatus());
+        verify(realtimeNotifier).notifyUser(eq(20L), eq("APPLICATION_WITHDRAWN"), any(Map.class));
+        verify(notificationFeedService).record(eq(20L), eq("APPLICATION_WITHDRAWN"), any(), any(), eq("/recruiter/dashboard"));
+    }
+
+    @Test
+    void onlyTheApplicantCanWithdraw() {
+        Application application = applicationWithRecruiter(1L, 10L, 20L, "APPLICATION_SUBMITTED");
+        when(applicationRepository.findById(1L)).thenReturn(Optional.of(application));
+
+        org.junit.jupiter.api.Assertions.assertThrows(ApplicationStatusService.NotTheApplicantException.class,
+            () -> service.withdrawApplication(1L, 999L));
+        verify(applicationRepository, never()).save(any());
+    }
+
+    @Test
+    void anAcceptedOfferCannotBeWithdrawn() {
+        Application application = applicationWithRecruiter(1L, 10L, 20L, "OFFER_ACCEPTED");
+        when(applicationRepository.findById(1L)).thenReturn(Optional.of(application));
+
+        org.junit.jupiter.api.Assertions.assertThrows(ApplicationStatusService.CannotWithdrawException.class,
+            () -> service.withdrawApplication(1L, 10L));
+    }
+
+    @Test
+    void anAlreadyWithdrawnApplicationCannotBeWithdrawnAgain() {
+        Application application = applicationWithRecruiter(1L, 10L, 20L, "WITHDRAWN");
+        when(applicationRepository.findById(1L)).thenReturn(Optional.of(application));
+
+        org.junit.jupiter.api.Assertions.assertThrows(ApplicationStatusService.CannotWithdrawException.class,
+            () -> service.withdrawApplication(1L, 10L));
+    }
+
+    @Test
+    void withdrawingAMissingApplicationFails() {
+        when(applicationRepository.findById(999L)).thenReturn(Optional.empty());
+
+        org.junit.jupiter.api.Assertions.assertThrows(ApplicationStatusService.ApplicationStatusException.class,
+            () -> service.withdrawApplication(999L, 10L));
+    }
 }
