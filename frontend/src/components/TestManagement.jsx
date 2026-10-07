@@ -1,9 +1,9 @@
 // src/components/TestManagement.jsx
 import React, { useState, useEffect } from 'react';
 import { 
-  Plus, BookOpen, Clock, Target, Users, CheckCircle, XCircle, 
+  Plus, BookOpen, Clock, Target, Users, CheckCircle, XCircle,
   X, Award, BarChart3, Eye, Send, Filter, Download, Calendar,
-  ChevronDown, ChevronUp, Sparkles, Briefcase, Building, Loader
+  ChevronDown, ChevronUp, Sparkles, Briefcase, Building, Loader, AlertTriangle
 } from 'lucide-react';
 import api from '../services/api';
 import DreamRoleTestCreator from './DreamRoleTestCreator';
@@ -55,6 +55,23 @@ const TestManagement = ({ recruiterId }) => {
   const [interviewLocation, setInterviewLocation] = useState('');
   const [interviewNotes, setInterviewNotes] = useState('');
   const [schedulingLoading, setSchedulingLoading] = useState(false);
+  const [viewingViolationsFor, setViewingViolationsFor] = useState(null);
+  const [violations, setViolations] = useState([]);
+  const [loadingViolations, setLoadingViolations] = useState(false);
+
+  const fetchViolations = async (assignmentId) => {
+    setViewingViolationsFor(assignmentId);
+    setLoadingViolations(true);
+    try {
+      const response = await api.get(`/aptitude-tests/${assignmentId}/violations`);
+      setViolations(response.data || []);
+    } catch (error) {
+      console.error('Error fetching violations:', error);
+      setViolations([]);
+    } finally {
+      setLoadingViolations(false);
+    }
+  };
 
   useEffect(() => {
     if (recruiterId) {
@@ -999,7 +1016,18 @@ const TestManagement = ({ recruiterId }) => {
                                 {getStatusBadge(result.status)}
                               </div>
                               <p className="text-sm text-gray-600">{result.candidateEmail}</p>
-                              
+
+                              {result.warningCount > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => fetchViolations(result.id)}
+                                  className="mt-1 inline-flex items-center text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 hover:bg-amber-100"
+                                >
+                                  <AlertTriangle className="h-3 w-3 mr-1" />
+                                  {result.warningCount} proctoring {result.warningCount === 1 ? 'flag' : 'flags'} - View
+                                </button>
+                              )}
+
                               {result.status === 'COMPLETED' && (
                                 <div className="mt-3">
                                   <div className="flex items-center justify-between mb-1">
@@ -1440,6 +1468,50 @@ const TestManagement = ({ recruiterId }) => {
                 {schedulingLoading ? 'Scheduling...' : 'Schedule Interview'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {viewingViolationsFor !== null && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-full max-w-lg shadow-lg rounded-md bg-white">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold flex items-center">
+                <AlertTriangle className="h-5 w-5 mr-2 text-amber-600" />
+                Proctoring Flags
+              </h3>
+              <button onClick={() => setViewingViolationsFor(null)} className="text-gray-400 hover:text-gray-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {loadingViolations ? (
+              <p className="text-sm text-gray-500">Loading...</p>
+            ) : violations.length === 0 ? (
+              <p className="text-sm text-gray-500">No violation details were recorded for this test.</p>
+            ) : (
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {violations.map((v) => (
+                  <div
+                    key={v.id}
+                    className={`border rounded-lg p-3 text-sm ${v.critical ? 'border-red-200 bg-red-50' : 'border-gray-200 bg-gray-50'}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">{v.violationType?.replace(/_/g, ' ')}</span>
+                      {v.critical && (
+                        <span className="text-xs font-semibold text-red-700 bg-red-100 px-2 py-0.5 rounded-full">
+                          Critical
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-gray-600 mt-1">{v.message}</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {v.timestamp ? new Date(v.timestamp).toLocaleString() : ''}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

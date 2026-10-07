@@ -604,6 +604,25 @@ public class AptitudeTestController {
         }
     }
 
+    /** The individual flagged events behind a test's violation counts, so a recruiter can judge
+     *  a flagged result instead of just seeing that it was flagged. Recruiter-only (see
+     *  AccessPolicy.ownsAptitudeAssignment) - the candidate never sees this. */
+    @GetMapping("/{assignmentId}/violations")
+    public ResponseEntity<List<Map<String, Object>>> getViolations(@PathVariable Long assignmentId) {
+        List<Map<String, Object>> violations = violationRepository.findByTestAssignmentId(assignmentId).stream()
+            .map(v -> {
+                Map<String, Object> view = new HashMap<>();
+                view.put("id", v.getId());
+                view.put("violationType", v.getViolationType());
+                view.put("message", v.getMessage());
+                view.put("critical", v.getCritical());
+                view.put("timestamp", v.getTimestamp());
+                return view;
+            })
+            .collect(Collectors.toList());
+        return ResponseEntity.ok(violations);
+    }
+
     private void markProctoringTerminated(TestAssignment assignment, String reason) {
         LocalDateTime now = LocalDateTime.now();
         String trimmedReason = reason != null && reason.length() > 500 ? reason.substring(0, 500) : reason;

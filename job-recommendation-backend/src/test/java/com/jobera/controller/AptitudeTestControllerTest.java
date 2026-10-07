@@ -264,4 +264,30 @@ class AptitudeTestControllerTest {
         assertTrue(body.containsKey("questions"));
         assertFalse(((List<?>) body.get("questions")).isEmpty());
     }
+
+    @Test
+    void violationsOfAnAssignmentAreListedWithTheirDetails() {
+        TestAssignment assignment = new TestAssignment();
+        assignment.setId(7L);
+        ProctoringViolation looking = new ProctoringViolation(assignment, "LOOKING_AWAY", "Looked away from camera", false);
+        ProctoringViolation mobile = new ProctoringViolation(assignment, "MOBILE_DETECTED", "Phone detected", true);
+        when(violationRepository.findByTestAssignmentId(7L)).thenReturn(List.of(looking, mobile));
+
+        List<Map<String, Object>> body = controller.getViolations(7L).getBody();
+
+        assertEquals(2, body.size());
+        assertEquals("LOOKING_AWAY", body.get(0).get("violationType"));
+        assertEquals(false, body.get(0).get("critical"));
+        assertEquals("MOBILE_DETECTED", body.get(1).get("violationType"));
+        assertEquals(true, body.get(1).get("critical"));
+    }
+
+    @Test
+    void anAssignmentWithNoViolationsReturnsAnEmptyList() {
+        when(violationRepository.findByTestAssignmentId(7L)).thenReturn(List.of());
+
+        List<Map<String, Object>> body = controller.getViolations(7L).getBody();
+
+        assertTrue(body.isEmpty());
+    }
 }
