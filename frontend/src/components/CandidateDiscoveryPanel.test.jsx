@@ -96,4 +96,31 @@ describe('CandidateDiscoveryPanel', () => {
     expect(await screen.findByText(/no messages yet/i)).toBeInTheDocument();
     expect(directMessageAPI.getThread).toHaveBeenCalledWith(100, 1);
   });
+
+  it('displays saved searches and allows saving a new search', async () => {
+    const { savedCandidateSearchAPI } = await import('../services/api');
+    candidateDiscoveryAPI.discover.mockResolvedValue({ data: [candidate()] });
+    savedCandidateSearchAPI.list.mockResolvedValue({
+      data: [{ id: 1, name: 'Pune Reacts', skillFilter: 'React', locationFilter: 'Pune', alertEnabled: true }]
+    });
+    savedCandidateSearchAPI.create.mockResolvedValue({ data: { id: 2, name: 'Java Devs' } });
+
+    const user = userEvent.setup();
+    render(<CandidateDiscoveryPanel recruiterId={100} />);
+
+    expect(await screen.findByText('Pune Reacts')).toBeInTheDocument();
+
+    await user.type(screen.getByPlaceholderText(/skill/i), 'Java');
+    const saveBtn = screen.getByRole('button', { name: /Save Search & Alert/i });
+    await user.click(saveBtn);
+
+    expect(screen.getByText('Save Candidate Search')).toBeInTheDocument();
+    const saveTrackBtn = screen.getByRole('button', { name: /Save & Track/i });
+    await user.click(saveTrackBtn);
+
+    expect(savedCandidateSearchAPI.create).toHaveBeenCalledWith(100, expect.objectContaining({
+      name: expect.any(String),
+      alertEnabled: true
+    }));
+  });
 });
