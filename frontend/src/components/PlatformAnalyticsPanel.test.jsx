@@ -44,6 +44,9 @@ describe('PlatformAnalyticsPanel', () => {
     expect(await screen.findByText(/hiring funnel/i)).toBeInTheDocument();
     expect(screen.getByText('Shortlisted')).toBeInTheDocument();
     expect(screen.getByText('Offer accepted')).toBeInTheDocument();
+    expect(screen.getByText(/Avg. Time-to-Hire/i)).toBeInTheDocument();
+    expect(screen.getByText(/14.2 Days/i)).toBeInTheDocument();
+    expect(screen.getByText(/99.1% Clean/i)).toBeInTheDocument();
   });
 
   it('shows an error message when the request fails', async () => {

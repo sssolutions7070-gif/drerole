@@ -866,12 +866,78 @@ const RecruiterDashboard = () => {
                 </div>
               </div>
 
-              {analyticsData.averageHoursToFirstView != null && (
-                <p className="text-sm text-gray-600 mb-6 flex items-center">
-                  <Clock className="h-4 w-4 mr-1 text-gray-400" />
-                  On average, you first view a new application after {analyticsData.averageHoursToFirstView} hours.
-                </p>
-              )}
+              {/* Visual Hiring Funnel Drop-off Bar */}
+              <div className="bg-gradient-to-r from-slate-50 to-blue-50/40 border border-blue-100 rounded-xl p-5 mb-8">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h4 className="font-semibold text-gray-800 flex items-center gap-2">
+                      <TrendingUp className="h-5 w-5 text-blue-600" /> Hiring Funnel & Candidate Conversion
+                    </h4>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Conversion progression from candidate application to formal job offer.
+                    </p>
+                  </div>
+                  <span className="text-xs bg-blue-100 text-blue-800 font-medium px-2.5 py-1 rounded-full">
+                    {analyticsData.averageDaysToOffer != null ? `⚡ Time-to-Offer: ${analyticsData.averageDaysToOffer} Days` : '⚡ High Velocity'}
+                  </span>
+                </div>
+
+                {(() => {
+                  const totalApps = Math.max(1, analyticsData.totalApplications || 1);
+                  const viewed = analyticsData.totalViewed || 0;
+                  const shortlisted = analyticsData.jobs?.reduce((acc, j) => acc + (j.shortlisted || 0), 0) || 0;
+                  const offers = analyticsData.totalOffers || 0;
+
+                  const funnelSteps = [
+                    { label: 'Applied', count: analyticsData.totalApplications, color: 'from-blue-500 to-blue-600' },
+                    { label: 'Viewed', count: viewed, color: 'from-purple-500 to-purple-600' },
+                    { label: 'Shortlisted', count: shortlisted, color: 'from-amber-500 to-amber-600' },
+                    { label: 'Offer Sent', count: offers, color: 'from-emerald-500 to-emerald-600' },
+                  ];
+
+                  return (
+                    <div className="space-y-3">
+                      {funnelSteps.map((step, idx) => {
+                        const pctOverall = Math.round((step.count / totalApps) * 100);
+                        const prevCount = idx > 0 ? funnelSteps[idx - 1].count : null;
+                        const stepConversion = prevCount && prevCount > 0 ? Math.round((step.count / prevCount) * 100) : null;
+
+                        return (
+                          <div key={step.label} className="space-y-1">
+                            <div className="flex items-center justify-between text-xs">
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-gray-700 w-24">{step.label}</span>
+                                {stepConversion !== null && (
+                                  <span className="text-[11px] text-gray-500 font-mono">
+                                    ({stepConversion}% of {funnelSteps[idx - 1].label})
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-gray-500 font-mono text-[11px]">{pctOverall}% of all apps</span>
+                                <span className="font-bold text-gray-900 w-8 text-right">{step.count}</span>
+                              </div>
+                            </div>
+                            <div className="w-full bg-gray-200/80 rounded-full h-2.5 overflow-hidden">
+                              <div
+                                className={`bg-gradient-to-r ${step.color} h-2.5 rounded-full transition-all duration-500`}
+                                style={{ width: `${Math.min(100, Math.max(2, pctOverall))}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+
+                {analyticsData.averageHoursToFirstView != null && (
+                  <p className="text-xs text-gray-600 mt-4 flex items-center gap-1.5 pt-3 border-t border-blue-100/60">
+                    <Clock className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                    <span>On average, your team first reviews candidate profiles within <strong>{analyticsData.averageHoursToFirstView} hours</strong> of submission.</span>
+                  </p>
+                )}
+              </div>
 
               <h4 className="font-semibold text-gray-800 mb-3">By Job</h4>
               <div className="overflow-x-auto">
