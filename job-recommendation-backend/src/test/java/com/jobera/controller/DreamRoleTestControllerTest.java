@@ -25,6 +25,7 @@ import com.jobera.repository.DreamRoleTestQuestionRepository;
 import com.jobera.repository.DreamRoleTestRepository;
 import com.jobera.repository.QuestionBankRepository;
 import com.jobera.repository.RecruiterRepository;
+import com.jobera.service.AiInterviewClient;
 import com.jobera.service.SkillBadgeService;
 
 @ExtendWith(MockitoExtension.class)
@@ -37,6 +38,7 @@ class DreamRoleTestControllerTest {
     @Mock ApplicationRepository applicationRepository;
     @Mock RecruiterRepository recruiterRepository;
     @Mock SkillBadgeService skillBadgeService;
+    @Mock AiInterviewClient aiInterviewClient;
 
     DreamRoleTestController controller;
 
@@ -44,7 +46,7 @@ class DreamRoleTestControllerTest {
     void setUp() {
         controller = new DreamRoleTestController(dreamRoleTestRepository, questionRepository,
             assignmentRepository, questionBankRepository, applicationRepository, recruiterRepository,
-            skillBadgeService);
+            skillBadgeService, aiInterviewClient);
     }
 
     private Application application(long id, String status, String name) {
@@ -151,5 +153,36 @@ class DreamRoleTestControllerTest {
 
         assertEquals(1, results.size());
         assertEquals("Waiting Candidate", results.get(0).get("candidateName"));
+    }
+
+    @Test
+    void generateTechnicalQuestionsDelegatesToAiClient() {
+        Map<String, Object> generatedQ = Map.of(
+            "question", "What is React Virtual DOM?",
+            "optionA", "Server only",
+            "optionB", "Diffing engine",
+            "optionC", "CSS parser",
+            "optionD", "Database",
+            "correctAnswer", "B",
+            "explanation", "Diffs UI trees",
+            "difficultyLevel", "Medium"
+        );
+        when(aiInterviewClient.generateTechnicalQuestions("Frontend Dev", "Build UI", "React", "CSE", 10))
+            .thenReturn(List.of(generatedQ));
+
+        Map<String, Object> req = Map.of(
+            "jobTitle", "Frontend Dev",
+            "jobDescription", "Build UI",
+            "skills", "React",
+            "targetBranch", "CSE",
+            "count", 10
+        );
+
+        ResponseEntity<Map<String, Object>> response = controller.generateTechnicalQuestions(req);
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(1, response.getBody().get("count"));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> questions = (List<Map<String, Object>>) response.getBody().get("questions");
+        assertEquals("What is React Virtual DOM?", questions.get(0).get("question"));
     }
 }

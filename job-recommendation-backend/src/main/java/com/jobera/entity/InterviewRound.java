@@ -74,6 +74,12 @@ public class InterviewRound {
         }
     }
 
+    @Column(name = "recording_url")
+    private String recordingUrl;
+
+    @Column(name = "recorded_at")
+    private LocalDateTime recordedAt;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public Long getApplicationId() { return applicationId; }
@@ -92,6 +98,10 @@ public class InterviewRound {
     public void setProposedSlots(String proposedSlots) { this.proposedSlots = proposedSlots; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
+    public String getRecordingUrl() { return recordingUrl; }
+    public void setRecordingUrl(String recordingUrl) { this.recordingUrl = recordingUrl; }
+    public LocalDateTime getRecordedAt() { return recordedAt; }
+    public void setRecordedAt(LocalDateTime recordedAt) { this.recordedAt = recordedAt; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }

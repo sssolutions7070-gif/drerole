@@ -1,16 +1,25 @@
 package com.jobera.service;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -245,6 +254,10 @@ public class InterviewRoundService {
         return interviewRoundRepository.findByApplicationIdOrderByRoundNumberAsc(applicationId);
     }
 
+    public InterviewRound getRound(Long roundId) {
+        return requireRound(roundId);
+    }
+
     private InterviewRound requireRound(Long roundId) {
         return interviewRoundRepository.findById(roundId)
             .orElseThrow(() -> new RoundNotFoundException(roundId));
@@ -390,5 +403,51 @@ public class InterviewRoundService {
             .flatMap(round -> applicationRepository.findById(round.getApplicationId()))
             .map(application -> userId.equals(candidateUserId(application)) || userId.equals(recruiterUserId(application)))
             .orElse(false);
+    }
+
+    public InterviewRound saveRecording(Long roundId, MultipartFile file) throws IOException {
+        InterviewRound round = interviewRoundRepository.findById(roundId)
+            .orElseThrow(() -> new RoundNotFoundException(roundId));
+
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("Recording file cannot be empty");
+        }
+
+        Path recordingsDir = Paths.get("uploads/recordings");
+        Files.createDirectories(recordingsDir);
+
+        String extension = ".webm";
+        String originalName = file.getOriginalFilename();
+        if (originalName != null && originalName.lastIndexOf('.') != -1) {
+            extension = originalName.substring(originalName.lastIndexOf('.'));
+        }
+
+        String fileName = "round_" + roundId + "_" + System.currentTimeMillis() + extension;
+        Path filePath = recordingsDir.resolve(fileName);
+        Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+        String relativeUrl = "/uploads/recordings/" + fileName;
+        round.setRecordingUrl(relativeUrl);
+        round.setRecordedAt(LocalDateTime.now());
+        if ("SCHEDULED".equals(round.getStatus()) || "IN_PROGRESS".equals(round.getStatus())) {
+            round.setStatus("COMPLETED");
+        }
+        return interviewRoundRepository.save(round);
+    }
+
+    public Resource getRecordingResource(Long roundId) {
+        InterviewRound round = interviewRoundRepository.findById(roundId)
+            .orElseThrow(() -> new RoundNotFoundException(roundId));
+        if (round.getRecordingUrl() == null) {
+            throw new NoSuchElementException("No recording available for round " + roundId);
+        }
+        String cleanPath = round.getRecordingUrl().startsWith("/")
+            ? round.getRecordingUrl().substring(1)
+            : round.getRecordingUrl();
+        Path path = Paths.get(cleanPath);
+        if (!Files.exists(path)) {
+            throw new NoSuchElementException("Recording file not found on disk");
+        }
+        return new FileSystemResource(path);
     }
 }

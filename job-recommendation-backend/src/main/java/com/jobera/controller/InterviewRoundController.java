@@ -5,7 +5,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -13,11 +16,14 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.jobera.config.AuthInterceptor;
 import com.jobera.entity.InterviewRound;
 import com.jobera.entity.User;
+import com.jobera.service.AiInterviewClient;
 import com.jobera.service.InterviewRoundService;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -31,9 +37,16 @@ public class InterviewRoundController {
     private static final String ERROR_KEY = "error";
 
     private final InterviewRoundService interviewRoundService;
+    private final AiInterviewClient aiInterviewClient;
 
     public InterviewRoundController(InterviewRoundService interviewRoundService) {
+        this(interviewRoundService, null);
+    }
+
+    @Autowired
+    public InterviewRoundController(InterviewRoundService interviewRoundService, AiInterviewClient aiInterviewClient) {
         this.interviewRoundService = interviewRoundService;
+        this.aiInterviewClient = aiInterviewClient;
     }
 
     private User callingUser(HttpServletRequest request) {
@@ -178,6 +191,72 @@ public class InterviewRoundController {
             return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, e.getMessage()));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "scheduledAt must be an ISO-8601 date-time"));
+        }
+    }
+
+    @PostMapping("/api/interview-rounds/{roundId}/recording")
+    public ResponseEntity<?> uploadRecording(@PathVariable Long roundId,
+                                            @RequestParam("file") MultipartFile file) {
+        try {
+            InterviewRound round = interviewRoundService.saveRecording(roundId, file);
+            return ResponseEntity.ok(round);
+        } catch (InterviewRoundService.RoundNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(ERROR_KEY, e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of(ERROR_KEY, "Failed to save interview recording: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/api/interview-rounds/{roundId}/recording")
+    public ResponseEntity<Resource> getRecording(@PathVariable Long roundId) {
+        try {
+            Resource resource = interviewRoundService.getRecordingResource(roundId);
+            return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("video/webm"))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"interview_round_" + roundId + ".webm\"")
+                .body(resource);
+        } catch (Exception e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @PostMapping("/api/interview-rounds/{roundId}/copilot-probes")
+    public ResponseEntity<?> getCopilotProbes(@PathVariable Long roundId, @RequestBody Map<String, String> payload) {
+        try {
+            InterviewRound round = interviewRoundService.getRound(roundId);
+            String language = payload != null ? payload.getOrDefault("language", "JavaScript") : "JavaScript";
+            String code = payload != null ? payload.getOrDefault("code", "") : "";
+            if (aiInterviewClient == null) {
+                return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "AI client is unavailable"));
+            }
+            Map<String, Object> probes = aiInterviewClient.generateLiveCodingProbes(round.getTitle(), language, code);
+            return ResponseEntity.ok(probes);
+        } catch (InterviewRoundService.RoundNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(ERROR_KEY, e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of(ERROR_KEY, "Failed to generate copilot probes: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/api/interview-rounds/{roundId}/recording-insights")
+    public ResponseEntity<?> getRecordingInsights(@PathVariable Long roundId) {
+        try {
+            InterviewRound round = interviewRoundService.getRound(roundId);
+            String roundType = round.getRoundType() != null ? round.getRoundType() : "TECHNICAL";
+            String title = round.getTitle() != null ? round.getTitle() : "Interview Round";
+            Map<String, Object> insights = (aiInterviewClient != null)
+                ? aiInterviewClient.generateRecordingInsights(title, roundType, "")
+                : new AiInterviewClient(new org.springframework.web.client.RestTemplate(), "", "").generateFallbackRecordingInsights(title, roundType, "");
+            return ResponseEntity.ok(insights);
+        } catch (InterviewRoundService.RoundNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(ERROR_KEY, e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of(ERROR_KEY, "Failed to generate recording insights: " + e.getMessage()));
         }
     }
 }

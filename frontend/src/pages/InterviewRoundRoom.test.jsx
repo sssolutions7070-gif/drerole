@@ -9,6 +9,7 @@ vi.mock('../services/api', () => ({
   interviewRoundsAPI: {
     getJoinInfo: vi.fn(),
     updateStatus: vi.fn(),
+    getCopilotProbes: vi.fn(),
   },
 }));
 
@@ -182,5 +183,121 @@ describe('InterviewRoundRoom', () => {
 
     expect(await screen.findByText(/call ended/i)).toBeInTheDocument();
     expect(interviewRoundsAPI.updateStatus).toHaveBeenCalledWith('5000', 'COMPLETED');
+  });
+
+  it('runs code and displays output in the live terminal console', async () => {
+    interviewRoundsAPI.getJoinInfo.mockResolvedValue({
+      data: { roomId: 'room-1', title: 'Technical round', roundType: 'TECHNICAL', role: 'candidate',
+        counterpartName: 'Acme Corp', status: 'SCHEDULED', scheduledAt: null, iceServers: [] }
+    });
+    interviewRoundsAPI.updateStatus.mockResolvedValue({ data: {} });
+    const user = userEvent.setup();
+
+    renderRoom();
+    await user.click(await screen.findByRole('button', { name: /join call/i }));
+
+    const editor = await screen.findByRole('textbox', { name: /code editor/i });
+    await user.clear(editor);
+    await user.type(editor, 'console.log("Live Execution Test!");');
+
+    const runBtn = screen.getByRole('button', { name: /run code/i });
+    expect(runBtn).toBeInTheDocument();
+    await user.click(runBtn);
+
+    const matches = await screen.findAllByText(/Live Execution Test!/);
+    expect(matches.length).toBeGreaterThanOrEqual(2); // One in editor textarea, one in terminal output
+
+    // Verify WebSocket signal was sent for code-run-started and code-run-result
+    await waitFor(() => {
+      const sent = MockWebSocket.instances[0].sent.map((m) => JSON.parse(m));
+      expect(sent.some((m) => m.type === 'code-run-started')).toBe(true);
+      expect(sent.some((m) => m.type === 'code-run-result')).toBe(true);
+    });
+  });
+
+  it('allows switching code language and toggles terminal console', async () => {
+    interviewRoundsAPI.getJoinInfo.mockResolvedValue({
+      data: { roomId: 'room-1', title: 'Technical round', roundType: 'TECHNICAL', role: 'candidate',
+        counterpartName: 'Acme Corp', status: 'SCHEDULED', scheduledAt: null, iceServers: [] }
+    });
+    interviewRoundsAPI.updateStatus.mockResolvedValue({ data: {} });
+    const user = userEvent.setup();
+
+    renderRoom();
+    await user.click(await screen.findByRole('button', { name: /join call/i }));
+
+    const langSelect = await screen.findByRole('combobox', { name: /code language/i });
+    expect(langSelect).toBeInTheDocument();
+    await user.selectOptions(langSelect, 'Python');
+
+    // Terminal toggle
+    const terminalToggle = screen.getByRole('button', { name: /hide terminal/i });
+    await user.click(terminalToggle);
+    expect(screen.queryByText(/console output/i)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /show terminal/i }));
+    expect(screen.getByText(/console output/i)).toBeInTheDocument();
+  });
+
+  it('does not display AI Copilot controls to candidates', async () => {
+    interviewRoundsAPI.getJoinInfo.mockResolvedValue({
+      data: { roomId: 'room-1', title: 'Technical round', roundType: 'TECHNICAL', role: 'candidate',
+        counterpartName: 'Acme Corp', status: 'SCHEDULED', scheduledAt: null, iceServers: [] }
+    });
+    interviewRoundsAPI.updateStatus.mockResolvedValue({ data: {} });
+    const user = userEvent.setup();
+
+    renderRoom();
+    await user.click(await screen.findByRole('button', { name: /join call/i }));
+
+    expect(screen.queryByRole('button', { name: /ai interviewer copilot/i })).not.toBeInTheDocument();
+  });
+
+  it('allows recruiter to access AI Copilot, generates probes, and copies probing question', async () => {
+    interviewRoundsAPI.getJoinInfo.mockResolvedValue({
+      data: { roomId: 'room-1', title: 'Technical round', roundType: 'TECHNICAL', role: 'recruiter',
+        counterpartName: 'Jane Candidate', status: 'SCHEDULED', scheduledAt: null, iceServers: [] }
+    });
+    interviewRoundsAPI.updateStatus.mockResolvedValue({ data: {} });
+    interviewRoundsAPI.getCopilotProbes.mockResolvedValue({
+      data: {
+        estimatedComplexity: {
+          time: 'O(N²)',
+          space: 'O(1)',
+          explanation: 'Nested pairwise loop structure detected.'
+        },
+        strengths: ['Modular function structure'],
+        edgeCases: [
+          { scenario: 'Empty Array', probe: 'How does your solution handle an empty array or null input?' }
+        ],
+        optimizationProbes: [
+          {
+            topic: 'Quadratic Loop Elimination',
+            question: 'Can we reduce this to O(N) using a Hash Map?',
+            expectedInsight: 'Trading memory for linear time.'
+          }
+        ],
+        architecturalFollowUps: ['How to handle a stream of 100M items?']
+      }
+    });
+
+    const user = userEvent.setup();
+    renderRoom();
+    await user.click(await screen.findByRole('button', { name: /join call/i }));
+
+    const copilotBtn = await screen.findByRole('button', { name: /ai interviewer copilot/i });
+    expect(copilotBtn).toBeInTheDocument();
+    await user.click(copilotBtn);
+
+    expect(await screen.findByText(/nested pairwise loop structure detected/i)).toBeInTheDocument();
+    expect(screen.getByText(/scenario: empty array/i)).toBeInTheDocument();
+    expect(screen.getByText(/"How does your solution handle an empty array or null input\?"/i)).toBeInTheDocument();
+    expect(screen.getByText(/quadratic loop elimination/i)).toBeInTheDocument();
+    expect(screen.getByText(/trading memory for linear time/i)).toBeInTheDocument();
+
+    const copyBtns = screen.getAllByRole('button', { name: /copy question/i });
+    expect(copyBtns.length).toBeGreaterThanOrEqual(1);
+    await user.click(copyBtns[0]);
+    expect(await screen.findByText('Copied')).toBeInTheDocument();
   });
 });

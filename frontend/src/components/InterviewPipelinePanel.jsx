@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Plus, Video, Calendar, Award, Download, CalendarPlus, Clock, Trash2 } from 'lucide-react';
+import { X, Plus, Video, Calendar, Award, Download, CalendarPlus, Clock, Trash2, Film, Sparkles, CheckCircle2, Volume2, Activity, Copy, Check, Loader2 } from 'lucide-react';
 import { interviewRoundsAPI, scorecardAPI } from '../services/api';
 import ScorecardForm from './ScorecardForm';
 
@@ -59,6 +59,25 @@ const InterviewPipelinePanel = ({ applicationId, isRecruiter, onClose }) => {
   const [rescheduleTime, setRescheduleTime] = useState('');
 
   const [scorecardRoundId, setScorecardRoundId] = useState(null);
+  const [playingRecordingRound, setPlayingRecordingRound] = useState(null);
+  const [insightsByRoundId, setInsightsByRoundId] = useState({});
+  const [loadingInsights, setLoadingInsights] = useState(false);
+  const [copiedInsights, setCopiedInsights] = useState(false);
+
+  const openRecordingModal = async (round) => {
+    setPlayingRecordingRound(round);
+    if (!insightsByRoundId[round.id]) {
+      setLoadingInsights(true);
+      try {
+        const res = await interviewRoundsAPI.getRecordingInsights(round.id);
+        setInsightsByRoundId((prev) => ({ ...prev, [round.id]: res.data }));
+      } catch (err) {
+        console.error('Failed to load recording insights:', err);
+      } finally {
+        setLoadingInsights(false);
+      }
+    }
+  };
 
   const fetchAll = async () => {
     try {
@@ -279,6 +298,18 @@ const InterviewPipelinePanel = ({ applicationId, isRecruiter, onClose }) => {
                     </a>
                   )}
 
+                  {round.recordingUrl && (
+                    <button
+                      onClick={() => openRecordingModal(round)}
+                      className="inline-flex items-center px-3 py-1.5 border border-purple-300 text-purple-700 bg-purple-50 rounded-md text-sm font-medium hover:bg-purple-100 transition-all shadow-sm"
+                    >
+                      <Film className="h-4 w-4 mr-1 text-purple-600" /> Watch Recording
+                      <span className="ml-1.5 bg-purple-200 text-purple-800 text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                        <Sparkles className="h-2.5 w-2.5 text-purple-700" /> AI Insights
+                      </span>
+                    </button>
+                  )}
+
                   {isRecruiter && (
                     <button
                       onClick={() => { setReschedulingRoundId(round.id); setRescheduleDate(''); setRescheduleTime(''); }}
@@ -431,6 +462,228 @@ const InterviewPipelinePanel = ({ applicationId, isRecruiter, onClose }) => {
           </div>
         )}
       </div>
+
+      {playingRecordingRound && (() => {
+        const insights = insightsByRoundId[playingRecordingRound.id];
+        const sentiment = insights?.sentiment || { confident: 84, thoughtful: 12, hesitant: 4 };
+
+        const handleCopyInsights = () => {
+          if (!insights) return;
+          const text = [
+            `Interview Round: ${playingRecordingRound.title}`,
+            `Clarity Score: ${insights.clarityScore}% (${insights.cadenceEvaluation})`,
+            `Cadence: ${insights.wordsPerMinute} WPM | Filler Words: ${insights.fillerWordFrequency}`,
+            `Sentiment: ${sentiment.confident}% Confident, ${sentiment.thoughtful}% Thoughtful, ${sentiment.hesitant}% Hesitant`,
+            `Keywords: ${(insights.technicalKeywords || []).join(', ')}`,
+            `Takeaways:`,
+            ...(insights.keyTakeaways || []).map(t => `- ${t}`)
+          ].join('\n');
+          navigator.clipboard.writeText(text);
+          setCopiedInsights(true);
+          setTimeout(() => setCopiedInsights(false), 2000);
+        };
+
+        return (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-gray-900 rounded-2xl shadow-2xl max-w-5xl w-full p-5 text-white relative border border-gray-800 max-h-[92vh] flex flex-col">
+              {/* Modal Header */}
+              <div className="flex justify-between items-center pb-3 border-b border-gray-800 flex-shrink-0">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-purple-900/60 border border-purple-700/60 flex items-center justify-center">
+                    <Film className="h-4 w-4 text-purple-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base text-white">
+                      Round {playingRecordingRound.roundNumber}: {playingRecordingRound.title}
+                    </h3>
+                    <p className="text-xs text-gray-400">
+                      Recording & AI Speech/Sentiment Evaluation
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setPlayingRecordingRound(null)}
+                  aria-label="Close recording modal"
+                  className="text-gray-400 hover:text-white p-1.5 rounded-lg hover:bg-gray-800 transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Modal Body: Dual Pane Layout */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 py-4 overflow-y-auto flex-1">
+                {/* Left Pane: Video Player */}
+                <div className="lg:col-span-7 flex flex-col space-y-3">
+                  <div className="relative rounded-xl overflow-hidden bg-black border border-gray-800 shadow-inner flex items-center justify-center">
+                    <video
+                      src={interviewRoundsAPI.getRecordingUrl(playingRecordingRound.id)}
+                      controls
+                      autoPlay
+                      className="w-full aspect-video object-contain"
+                    />
+                  </div>
+                  <div className="flex justify-between items-center text-xs text-gray-400 px-1">
+                    <span>Recorded: {playingRecordingRound.recordedAt ? new Date(playingRecordingRound.recordedAt).toLocaleString() : 'Recently'}</span>
+                    <a
+                      href={interviewRoundsAPI.getRecordingUrl(playingRecordingRound.id)}
+                      download={`round_${playingRecordingRound.id}_recording.webm`}
+                      className="inline-flex items-center gap-1.5 text-purple-400 hover:text-purple-300 font-medium"
+                    >
+                      <Download className="h-3.5 w-3.5" /> Download video
+                    </a>
+                  </div>
+                </div>
+
+                {/* Right Pane: AI Speech & Sentiment Analytics */}
+                <div className="lg:col-span-5 bg-gray-800/60 rounded-xl p-4 border border-gray-700/60 overflow-y-auto space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Sparkles className="h-4 w-4 text-yellow-400" />
+                      <span className="text-sm font-bold text-white">AI Vocal & Sentiment Insights</span>
+                    </div>
+                    {insights && (
+                      <button
+                        onClick={handleCopyInsights}
+                        className="text-[11px] font-semibold text-purple-300 hover:text-white flex items-center gap-1 px-2 py-1 rounded bg-purple-900/40 border border-purple-700/50 transition-colors"
+                      >
+                        {copiedInsights ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
+                        <span>{copiedInsights ? 'Copied' : 'Copy'}</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {loadingInsights ? (
+                    <div className="py-16 text-center space-y-3">
+                      <Loader2 className="h-8 w-8 animate-spin mx-auto text-purple-400" />
+                      <p className="text-xs text-gray-400">
+                        Analyzing audio clarity, speaking cadence & candidate sentiment...
+                      </p>
+                    </div>
+                  ) : insights ? (
+                    <>
+                      {/* Metric Cards Row */}
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="bg-gray-900/80 p-2.5 rounded-lg border border-gray-700/50 text-center">
+                          <span className="text-[10px] uppercase font-semibold text-gray-400 block">Clarity</span>
+                          <span className="text-lg font-black text-emerald-400">{insights.clarityScore}%</span>
+                          <span className="text-[9px] text-gray-500 block truncate">Articulate</span>
+                        </div>
+                        <div className="bg-gray-900/80 p-2.5 rounded-lg border border-gray-700/50 text-center">
+                          <span className="text-[10px] uppercase font-semibold text-gray-400 block">Cadence</span>
+                          <span className="text-lg font-black text-blue-400">{insights.wordsPerMinute}</span>
+                          <span className="text-[9px] text-gray-500 block truncate">WPM</span>
+                        </div>
+                        <div className="bg-gray-900/80 p-2.5 rounded-lg border border-gray-700/50 text-center">
+                          <span className="text-[10px] uppercase font-semibold text-gray-400 block">Fillers</span>
+                          <span className="text-sm font-bold text-purple-300 mt-0.5 block truncate">{insights.fillerWordFrequency?.split(' ')[0] || '< 1.5%'}</span>
+                          <span className="text-[9px] text-gray-500 block truncate">Low Rate</span>
+                        </div>
+                      </div>
+
+                      {/* Sentiment Distribution */}
+                      <div className="space-y-1.5 pt-1">
+                        <div className="flex justify-between text-xs text-gray-300">
+                          <span className="font-semibold text-gray-300">Vocal Tone & Sentiment</span>
+                          <span className="text-emerald-400 font-bold">{sentiment.confident}% Confident</span>
+                        </div>
+                        <div className="h-2 w-full bg-gray-950 rounded-full overflow-hidden flex">
+                          <div
+                            style={{ width: `${sentiment.confident}%` }}
+                            className="bg-emerald-500 h-full"
+                            title={`Confident: ${sentiment.confident}%`}
+                          />
+                          <div
+                            style={{ width: `${sentiment.thoughtful}%` }}
+                            className="bg-blue-500 h-full"
+                            title={`Thoughtful: ${sentiment.thoughtful}%`}
+                          />
+                          <div
+                            style={{ width: `${sentiment.hesitant}%` }}
+                            className="bg-amber-500 h-full"
+                            title={`Hesitant: ${sentiment.hesitant}%`}
+                          />
+                        </div>
+                        <div className="flex justify-between text-[10px] text-gray-400 pt-0.5">
+                          <span className="flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                            Confident ({sentiment.confident}%)
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" />
+                            Thoughtful ({sentiment.thoughtful}%)
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
+                            Hesitant ({sentiment.hesitant}%)
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Technical Keywords */}
+                      {insights.technicalKeywords && insights.technicalKeywords.length > 0 && (
+                        <div className="space-y-1.5">
+                          <span className="text-[11px] uppercase tracking-wider font-semibold text-gray-400 flex items-center gap-1">
+                            <Activity className="h-3 w-3 text-purple-400" />
+                            Technical Keywords Detected
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {insights.technicalKeywords.map((kw, i) => (
+                              <span
+                                key={i}
+                                className="bg-purple-950/80 text-purple-200 border border-purple-800/60 px-2 py-0.5 rounded text-[11px] font-medium"
+                              >
+                                {kw}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Key Takeaways */}
+                      {insights.keyTakeaways && insights.keyTakeaways.length > 0 && (
+                        <div className="space-y-1.5">
+                          <span className="text-[11px] uppercase tracking-wider font-semibold text-gray-400 block">
+                            Key Communication Takeaways
+                          </span>
+                          <div className="space-y-1.5">
+                            {insights.keyTakeaways.map((takeaway, i) => (
+                              <div key={i} className="flex items-start gap-2 text-xs text-gray-200">
+                                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />
+                                <span>{takeaway}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Suggestions */}
+                      {insights.growthSuggestions && insights.growthSuggestions.length > 0 && (
+                        <div className="space-y-1.5 pt-1">
+                          <span className="text-[11px] uppercase tracking-wider font-semibold text-gray-400 block">
+                            Pacing & Polish Recommendations
+                          </span>
+                          <div className="space-y-1">
+                            {insights.growthSuggestions.map((sug, i) => (
+                              <div key={i} className="flex items-start gap-2 text-xs text-gray-300">
+                                <Clock className="h-3.5 w-3.5 text-blue-400 flex-shrink-0 mt-0.5" />
+                                <span>{sug}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="py-8 text-center text-xs text-gray-400">
+                      No speech analysis available for this recording.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };

@@ -1,10 +1,12 @@
 // src/pages/Jobs.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { Search, MapPin, DollarSign, Calendar, Star, TrendingUp, Clock, AlertCircle, Briefcase, Filter, X, Bookmark, BookmarkCheck, Sparkles } from 'lucide-react';
+import { Search, MapPin, DollarSign, Calendar, Star, TrendingUp, Clock, AlertCircle, Briefcase, Filter, X, Bookmark, BookmarkCheck, Sparkles, Compass } from 'lucide-react';
 import api, { savedJobsAPI, mockInterviewAPI } from '../services/api';
 import JobApplicationModal from '../components/JobApplicationModal';
 import JobRatingModal from '../components/JobRatingModal';
+import ResumeTailoringModal from '../components/ResumeTailoringModal';
+import CareerRoadmapModal from '../components/CareerRoadmapModal';
 import { isSkillMatch } from '../utils/skillMatching';
 import { parseSalary, getUniqueSalaryCurrencies } from '../utils/salaryParsing';
 
@@ -35,6 +37,8 @@ const Jobs = () => {
   const [showSavedOnly, setShowSavedOnly] = useState(false);
   const [startingPractice, setStartingPractice] = useState(false);
   const [practiceError, setPracticeError] = useState('');
+  const [showTailoringModal, setShowTailoringModal] = useState(false);
+  const [showRoadmapModal, setShowRoadmapModal] = useState(false);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -949,6 +953,14 @@ const Jobs = () => {
                     style={{ width: `${selectedJob.matchScore}%` }}
                   ></div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setShowTailoringModal(true)}
+                  className="mt-2.5 w-full flex items-center justify-center text-xs font-semibold text-purple-700 bg-purple-100/70 hover:bg-purple-200/80 py-1.5 px-3 rounded-md transition-colors"
+                >
+                  <Sparkles className="h-3.5 w-3.5 mr-1.5 text-purple-600" />
+                  Boost this score with AI Resume Tailoring
+                </button>
               </div>
             )}
             
@@ -1033,9 +1045,19 @@ const Jobs = () => {
                     </span>
                   ))}
                 </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  Consider learning these skills to increase your chances!
-                </p>
+                <div className="flex items-center justify-between mt-2 pt-1">
+                  <p className="text-xs text-gray-500">
+                    Consider learning these skills to increase your chances!
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowRoadmapModal(true)}
+                    className="text-xs font-semibold text-teal-700 hover:text-teal-800 flex items-center transition-colors"
+                  >
+                    <Compass className="h-3.5 w-3.5 mr-1" />
+                    Bridge Gaps (AI) &rarr;
+                  </button>
+                </div>
               </div>
             )}
             
@@ -1062,6 +1084,22 @@ const Jobs = () => {
                 <Sparkles className="h-5 w-5 mr-2" />
                 {startingPractice ? 'Preparing questions...' : 'Practice Interview (AI)'}
               </button>
+              <button
+                type="button"
+                onClick={() => setShowTailoringModal(true)}
+                className="w-full flex items-center justify-center bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 rounded-lg font-semibold hover:from-indigo-700 hover:to-purple-700 transition-all shadow-sm"
+              >
+                <Sparkles className="h-5 w-5 mr-2 text-yellow-300" />
+                Tailor Resume & Boost Match (AI)
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowRoadmapModal(true)}
+                className="w-full flex items-center justify-center bg-gradient-to-r from-teal-600 to-emerald-600 text-white py-3 rounded-lg font-semibold hover:from-teal-700 hover:to-emerald-700 transition-all shadow-sm"
+              >
+                <Compass className="h-5 w-5 mr-2 text-emerald-200" />
+                View 4-Week Career Roadmap (AI)
+              </button>
             </div>
           </div>
         )}
@@ -1081,6 +1119,27 @@ const Jobs = () => {
           userRating={userRatings[selectedJob.id]} 
           onClose={() => setShowRatingModal(false)} 
           onSuccess={handleRatingSuccess}
+        />
+      )}
+
+      {showTailoringModal && selectedJob && (
+        <ResumeTailoringModal
+          job={selectedJob}
+          userSkills={userSkills}
+          missingSkills={selectedJob.missingSkills || []}
+          currentMatchScore={selectedJob.matchScore || 0}
+          onClose={() => setShowTailoringModal(false)}
+        />
+      )}
+
+      {showRoadmapModal && selectedJob && (
+        <CareerRoadmapModal
+          job={selectedJob}
+          userSkills={userSkills}
+          missingSkills={selectedJob.missingSkills || []}
+          currentMatchScore={selectedJob.matchScore || 0}
+          onClose={() => setShowRoadmapModal(false)}
+          onStartPractice={() => startMockInterview(selectedJob)}
         />
       )}
     </div>

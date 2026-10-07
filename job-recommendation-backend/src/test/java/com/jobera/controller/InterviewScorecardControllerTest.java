@@ -30,13 +30,15 @@ class InterviewScorecardControllerTest {
 
     @Mock InterviewScorecardService scorecardService;
     @Mock InterviewRoundService interviewRoundService;
+    @Mock com.jobera.repository.InterviewRoundRepository interviewRoundRepository;
+    @Mock com.jobera.service.AiInterviewClient aiInterviewClient;
 
     InterviewScorecardController controller;
     HttpServletRequest request;
 
     @BeforeEach
     void setUp() {
-        controller = new InterviewScorecardController(scorecardService, interviewRoundService);
+        controller = new InterviewScorecardController(scorecardService, interviewRoundService, interviewRoundRepository, aiInterviewClient);
         User recruiterUser = new User("recruiter@example.com", "hash", "Recruiter");
         recruiterUser.setId(2L);
         request = mock(HttpServletRequest.class);
@@ -118,5 +120,33 @@ class InterviewScorecardControllerTest {
         ResponseEntity<?> response = controller.getForApplication(1000L);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+    }
+
+    @Test
+    void generatingScorecardDraftReturnsAiRubricAndSummary() {
+        InterviewRound round = new InterviewRound(1000L, 1, "System Design Round", "TECHNICAL", "room-1", null);
+        round.setId(5000L);
+        when(interviewRoundRepository.findById(5000L)).thenReturn(java.util.Optional.of(round));
+        when(aiInterviewClient.generateInterviewScorecard("System Design Round", "TECHNICAL", "Discussed caching", "redis.get()"))
+            .thenReturn(Map.of(
+                "communicationRating", 4,
+                "technicalRating", 5,
+                "cultureFitRating", 4,
+                "recommendation", "STRONG_YES",
+                "executiveSummary", "Strong candidate with solid caching architecture knowledge."
+            ));
+
+        ResponseEntity<?> response = controller.generateScorecardDraft(5000L, Map.of(
+            "notes", "Discussed caching",
+            "codeSnippet", "redis.get()"
+        ));
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = (Map<String, Object>) response.getBody();
+        assertEquals(4, body.get("communicationRating"));
+        assertEquals(5, body.get("technicalRating"));
+        assertEquals("STRONG_YES", body.get("recommendation"));
+        assertEquals("Strong candidate with solid caching architecture knowledge.", body.get("executiveSummary"));
     }
 }

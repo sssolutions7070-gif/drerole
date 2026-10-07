@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -56,6 +57,7 @@ public class DreamRoleTestController {
     private final ApplicationRepository applicationRepository;
     private final RecruiterRepository recruiterRepository;
     private final com.jobera.service.SkillBadgeService skillBadgeService;
+    private final com.jobera.service.AiInterviewClient aiInterviewClient;
     private final ObjectMapper objectMapper;
 
     public DreamRoleTestController(
@@ -66,6 +68,20 @@ public class DreamRoleTestController {
             ApplicationRepository applicationRepository,
             RecruiterRepository recruiterRepository,
             com.jobera.service.SkillBadgeService skillBadgeService) {
+        this(dreamRoleTestRepository, questionRepository, assignmentRepository, questionBankRepository,
+            applicationRepository, recruiterRepository, skillBadgeService, null);
+    }
+
+    @Autowired
+    public DreamRoleTestController(
+            DreamRoleTestRepository dreamRoleTestRepository,
+            DreamRoleTestQuestionRepository questionRepository,
+            DreamRoleTestAssignmentRepository assignmentRepository,
+            QuestionBankRepository questionBankRepository,
+            ApplicationRepository applicationRepository,
+            RecruiterRepository recruiterRepository,
+            com.jobera.service.SkillBadgeService skillBadgeService,
+            com.jobera.service.AiInterviewClient aiInterviewClient) {
         this.dreamRoleTestRepository = dreamRoleTestRepository;
         this.questionRepository = questionRepository;
         this.assignmentRepository = assignmentRepository;
@@ -73,6 +89,7 @@ public class DreamRoleTestController {
         this.applicationRepository = applicationRepository;
         this.recruiterRepository = recruiterRepository;
         this.skillBadgeService = skillBadgeService;
+        this.aiInterviewClient = aiInterviewClient;
         this.objectMapper = new ObjectMapper();
     }
 
@@ -167,6 +184,34 @@ public class DreamRoleTestController {
             
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "Failed to add questions: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/generate-questions")
+    public ResponseEntity<Map<String, Object>> generateTechnicalQuestions(@RequestBody Map<String, Object> request) {
+        try {
+            String jobTitle = (String) request.getOrDefault("jobTitle", "Software Engineer");
+            String jobDescription = (String) request.getOrDefault("jobDescription", "");
+            String skills = (String) request.getOrDefault("skills", "");
+            String branch = (String) request.getOrDefault("targetBranch", "");
+            int count = request.containsKey("count") ? Integer.parseInt(request.get("count").toString()) : 10;
+            if (count <= 0 || count > 20) count = 10;
+
+            List<Map<String, Object>> questions;
+            if (aiInterviewClient != null) {
+                questions = aiInterviewClient.generateTechnicalQuestions(jobTitle, jobDescription, skills, branch, count);
+            } else {
+                questions = List.of();
+            }
+
+            Map<String, Object> response = new HashMap<>();
+            response.put(MESSAGE_KEY, "Technical questions generated successfully");
+            response.put("questions", questions);
+            response.put("count", questions.size());
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "Failed to generate questions: " + e.getMessage()));
         }
     }
 

@@ -22,6 +22,7 @@ import org.springframework.http.ResponseEntity;
 import com.jobera.config.AuthInterceptor;
 import com.jobera.entity.InterviewRound;
 import com.jobera.entity.User;
+import com.jobera.service.AiInterviewClient;
 import com.jobera.service.InterviewRoundService;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -30,6 +31,7 @@ import jakarta.servlet.http.HttpServletRequest;
 class InterviewRoundControllerTest {
 
     @Mock InterviewRoundService interviewRoundService;
+    @Mock AiInterviewClient aiInterviewClient;
 
     InterviewRoundController controller;
     HttpServletRequest request;
@@ -37,7 +39,7 @@ class InterviewRoundControllerTest {
 
     @BeforeEach
     void setUp() {
-        controller = new InterviewRoundController(interviewRoundService);
+        controller = new InterviewRoundController(interviewRoundService, aiInterviewClient);
         candidate = new User("candidate@example.com", "hash", "Candidate");
         candidate.setId(1L);
         request = mock(HttpServletRequest.class);
@@ -228,5 +230,63 @@ class InterviewRoundControllerTest {
         ResponseEntity<?> response = controller.reschedule(5000L, Map.of("scheduledAt", "not-a-date"));
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+    }
+
+    @Test
+    void getCopilotProbesReturnsProbesWhenRoundFound() {
+        InterviewRound round = new InterviewRound(1000L, 1, "Technical round", "TECHNICAL", "room-1",
+            LocalDateTime.parse("2026-02-01T10:00:00"));
+        when(interviewRoundService.getRound(5000L)).thenReturn(round);
+        Map<String, Object> mockProbes = Map.of(
+            "estimatedComplexity", Map.of("time", "O(N)", "space", "O(1)"),
+            "edgeCases", List.of(Map.of("scenario", "Empty input", "probe", "How does it handle null?"))
+        );
+        when(aiInterviewClient.generateLiveCodingProbes("Technical round", "JavaScript", "let x = 1;"))
+            .thenReturn(mockProbes);
+
+        ResponseEntity<?> response = controller.getCopilotProbes(5000L, Map.of("language", "JavaScript", "code", "let x = 1;"));
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(mockProbes, response.getBody());
+    }
+
+    @Test
+    void getCopilotProbesReturnsNotFoundWhenRoundMissing() {
+        when(interviewRoundService.getRound(5000L)).thenThrow(new InterviewRoundService.RoundNotFoundException(5000L));
+
+        ResponseEntity<?> response = controller.getCopilotProbes(5000L, Map.of("language", "JavaScript", "code", ""));
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+    }
+
+    @Test
+    void getRecordingInsightsReturnsAiInsights() {
+        InterviewRound round = new InterviewRound();
+        round.setTitle("System Design Round");
+        round.setRoundType("TECHNICAL");
+        when(interviewRoundService.getRound(5000L)).thenReturn(round);
+
+        Map<String, Object> mockInsights = Map.of(
+            "clarityScore", 94,
+            "wordsPerMinute", 142,
+            "cadenceEvaluation", "Optimal & Confident Pace",
+            "technicalKeywords", List.of("Cache", "Redis")
+        );
+        when(aiInterviewClient.generateRecordingInsights(any(), any(), any()))
+            .thenReturn(mockInsights);
+
+        ResponseEntity<?> response = controller.getRecordingInsights(5000L);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(mockInsights, response.getBody());
+    }
+
+    @Test
+    void getRecordingInsightsReturnsNotFoundWhenRoundMissing() {
+        when(interviewRoundService.getRound(5000L)).thenThrow(new InterviewRoundService.RoundNotFoundException(5000L));
+
+        ResponseEntity<?> response = controller.getRecordingInsights(5000L);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
     }
 }

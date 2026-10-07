@@ -329,4 +329,37 @@ class InterviewRoundServiceTest {
 
         assertThrows(InterviewRoundService.RoundNotFoundException.class, () -> service.generateIcs(5000L));
     }
+
+    @Test
+    void savingRecordingUpdatesUrlAndStatus() throws Exception {
+        InterviewRound round = new InterviewRound(1000L, 1, "Technical", "TECHNICAL", "room-1", LocalDateTime.now());
+        round.setId(5000L);
+        when(interviewRoundRepository.findById(5000L)).thenReturn(Optional.of(round));
+        when(interviewRoundRepository.save(any(InterviewRound.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        org.springframework.mock.web.MockMultipartFile file = new org.springframework.mock.web.MockMultipartFile(
+            "file", "interview.webm", "video/webm", "fake video stream data".getBytes()
+        );
+
+        InterviewRound saved = service.saveRecording(5000L, file);
+
+        assertNotNull(saved.getRecordingUrl());
+        assertTrue(saved.getRecordingUrl().startsWith("/uploads/recordings/round_5000_"));
+        assertTrue(saved.getRecordingUrl().endsWith(".webm"));
+        assertEquals("COMPLETED", saved.getStatus());
+        assertNotNull(saved.getRecordedAt());
+    }
+
+    @Test
+    void savingEmptyRecordingFails() {
+        InterviewRound round = new InterviewRound(1000L, 1, "Technical", "TECHNICAL", "room-1", LocalDateTime.now());
+        round.setId(5000L);
+        when(interviewRoundRepository.findById(5000L)).thenReturn(Optional.of(round));
+
+        org.springframework.mock.web.MockMultipartFile emptyFile = new org.springframework.mock.web.MockMultipartFile(
+            "file", "empty.webm", "video/webm", new byte[0]
+        );
+
+        assertThrows(IllegalArgumentException.class, () -> service.saveRecording(5000L, emptyFile));
+    }
 }

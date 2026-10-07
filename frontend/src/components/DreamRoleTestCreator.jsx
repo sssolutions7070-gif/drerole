@@ -1,6 +1,9 @@
 // File: src/components/DreamRoleTestCreator.jsx
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2, BookOpen, Clock, Target, AlertCircle } from 'lucide-react';
+import {
+  X, Plus, Trash2, BookOpen, Clock, Target, AlertCircle,
+  Sparkles, Wand2, Check, RefreshCw, CheckCircle2, ChevronRight, Eye
+} from 'lucide-react';
 import api from '../services/api';
 
 const DreamRoleTestCreator = ({ recruiterId, onClose, onSuccess }) => {
@@ -9,6 +12,15 @@ const DreamRoleTestCreator = ({ recruiterId, onClose, onSuccess }) => {
   const [branchStats, setBranchStats] = useState({});
   const [loading, setLoading] = useState(true);
   const [testId, setTestId] = useState(null);
+
+  // Recruiter Jobs & AI Generator state
+  const [recruiterJobs, setRecruiterJobs] = useState([]);
+  const [selectedJobId, setSelectedJobId] = useState('');
+  const [selectedJob, setSelectedJob] = useState(null);
+  const [isGeneratingAi, setIsGeneratingAi] = useState(false);
+  const [aiGeneratedQuestions, setAiGeneratedQuestions] = useState([]);
+  const [showAiPreviewModal, setShowAiPreviewModal] = useState(false);
+  const [aiNotification, setAiNotification] = useState('');
   
   const [testInfo, setTestInfo] = useState({
     testName: '',
@@ -32,7 +44,10 @@ const DreamRoleTestCreator = ({ recruiterId, onClose, onSuccess }) => {
 
   useEffect(() => {
     fetchBranchStats();
-  }, []);
+    if (recruiterId) {
+      fetchRecruiterJobs();
+    }
+  }, [recruiterId]);
 
   const fetchBranchStats = async () => {
     try {
@@ -45,6 +60,88 @@ const DreamRoleTestCreator = ({ recruiterId, onClose, onSuccess }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchRecruiterJobs = async () => {
+    try {
+      const res = await api.get(`/recruiters/jobs/recruiter/${recruiterId}`);
+      setRecruiterJobs(res.data || []);
+    } catch (err) {
+      // Non-blocking: recruiter might have no active postings yet
+    }
+  };
+
+  const handleSelectJob = (jobId) => {
+    setSelectedJobId(jobId);
+    if (!jobId) {
+      setSelectedJob(null);
+      return;
+    }
+
+    const job = recruiterJobs.find(j => String(j.id) === String(jobId));
+    if (job) {
+      setSelectedJob(job);
+      // Auto-populate test name and description
+      const updatedInfo = {
+        ...testInfo,
+        testName: testInfo.testName || `${job.title} Technical Assessment`,
+        description: testInfo.description || job.description || `Assessment for ${job.title} role.`
+      };
+
+      // Auto-match best branch
+      const jobText = `${job.title} ${job.skills || ''} ${job.requiredSkills || ''}`.toLowerCase();
+      if (!testInfo.targetBranch && branches.length > 0) {
+        if (jobText.includes('software') || jobText.includes('developer') || jobText.includes('full stack') || jobText.includes('frontend') || jobText.includes('backend') || jobText.includes('react') || jobText.includes('java') || jobText.includes('python')) {
+          const cseBranch = branches.find(b => b.toLowerCase().includes('computer'));
+          if (cseBranch) updatedInfo.targetBranch = cseBranch;
+        } else if (jobText.includes('data') || jobText.includes('ai') || jobText.includes('machine learning')) {
+          const aiBranch = branches.find(b => b.toLowerCase().includes('data') || b.toLowerCase().includes('artificial') || b.toLowerCase().includes('computer'));
+          if (aiBranch) updatedInfo.targetBranch = aiBranch;
+        } else if (branches.length > 0) {
+          updatedInfo.targetBranch = branches[0];
+        }
+      }
+
+      setTestInfo(updatedInfo);
+    }
+  };
+
+  const handleGenerateAiQuestions = async () => {
+    setIsGeneratingAi(true);
+    setAiNotification('');
+    try {
+      const response = await api.post('/dream-role-tests/generate-questions', {
+        jobTitle: testInfo.testName || selectedJob?.title || 'Software Engineer',
+        jobDescription: testInfo.description || selectedJob?.description || '',
+        skills: selectedJob?.skills || selectedJob?.requiredSkills || '',
+        targetBranch: testInfo.targetBranch || '',
+        count: 10
+      });
+
+      const generated = response.data?.questions || [];
+      if (generated.length === 0) {
+        alert('Could not generate questions. Please try again.');
+        return;
+      }
+
+      setAiGeneratedQuestions(generated);
+      setShowAiPreviewModal(true);
+    } catch (err) {
+      console.error('Failed to generate AI questions:', err);
+      alert(err.response?.data?.error || 'Failed to generate technical questions with AI.');
+    } finally {
+      setIsGeneratingAi(false);
+    }
+  };
+
+  const handleApplyAllAiQuestions = () => {
+    const formatted = aiGeneratedQuestions.map((q, idx) => ({
+      ...q,
+      id: Date.now() + idx
+    }));
+    setTechnicalQuestions(formatted);
+    setShowAiPreviewModal(false);
+    setAiNotification('Successfully applied 10 AI-generated technical questions!');
   };
 
   const handleCreateTest = async () => {
@@ -158,6 +255,38 @@ const DreamRoleTestCreator = ({ recruiterId, onClose, onSuccess }) => {
 
         {step === 1 && (
           <div className="space-y-6">
+            {/* Auto-Fill from Posted Job */}
+            {recruiterJobs.length > 0 && (
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 p-4 rounded-xl">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-semibold text-blue-900 flex items-center gap-1.5 uppercase tracking-wider">
+                    <Sparkles className="h-4 w-4 text-blue-600" />
+                    Auto-Fill Test Details from Posted Job
+                  </label>
+                  <span className="text-[11px] text-blue-600 bg-white px-2 py-0.5 rounded border border-blue-200 font-medium">Optional</span>
+                </div>
+                <select
+                  value={selectedJobId}
+                  onChange={(e) => handleSelectJob(e.target.value)}
+                  aria-label="Auto-fill from posted job"
+                  className="w-full p-2.5 bg-white border border-blue-300 rounded-lg text-sm text-gray-800 focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">-- Choose a job to auto-fill title, description & branch --</option>
+                  {recruiterJobs.map(job => (
+                    <option key={job.id} value={job.id}>
+                      {job.title} ({job.location || 'Remote'})
+                    </option>
+                  ))}
+                </select>
+                {selectedJob && (
+                  <p className="mt-2 text-xs text-blue-700 flex items-center gap-1">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-green-600 flex-shrink-0" />
+                    Auto-populated from "{selectedJob.title}". You can adjust any fields below.
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Branch Selection with Stats */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -272,10 +401,66 @@ const DreamRoleTestCreator = ({ recruiterId, onClose, onSuccess }) => {
 
         {step === 2 && (
           <div className="space-y-6">
-            <div className="bg-yellow-50 p-4 rounded-lg mb-4">
-              <p className="text-sm text-yellow-800">
+            {aiNotification && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800 flex items-center justify-between">
+                <span className="flex items-center gap-1.5 font-medium">
+                  <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
+                  {aiNotification}
+                </span>
+                <button onClick={() => setAiNotification('')} className="text-green-600 hover:text-green-800">
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
+
+            {/* AI Generator Banner */}
+            <div className="bg-gradient-to-r from-indigo-900 via-indigo-800 to-purple-900 text-white p-4 rounded-xl shadow-md border border-indigo-700/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="p-2 bg-indigo-700/80 rounded-lg text-yellow-300 flex-shrink-0">
+                  <Sparkles className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-white flex items-center gap-2">
+                    Claude AI Assessment Generator
+                    <span className="text-[10px] px-2 py-0.5 bg-yellow-400 text-gray-950 rounded font-bold uppercase tracking-wider">Instant</span>
+                  </h4>
+                  <p className="text-xs text-indigo-200 mt-0.5">
+                    Generate all 10 multiple-choice technical questions tailored to {testInfo.testName || 'this role'} with answers & explanations.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleGenerateAiQuestions}
+                disabled={isGeneratingAi}
+                aria-label="Generate 10 questions with AI"
+                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 text-gray-950 text-xs font-bold rounded-lg shadow transition disabled:opacity-50 whitespace-nowrap"
+              >
+                {isGeneratingAi ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    <span>Generating with AI...</span>
+                  </>
+                ) : (
+                  <>
+                    <Wand2 className="h-4 w-4" />
+                    <span>Generate 10 Questions with AI</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            <div className="bg-yellow-50 p-4 rounded-lg flex items-center justify-between">
+              <p className="text-sm text-yellow-800 font-medium">
                 Add 10 technical questions. Added: {technicalQuestions.length}/10
               </p>
+              {technicalQuestions.length > 0 && (
+                <button
+                  onClick={() => setTechnicalQuestions([])}
+                  className="text-xs text-red-600 hover:text-red-800 font-medium"
+                >
+                  Clear all
+                </button>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-6">
@@ -428,6 +613,99 @@ const DreamRoleTestCreator = ({ recruiterId, onClose, onSuccess }) => {
               >
                 Save & Complete Test
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* AI Questions Review Modal */}
+        {showAiPreviewModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col border border-gray-200">
+              <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-t-xl">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-indigo-600 text-white rounded-lg">
+                    <Sparkles className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900 text-base">Generated Questions ({aiGeneratedQuestions.length})</h3>
+                    <p className="text-xs text-gray-500">Tailored to "{testInfo.testName || 'Role'}"</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowAiPreviewModal(false)}
+                  aria-label="Close preview modal"
+                  className="text-gray-400 hover:text-gray-600 p-1"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 text-sm">
+                {aiGeneratedQuestions.map((q, idx) => (
+                  <div key={idx} className="p-3.5 bg-gray-50 border border-gray-200 rounded-lg space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="font-semibold text-gray-900">
+                        {idx + 1}. {q.question}
+                      </span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded font-semibold uppercase ${
+                        q.difficultyLevel === 'Hard' ? 'bg-red-100 text-red-700' :
+                        q.difficultyLevel === 'Easy' ? 'bg-green-100 text-green-700' :
+                        'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {q.difficultyLevel || 'Medium'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      <div className={`p-2 rounded border ${q.correctAnswer === 'A' ? 'bg-green-50 border-green-300 text-green-900 font-medium' : 'bg-white border-gray-200 text-gray-700'}`}>
+                        <span className="font-bold mr-1">A:</span> {q.optionA}
+                      </div>
+                      <div className={`p-2 rounded border ${q.correctAnswer === 'B' ? 'bg-green-50 border-green-300 text-green-900 font-medium' : 'bg-white border-gray-200 text-gray-700'}`}>
+                        <span className="font-bold mr-1">B:</span> {q.optionB}
+                      </div>
+                      <div className={`p-2 rounded border ${q.correctAnswer === 'C' ? 'bg-green-50 border-green-300 text-green-900 font-medium' : 'bg-white border-gray-200 text-gray-700'}`}>
+                        <span className="font-bold mr-1">C:</span> {q.optionC}
+                      </div>
+                      <div className={`p-2 rounded border ${q.correctAnswer === 'D' ? 'bg-green-50 border-green-300 text-green-900 font-medium' : 'bg-white border-gray-200 text-gray-700'}`}>
+                        <span className="font-bold mr-1">D:</span> {q.optionD}
+                      </div>
+                    </div>
+
+                    {q.explanation && (
+                      <p className="text-xs text-gray-600 bg-white p-2 rounded border border-gray-100 italic">
+                        <span className="font-medium not-italic text-gray-800">Explanation:</span> {q.explanation}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex items-center justify-between p-4 border-t border-gray-200 bg-gray-50 rounded-b-xl">
+                <button
+                  onClick={handleGenerateAiQuestions}
+                  disabled={isGeneratingAi}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-700 hover:text-gray-900 font-medium"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${isGeneratingAi ? 'animate-spin' : ''}`} />
+                  Regenerate
+                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowAiPreviewModal(false)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-100"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleApplyAllAiQuestions}
+                    aria-label="Apply AI questions"
+                    className="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-lg text-xs font-bold shadow transition flex items-center gap-1.5"
+                  >
+                    <Check className="h-4 w-4" />
+                    Apply All ({aiGeneratedQuestions.length}) to Test
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}

@@ -75,4 +75,32 @@ describe('ScorecardForm', () => {
 
     expect(onCancel).toHaveBeenCalled();
   });
+
+  it('generates an AI scorecard draft and populates the rubric and summary', async () => {
+    scorecardAPI.generateDraft = vi.fn().mockResolvedValue({
+      data: {
+        communicationRating: 4,
+        technicalRating: 5,
+        cultureFitRating: 4,
+        recommendation: 'STRONG_YES',
+        notes: 'Candidate demonstrated exceptional problem solving in binary trees.',
+        executiveSummary: 'Very strong engineer with clear architectural communication.',
+        strengths: ['Algorithmic reasoning', 'System design'],
+        areasForImprovement: ['Concurrency nuance'],
+      },
+    });
+
+    const user = userEvent.setup();
+    render(<ScorecardForm roundId={5000} existingScorecard={null} onSaved={() => {}} onCancel={() => {}} />);
+
+    await user.click(screen.getByRole('button', { name: /auto-fill with ai/i }));
+
+    expect(scorecardAPI.generateDraft).toHaveBeenCalledWith(5000, expect.any(Object));
+
+    expect(await screen.findByText(/AI Evaluation Summary/i)).toBeInTheDocument();
+    expect(screen.getByText(/Very strong engineer with clear architectural communication/i)).toBeInTheDocument();
+    expect(screen.getByText(/✓ Algorithmic reasoning/i)).toBeInTheDocument();
+    expect(screen.getByRole('combobox')).toHaveValue('STRONG_YES');
+    expect(screen.getByDisplayValue(/exceptional problem solving in binary trees/i)).toBeInTheDocument();
+  });
 });

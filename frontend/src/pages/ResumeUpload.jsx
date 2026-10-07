@@ -1,6 +1,6 @@
 // src/pages/ResumeUpload.jsx
 import React, { useState } from 'react';
-import { Upload, FileText, CheckCircle, AlertCircle, Loader, TrendingUp, Target, XCircle } from 'lucide-react';
+import { Upload, FileText, CheckCircle, AlertCircle, Loader, TrendingUp, Target, XCircle, Sparkles } from 'lucide-react';
 import api from '../services/api';
 import { BACKEND_ORIGIN } from '../config';
 
@@ -533,6 +533,13 @@ const ResumeUpload = () => {
                       className="bg-white text-blue-600 px-6 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors"
                     >
                       Browse Jobs
+                    </button>
+                    <button 
+                      onClick={() => window.location.href = '/jobs'}
+                      className="bg-yellow-300 text-slate-900 px-6 py-3 rounded-lg font-bold hover:bg-yellow-400 transition-colors flex items-center justify-center shadow"
+                    >
+                      <Sparkles className="h-4 w-4 mr-2 text-purple-700" />
+                      AI Resume Tailoring Copilot
                     </button>
                     <button 
                       onClick={() => window.location.href = '/internships'}

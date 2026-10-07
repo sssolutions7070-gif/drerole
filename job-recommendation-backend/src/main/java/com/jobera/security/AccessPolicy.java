@@ -165,6 +165,7 @@ public class AccessPolicy {
         rule("GET", "/api/recruiters/{recruiterId}/webhooks", ownRecruiterId("recruiterId"));
         rule("POST", "/api/recruiters/{recruiterId}/webhooks", ownRecruiterId("recruiterId"));
         rule("DELETE", "/api/recruiters/{recruiterId}/webhooks/{webhookId}", ownRecruiterId("recruiterId"));
+        rule("POST", "/api/recruiters/{recruiterId}/webhooks/{webhookId}/test", ownRecruiterId("recruiterId"));
         rule("GET", "/api/recruiters/{recruiterId}/verification", ownRecruiterId("recruiterId"));
         rule("POST", "/api/recruiters/{recruiterId}/verification", ownRecruiterId("recruiterId"));
         rule("GET", "/api/recruiters/{recruiterId}/direct-messages", ownRecruiterId("recruiterId"));
@@ -172,6 +173,11 @@ public class AccessPolicy {
         rule("POST", "/api/recruiters/{recruiterId}/direct-messages/{candidateUserId}", participatesInDirectThread());
         rule("GET", "/api/recruiters/{recruiterId}/talent-pool", ownRecruiterId("recruiterId"));
         rule("PUT", "/api/recruiters/{recruiterId}/talent-pool/{candidateUserId}/note", ownRecruiterId("recruiterId"));
+        rule("GET", "/api/recruiters/{recruiterId}/saved-searches", ownRecruiterId("recruiterId"));
+        rule("POST", "/api/recruiters/{recruiterId}/saved-searches", ownRecruiterId("recruiterId"));
+        rule("DELETE", "/api/recruiters/{recruiterId}/saved-searches/{searchId}", ownRecruiterId("recruiterId"));
+        rule("PUT", "/api/recruiters/{recruiterId}/saved-searches/{searchId}/alert", ownRecruiterId("recruiterId"));
+        rule("POST", "/api/recruiters/{recruiterId}/saved-searches/{searchId}/check", ownRecruiterId("recruiterId"));
         rule("GET", "/api/recruiters/{recruiterId}/subscription", ownRecruiterId("recruiterId"));
         rule("POST", "/api/recruiters/{recruiterId}/subscription/checkout", ownRecruiterId("recruiterId"));
         rule("POST", "/api/recruiters/{recruiterId}/subscription/cancel", ownRecruiterId("recruiterId"));
@@ -185,6 +191,7 @@ public class AccessPolicy {
         rule("GET", "/api/applications/recruiter/{recruiterId}/**", ownRecruiterId("recruiterId"));
         rule("PUT", "/api/applications/{applicationId}/*", c -> recruiterManagesApplication(c, "applicationId"));
         rule("POST", "/api/applications/{applicationId}/withdraw", c -> participatesInApplication(c, "applicationId"));
+        rule("POST", "/api/applications/{applicationId}/follow-up", c -> recruiterManagesApplication(c, "applicationId"));
 
         // Messaging between a candidate and the recruiter behind their application
         rule("GET", "/api/applications/{applicationId}/messages", c -> participatesInApplication(c, "applicationId"));
@@ -202,10 +209,15 @@ public class AccessPolicy {
         rule("GET", "/api/interview-rounds/{roundId}/calendar.ics", c -> participatesInRound(c, "roundId"));
         rule("PUT", "/api/interview-rounds/{roundId}/status", c -> participatesInRound(c, "roundId"));
         rule("PUT", "/api/interview-rounds/{roundId}/reschedule", c -> recruiterManagesRound(c, "roundId"));
+        rule("POST", "/api/interview-rounds/{roundId}/recording", c -> participatesInRound(c, "roundId"));
+        rule("GET", "/api/interview-rounds/{roundId}/recording", c -> participatesInRound(c, "roundId"));
+        rule("GET", "/api/interview-rounds/{roundId}/recording-insights", c -> participatesInRound(c, "roundId"));
+        rule("POST", "/api/interview-rounds/{roundId}/copilot-probes", c -> recruiterManagesRound(c, "roundId"));
 
         // Structured interview scorecards - recruiter-only, a candidate never sees the internal
         // rubric filled in about them
         rule("PUT", "/api/interview-rounds/{roundId}/scorecard", c -> recruiterManagesRound(c, "roundId"));
+        rule("POST", "/api/interview-rounds/{roundId}/scorecard/generate-draft", c -> recruiterManagesRound(c, "roundId"));
         rule("GET", "/api/interview-rounds/{roundId}/scorecard", c -> recruiterManagesRound(c, "roundId"));
         rule("GET", "/api/applications/{applicationId}/scorecards", c -> recruiterManagesApplication(c, "applicationId"));
 
@@ -214,6 +226,7 @@ public class AccessPolicy {
         // themselves can accept or decline (not the recruiter who sent it)
         rule("POST", "/api/applications/{applicationId}/offer", c -> recruiterManagesApplication(c, "applicationId"));
         rule("GET", "/api/applications/{applicationId}/offer", c -> participatesInApplication(c, "applicationId"));
+        rule("GET", "/api/applications/{applicationId}/offer/letter", c -> participatesInApplication(c, "applicationId"));
         rule("POST", "/api/applications/{applicationId}/offer/accept", c -> participatesInApplication(c, "applicationId"));
         rule("POST", "/api/applications/{applicationId}/offer/decline", c -> participatesInApplication(c, "applicationId"));
         rule("POST", "/api/applications/{applicationId}/offer/withdraw", c -> recruiterManagesApplication(c, "applicationId"));
@@ -236,6 +249,7 @@ public class AccessPolicy {
 
         // DreamRole tests
         rule("POST", "/api/dream-role-tests/create", recruiter);
+        rule("POST", "/api/dream-role-tests/generate-questions", recruiter);
         rule("GET", "/api/dream-role-tests/branches/stats", recruiter);
         rule("GET", "/api/dream-role-tests/recruiter/{recruiterId}", ownRecruiterId("recruiterId"));
         rule("POST", "/api/dream-role-tests/assign", recruiter, this::checkDreamRoleAssignBody);
@@ -267,6 +281,8 @@ public class AccessPolicy {
         rule("GET", "/api/resume-matching/job/{jobId}/applications/sorted", ownsJob("jobId"));
         rule("GET", "/api/resume-matching/application/{applicationId}/resume-analysis",
             c -> participatesInApplication(c, "applicationId"));
+        rule("POST", "/api/resume-matching/tailor-resume", authenticated);
+        rule("POST", "/api/resume-matching/career-roadmap", authenticated);
 
         // Own profile
         rule(null, "/api/users/{userId}/**", self("userId"));

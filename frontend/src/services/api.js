@@ -132,6 +132,23 @@ export const interviewRoundsAPI = {
 
   downloadCalendarInvite: (roundId) =>
     api.get(`/interview-rounds/${roundId}/calendar.ics`, { responseType: 'blob' }),
+
+  uploadRecording: (roundId, file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post(`/interview-rounds/${roundId}/recording`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+
+  getRecordingUrl: (roundId) =>
+    `/api/interview-rounds/${roundId}/recording`,
+
+  getCopilotProbes: (roundId, data) =>
+    api.post(`/interview-rounds/${roundId}/copilot-probes`, data),
+
+  getRecordingInsights: (roundId) =>
+    api.get(`/interview-rounds/${roundId}/recording-insights`),
 };
 
 // Structured interview scorecards - recruiter-only
@@ -144,6 +161,9 @@ export const scorecardAPI = {
 
   getForApplication: (applicationId) =>
     api.get(`/applications/${applicationId}/scorecards`),
+
+  generateDraft: (roundId, payload) =>
+    api.post(`/interview-rounds/${roundId}/scorecard/generate-draft`, payload),
 };
 
 // Talent pool API calls - every candidate a recruiter has ever received an application from,
@@ -176,8 +196,11 @@ export const offerAPI = {
   get: (applicationId) =>
     api.get(`/applications/${applicationId}/offer`),
 
-  accept: (applicationId, signatureName) =>
-    api.post(`/applications/${applicationId}/offer/accept`, { signatureName }),
+  getLetter: (applicationId) =>
+    api.get(`/applications/${applicationId}/offer/letter`),
+
+  accept: (applicationId, signatureName, signatureDataUrl) =>
+    api.post(`/applications/${applicationId}/offer/accept`, { signatureName, signatureDataUrl }),
 
   decline: (applicationId, reason) =>
     api.post(`/applications/${applicationId}/offer/decline`, { reason }),
@@ -231,6 +254,24 @@ export const candidateDiscoveryAPI = {
     api.get('/candidates/discover/ai-search', { params: { query } }),
 };
 
+// Saved candidate discovery searches and alert settings
+export const savedCandidateSearchAPI = {
+  list: (recruiterId) =>
+    api.get(`/recruiters/${recruiterId}/saved-searches`),
+
+  create: (recruiterId, searchData) =>
+    api.post(`/recruiters/${recruiterId}/saved-searches`, searchData),
+
+  delete: (recruiterId, searchId) =>
+    api.delete(`/recruiters/${recruiterId}/saved-searches/${searchId}`),
+
+  toggleAlert: (recruiterId, searchId, alertEnabled) =>
+    api.put(`/recruiters/${recruiterId}/saved-searches/${searchId}/alert`, { alertEnabled }),
+
+  checkMatches: (recruiterId, searchId) =>
+    api.post(`/recruiters/${recruiterId}/saved-searches/${searchId}/check`),
+};
+
 // Platform-wide growth and funnel metrics for the admin dashboard
 export const platformAnalyticsAPI = {
   getOverview: () =>
@@ -259,6 +300,9 @@ export const webhookAPI = {
 
   remove: (recruiterId, webhookId) =>
     api.delete(`/recruiters/${recruiterId}/webhooks/${webhookId}`),
+
+  testPing: (recruiterId, webhookId) =>
+    api.post(`/recruiters/${recruiterId}/webhooks/${webhookId}/test`),
 };
 
 // Chat between a recruiter and a candidate outside of any application - reaching out to someone

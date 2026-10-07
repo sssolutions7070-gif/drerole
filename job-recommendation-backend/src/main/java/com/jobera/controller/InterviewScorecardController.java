@@ -4,17 +4,22 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
 
 import com.jobera.config.AuthInterceptor;
 import com.jobera.entity.InterviewRound;
 import com.jobera.entity.InterviewScorecard;
 import com.jobera.entity.User;
+import com.jobera.repository.InterviewRoundRepository;
+import com.jobera.service.AiInterviewClient;
 import com.jobera.service.InterviewRoundService;
 import com.jobera.service.InterviewScorecardService;
 
@@ -30,11 +35,23 @@ public class InterviewScorecardController {
 
     private final InterviewScorecardService scorecardService;
     private final InterviewRoundService interviewRoundService;
+    private final InterviewRoundRepository interviewRoundRepository;
+    private final AiInterviewClient aiInterviewClient;
+
+    @Autowired
+    public InterviewScorecardController(InterviewScorecardService scorecardService,
+                                         InterviewRoundService interviewRoundService,
+                                         InterviewRoundRepository interviewRoundRepository,
+                                         AiInterviewClient aiInterviewClient) {
+        this.scorecardService = scorecardService;
+        this.interviewRoundService = interviewRoundService;
+        this.interviewRoundRepository = interviewRoundRepository;
+        this.aiInterviewClient = aiInterviewClient;
+    }
 
     public InterviewScorecardController(InterviewScorecardService scorecardService,
                                          InterviewRoundService interviewRoundService) {
-        this.scorecardService = scorecardService;
-        this.interviewRoundService = interviewRoundService;
+        this(scorecardService, interviewRoundService, null, null);
     }
 
     private User callingUser(HttpServletRequest request) {
@@ -64,6 +81,29 @@ public class InterviewScorecardController {
             return ResponseEntity.ok(scorecardService.getScorecard(roundId));
         } catch (InterviewScorecardService.ScorecardNotFoundException e) {
             return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, e.getMessage()));
+        }
+    }
+
+    @PostMapping("/api/interview-rounds/{roundId}/scorecard/generate-draft")
+    public ResponseEntity<?> generateScorecardDraft(@PathVariable Long roundId,
+                                                    @RequestBody(required = false) Map<String, Object> payload) {
+        try {
+            InterviewRound round = (interviewRoundRepository != null)
+                ? interviewRoundRepository.findById(roundId).orElse(null)
+                : null;
+            String title = round != null ? round.getTitle() : "Technical Round";
+            String type = round != null ? round.getRoundType() : "TECHNICAL";
+
+            String notes = payload != null ? (String) payload.get("notes") : "";
+            String code = payload != null ? (String) payload.get("codeSnippet") : "";
+
+            Map<String, Object> draft = (aiInterviewClient != null)
+                ? aiInterviewClient.generateInterviewScorecard(title, type, notes, code)
+                : new AiInterviewClient(new RestTemplate(), "", "").generateFallbackInterviewScorecard(title, type, notes, code);
+
+            return ResponseEntity.ok(draft);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "Failed to generate scorecard draft: " + e.getMessage()));
         }
     }
 

@@ -213,4 +213,46 @@ describe('InterviewPipelinePanel', () => {
       expect(interviewRoundsAPI.confirmSlot).toHaveBeenCalledWith(5000, '2026-05-01T10:00:00');
     });
   });
+
+  describe('recording playback & AI insights', () => {
+    it('opens recording modal and loads speech & sentiment insights', async () => {
+      const recRound = round({
+        recordingUrl: '/uploads/recordings/round_5000_123.webm',
+        recordedAt: '2026-01-01T11:00:00'
+      });
+      interviewRoundsAPI.list.mockResolvedValue({ data: [recRound] });
+      interviewRoundsAPI.getRecordingUrl.mockReturnValue('/api/interview-rounds/5000/recording');
+      interviewRoundsAPI.getRecordingInsights.mockResolvedValue({
+        data: {
+          clarityScore: 94,
+          wordsPerMinute: 142,
+          cadenceEvaluation: 'Optimal & Confident Pace',
+          fillerWordFrequency: '< 1.0%',
+          sentiment: { confident: 88, thoughtful: 10, hesitant: 2 },
+          technicalKeywords: ['Microservices', 'Distributed Systems'],
+          keyTakeaways: ['Articulated trade-offs with structured rationale'],
+          growthSuggestions: ['Maintain comfortable eye contact']
+        }
+      });
+      const user = userEvent.setup();
+
+      renderPanel({ isRecruiter: true });
+
+      const watchButton = await screen.findByRole('button', { name: /watch recording/i });
+      expect(watchButton).toBeInTheDocument();
+      await user.click(watchButton);
+
+      expect(interviewRoundsAPI.getRecordingInsights).toHaveBeenCalledWith(5000);
+      expect(await screen.findByText(/AI Vocal & Sentiment Insights/i)).toBeInTheDocument();
+      expect(screen.getByText('94%')).toBeInTheDocument();
+      expect(screen.getByText('142')).toBeInTheDocument();
+      expect(screen.getByText('Microservices')).toBeInTheDocument();
+      expect(screen.getByText(/Articulated trade-offs with structured rationale/i)).toBeInTheDocument();
+
+      // Can close modal
+      const closeBtn = screen.getByRole('button', { name: /close recording modal/i });
+      await user.click(closeBtn);
+      expect(screen.queryByText(/AI Vocal & Sentiment Insights/i)).not.toBeInTheDocument();
+    });
+  });
 });
