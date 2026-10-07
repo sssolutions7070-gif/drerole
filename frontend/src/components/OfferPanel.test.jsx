@@ -120,5 +120,27 @@ describe('OfferPanel', () => {
 
       expect(await screen.findByText(/withdrawn by the recruiter/i)).toBeInTheDocument();
     });
+
+    it('opens and displays the official offer letter modal', async () => {
+      offerAPI.get.mockResolvedValue({
+        data: {
+          title: 'Staff Architect',
+          salaryOffered: '$180,000',
+          startDate: '2026-10-01',
+          additionalTerms: '10,000 ISO Stock Options',
+          status: 'SENT',
+        },
+      });
+      const user = userEvent.setup();
+
+      render(<OfferPanel applicationId={1000} isRecruiter={false} onClose={() => {}} />);
+
+      const viewBtn = await screen.findByRole('button', { name: /view official letter/i });
+      await user.click(viewBtn);
+
+      expect(await screen.findByRole('heading', { name: /official offer of employment/i })).toBeInTheDocument();
+      expect(screen.getAllByText(/10,000 ISO Stock Options/).length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByRole('button', { name: /print \/ save pdf/i })).toBeInTheDocument();
+    });
   });
 });

@@ -88,4 +88,35 @@ describe('IntegrationsPanel', () => {
 
     expect(await screen.findByText(/only the account owner/i)).toBeInTheDocument();
   });
+
+  it('populates preset URLs when clicking Slack and Discord preset buttons', async () => {
+    const user = userEvent.setup();
+    render(<IntegrationsPanel recruiterId={100} />);
+
+    await user.click(screen.getByRole('button', { name: /slack preset/i }));
+    expect(screen.getByDisplayValue(/hooks\.slack\.com/i)).toBeInTheDocument();
+    expect(screen.getByText('Slack Block Kit')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /discord preset/i }));
+    expect(screen.getByDisplayValue(/discord\.com\/api\/webhooks/i)).toBeInTheDocument();
+    expect(screen.getByText('Discord Embed')).toBeInTheDocument();
+  });
+
+  it('dispatches a test ping when clicking Send Test Ping', async () => {
+    webhookAPI.list.mockResolvedValue({
+      data: [{ id: 55, url: 'https://hooks.slack.com/services/test', eventType: 'INTERVIEW_SCHEDULED', active: true }],
+    });
+    webhookAPI.testPing = vi.fn().mockResolvedValue({
+      data: { status: 'SUCCESS', message: 'Test ping delivered!' },
+    });
+
+    const user = userEvent.setup();
+    render(<IntegrationsPanel recruiterId={100} />);
+
+    await screen.findByText('https://hooks.slack.com/services/test');
+    await user.click(screen.getByRole('button', { name: /send test ping/i }));
+
+    expect(webhookAPI.testPing).toHaveBeenCalledWith(100, 55);
+    expect(await screen.findByText(/test ping delivered!/i)).toBeInTheDocument();
+  });
 });

@@ -16,6 +16,8 @@ import jakarta.persistence.Table;
 public class Webhook {
     public static final String EVENT_APPLICATION_SUBMITTED = "APPLICATION_SUBMITTED";
     public static final String EVENT_OFFER_ACCEPTED = "OFFER_ACCEPTED";
+    public static final String EVENT_INTERVIEW_SCHEDULED = "INTERVIEW_SCHEDULED";
+    public static final String EVENT_TEST_COMPLETED = "TEST_COMPLETED";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

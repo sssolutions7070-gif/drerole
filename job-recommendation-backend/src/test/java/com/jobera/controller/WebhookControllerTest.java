@@ -89,4 +89,15 @@ class WebhookControllerTest {
 
         assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
     }
+
+    @Test
+    void testWebhookReturnsSuccessStatus() {
+        when(webhookService.testDispatch(100L, 5L, 1L))
+            .thenReturn(Map.of("status", "SUCCESS", "message", "Ping delivered"));
+
+        ResponseEntity<?> response = controller.testWebhook(100L, 5L, requestFor(1L));
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals("SUCCESS", ((Map<?, ?>) response.getBody()).get("status"));
+    }
 }

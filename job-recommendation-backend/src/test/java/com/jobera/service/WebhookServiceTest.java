@@ -126,4 +126,56 @@ class WebhookServiceTest {
 
         verify(webhookRepository).delete(webhook);
     }
+
+    @Test
+    void ownerCanRegisterInterviewAndTestWebhooks() {
+        Map<String, Object> interviewWebhook = service.register(100L, 1L, "https://hooks.slack.com/services/T1/B2/C3", Webhook.EVENT_INTERVIEW_SCHEDULED);
+        assertEquals(Webhook.EVENT_INTERVIEW_SCHEDULED, interviewWebhook.get("eventType"));
+
+        Map<String, Object> testWebhook = service.register(100L, 1L, "https://discord.com/api/webhooks/1/2", Webhook.EVENT_TEST_COMPLETED);
+        assertEquals(Webhook.EVENT_TEST_COMPLETED, testWebhook.get("eventType"));
+    }
+
+    @Test
+    void dispatchFormatsSlackBlockKitForSlackUrls() {
+        Webhook webhook = new Webhook(100L, "https://hooks.slack.com/services/T1/B2/C3", Webhook.EVENT_INTERVIEW_SCHEDULED, "slack-secret");
+        when(webhookRepository.findByRecruiterIdAndEventTypeAndActiveTrue(100L, Webhook.EVENT_INTERVIEW_SCHEDULED))
+            .thenReturn(List.of(webhook));
+
+        service.dispatch(100L, Webhook.EVENT_INTERVIEW_SCHEDULED, Map.of("candidate", "Alice", "role", "Staff Architect"));
+
+        ArgumentCaptor<HttpEntity> captor = ArgumentCaptor.forClass(HttpEntity.class);
+        verify(restTemplate).postForEntity(org.mockito.ArgumentMatchers.eq("https://hooks.slack.com/services/T1/B2/C3"), captor.capture(), org.mockito.ArgumentMatchers.eq(String.class));
+        String body = captor.getValue().getBody().toString();
+        assertEquals(true, body.contains("\"blocks\""));
+        assertEquals(true, body.contains("DreamRole Notification"));
+    }
+
+    @Test
+    void dispatchFormatsDiscordEmbedForDiscordUrls() {
+        Webhook webhook = new Webhook(100L, "https://discord.com/api/webhooks/999/xyz", Webhook.EVENT_APPLICATION_SUBMITTED, "discord-secret");
+        when(webhookRepository.findByRecruiterIdAndEventTypeAndActiveTrue(100L, Webhook.EVENT_APPLICATION_SUBMITTED))
+            .thenReturn(List.of(webhook));
+
+        service.dispatch(100L, Webhook.EVENT_APPLICATION_SUBMITTED, Map.of("candidate", "Bob", "role", "Lead Designer"));
+
+        ArgumentCaptor<HttpEntity> captor = ArgumentCaptor.forClass(HttpEntity.class);
+        verify(restTemplate).postForEntity(org.mockito.ArgumentMatchers.eq("https://discord.com/api/webhooks/999/xyz"), captor.capture(), org.mockito.ArgumentMatchers.eq(String.class));
+        String body = captor.getValue().getBody().toString();
+        assertEquals(true, body.contains("\"embeds\""));
+        assertEquals(true, body.contains("DreamRole Hiring Event"));
+    }
+
+    @Test
+    void testDispatchSendsPingAndReturnsSuccess() {
+        Webhook webhook = new Webhook(100L, "https://example.com/test-hook", Webhook.EVENT_APPLICATION_SUBMITTED, "test-secret");
+        webhook.setId(700L);
+        when(webhookRepository.findByIdAndRecruiterId(700L, 100L)).thenReturn(Optional.of(webhook));
+
+        Map<String, Object> result = service.testDispatch(100L, 700L, 1L);
+
+        assertEquals("SUCCESS", result.get("status"));
+        ArgumentCaptor<HttpEntity> captor = ArgumentCaptor.forClass(HttpEntity.class);
+        verify(restTemplate).postForEntity(org.mockito.ArgumentMatchers.eq("https://example.com/test-hook"), captor.capture(), org.mockito.ArgumentMatchers.eq(String.class));
+    }
 }

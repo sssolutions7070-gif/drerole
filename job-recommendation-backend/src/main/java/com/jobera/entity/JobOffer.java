@@ -47,6 +47,9 @@ public class JobOffer {
     @Column(name = "candidate_signature_ip")
     private String candidateSignatureIp;
 
+    @Column(name = "signature_data_url", columnDefinition = "TEXT")
+    private String signatureDataUrl;
+
     @Column(name = "signed_at")
     private LocalDateTime signedAt;
 
@@ -93,6 +96,8 @@ public class JobOffer {
     public void setCandidateSignatureName(String candidateSignatureName) { this.candidateSignatureName = candidateSignatureName; }
     public String getCandidateSignatureIp() { return candidateSignatureIp; }
     public void setCandidateSignatureIp(String candidateSignatureIp) { this.candidateSignatureIp = candidateSignatureIp; }
+    public String getSignatureDataUrl() { return signatureDataUrl; }
+    public void setSignatureDataUrl(String signatureDataUrl) { this.signatureDataUrl = signatureDataUrl; }
     public LocalDateTime getSignedAt() { return signedAt; }
     public void setSignedAt(LocalDateTime signedAt) { this.signedAt = signedAt; }
     public String getDeclineReason() { return declineReason; }

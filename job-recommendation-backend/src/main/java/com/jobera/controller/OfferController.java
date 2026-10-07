@@ -76,12 +76,25 @@ public class OfferController {
         if (signatureName == null || signatureName.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "signatureName is required"));
         }
+        String signatureDataUrl = payload.get("signatureDataUrl");
         try {
-            JobOffer offer = offerService.acceptOffer(applicationId, callingUser(request).getId(),
-                signatureName.trim(), request.getRemoteAddr());
+            JobOffer offer = (signatureDataUrl != null && !signatureDataUrl.isBlank())
+                ? offerService.acceptOffer(applicationId, callingUser(request).getId(),
+                    signatureName.trim(), request.getRemoteAddr(), signatureDataUrl)
+                : offerService.acceptOffer(applicationId, callingUser(request).getId(),
+                    signatureName.trim(), request.getRemoteAddr());
             return ResponseEntity.ok(offer);
         } catch (OfferService.ApplicationNotFoundException | OfferService.OfferNotFoundException
                  | OfferService.OfferNotPendingException | OfferService.NotTheCandidateException e) {
+            return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, e.getMessage()));
+        }
+    }
+
+    @GetMapping("/api/applications/{applicationId}/offer/letter")
+    public ResponseEntity<?> getOfferLetter(@PathVariable Long applicationId) {
+        try {
+            return ResponseEntity.ok(offerService.generateOfferLetter(applicationId));
+        } catch (OfferService.ApplicationNotFoundException | OfferService.OfferNotFoundException e) {
             return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, e.getMessage()));
         }
     }

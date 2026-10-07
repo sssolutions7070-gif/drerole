@@ -41,7 +41,10 @@ public class WebhookService {
     private static final int SECRET_RANDOM_BYTES = 24;
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final Set<String> VALID_EVENT_TYPES = Set.of(
-        Webhook.EVENT_APPLICATION_SUBMITTED, Webhook.EVENT_OFFER_ACCEPTED);
+        Webhook.EVENT_APPLICATION_SUBMITTED,
+        Webhook.EVENT_OFFER_ACCEPTED,
+        Webhook.EVENT_INTERVIEW_SCHEDULED,
+        Webhook.EVENT_TEST_COMPLETED);
 
     private final WebhookRepository webhookRepository;
     private final RecruiterRepository recruiterRepository;
@@ -136,9 +139,89 @@ public class WebhookService {
         webhookRepository.delete(webhook);
     }
 
-    /** Fires every active webhook a recruiter has registered for this event type. Never throws -
-     *  a delivery failure (unreachable URL, timeout, non-2xx) is logged and otherwise ignored,
-     *  since a broken webhook must never break the request that triggered it. */
+    /** Formats the payload according to destination platform (Slack Block Kit, Discord Embeds, or standard JSON). */
+    public String formatPayload(String url, String eventType, Map<String, Object> payload) {
+        try {
+            if (url != null && url.toLowerCase().contains("hooks.slack.com")) {
+                Map<String, Object> slackBody = new LinkedHashMap<>();
+                String title = "DreamRole Notification: " + humanizeEvent(eventType);
+                slackBody.put("text", title);
+                java.util.List<Map<String, Object>> blocks = new java.util.ArrayList<>();
+                blocks.add(Map.of("type", "header", "text", Map.of("type", "plain_text", "text", "🎯 " + title, "emoji", true)));
+
+                StringBuilder mrkdwn = new StringBuilder();
+                mrkdwn.append("*Event:* `").append(eventType).append("`\n");
+                for (Map.Entry<String, Object> entry : payload.entrySet()) {
+                    mrkdwn.append("*").append(entry.getKey()).append(":* ").append(entry.getValue()).append("\n");
+                }
+                blocks.add(Map.of("type", "section", "text", Map.of("type", "mrkdwn", "text", mrkdwn.toString())));
+                slackBody.put("blocks", blocks);
+                return objectMapper.writeValueAsString(slackBody);
+            } else if (url != null && (url.toLowerCase().contains("discord.com/api/webhooks") || url.toLowerCase().contains("discordapp.com/api/webhooks"))) {
+                Map<String, Object> discordBody = new LinkedHashMap<>();
+                discordBody.put("content", "🎯 **DreamRole Alert: " + humanizeEvent(eventType) + "**");
+                Map<String, Object> embed = new LinkedHashMap<>();
+                embed.put("title", "DreamRole Hiring Event");
+                embed.put("description", "An automated update from your DreamRole workspace.");
+                embed.put("color", 5793266); // Blurple
+
+                java.util.List<Map<String, Object>> fields = new java.util.ArrayList<>();
+                fields.add(Map.of("name", "Event", "value", eventType, "inline", true));
+                for (Map.Entry<String, Object> entry : payload.entrySet()) {
+                    fields.add(Map.of("name", entry.getKey(), "value", String.valueOf(entry.getValue()), "inline", true));
+                }
+                embed.put("fields", fields);
+                discordBody.put("embeds", java.util.List.of(embed));
+                return objectMapper.writeValueAsString(discordBody);
+            } else {
+                return objectMapper.writeValueAsString(Map.of("event", eventType, "data", payload));
+            }
+        } catch (Exception e) {
+            log.warn("Payload formatting fallback for event {}: {}", eventType, e.getMessage());
+            return "{\"event\":\"" + eventType + "\"}";
+        }
+    }
+
+    private String humanizeEvent(String eventType) {
+        if (eventType == null) return "Hiring Event";
+        return switch (eventType) {
+            case Webhook.EVENT_APPLICATION_SUBMITTED -> "New Candidate Application";
+            case Webhook.EVENT_OFFER_ACCEPTED -> "Candidate Accepted Offer";
+            case Webhook.EVENT_INTERVIEW_SCHEDULED -> "Interview Confirmed";
+            case Webhook.EVENT_TEST_COMPLETED -> "Assessment Completed";
+            default -> eventType.replace('_', ' ');
+        };
+    }
+
+    /** Test dispatch sends an immediate verification message to test connection. */
+    public Map<String, Object> testDispatch(Long recruiterId, Long webhookId, Long callerId) {
+        Recruiter recruiter = recruiterRepository.findById(recruiterId)
+            .orElseThrow(() -> new RecruiterNotFoundException(recruiterId));
+        requireOwner(recruiter, callerId);
+
+        Webhook webhook = webhookRepository.findByIdAndRecruiterId(webhookId, recruiterId)
+            .orElseThrow(() -> new WebhookNotFoundException(webhookId));
+
+        Map<String, Object> testData = new LinkedHashMap<>();
+        testData.put("status", "VERIFIED");
+        testData.put("testPing", true);
+        testData.put("message", "✨ DreamRole test webhook ping successful! Your integration is active.");
+        testData.put("eventType", webhook.getEventType());
+        testData.put("timestamp", java.time.LocalDateTime.now().toString());
+
+        String body = formatPayload(webhook.getUrl(), webhook.getEventType(), testData);
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("X-DreamRole-Signature", "sha256=" + hmacHex(body, webhook.getSecret()));
+            restTemplate.postForEntity(webhook.getUrl(), new HttpEntity<>(body, headers), String.class);
+            return Map.of("status", "SUCCESS", "message", "Test ping delivered successfully to " + webhook.getUrl());
+        } catch (Exception e) {
+            return Map.of("status", "FAILED", "message", "Delivery failed: " + e.getMessage());
+        }
+    }
+
+    /** Fires every active webhook a recruiter has registered for this event type. Never throws. */
     public void dispatch(Long recruiterId, String eventType, Map<String, Object> payload) {
         if (recruiterId == null) {
             return;
@@ -148,16 +231,9 @@ public class WebhookService {
             return;
         }
 
-        String body;
-        try {
-            body = objectMapper.writeValueAsString(Map.of("event", eventType, "data", payload));
-        } catch (Exception e) {
-            log.warn("Failed to serialize webhook payload for event {}: {}", eventType, e.getMessage());
-            return;
-        }
-
         for (Webhook webhook : webhooks) {
             try {
+                String body = formatPayload(webhook.getUrl(), eventType, payload);
                 HttpHeaders headers = new HttpHeaders();
                 headers.setContentType(MediaType.APPLICATION_JSON);
                 headers.set("X-DreamRole-Signature", "sha256=" + hmacHex(body, webhook.getSecret()));

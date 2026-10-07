@@ -72,4 +72,16 @@ public class WebhookController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(ERROR_KEY, e.getMessage()));
         }
     }
+
+    @PostMapping("/{webhookId}/test")
+    public ResponseEntity<?> testWebhook(@PathVariable Long recruiterId, @PathVariable Long webhookId, HttpServletRequest request) {
+        try {
+            Map<String, Object> result = webhookService.testDispatch(recruiterId, webhookId, callingUserId(request));
+            return ResponseEntity.ok(result);
+        } catch (WebhookService.RecruiterNotFoundException | WebhookService.WebhookNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(ERROR_KEY, e.getMessage()));
+        } catch (WebhookService.NotTheAccountOwnerException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(ERROR_KEY, e.getMessage()));
+        }
+    }
 }

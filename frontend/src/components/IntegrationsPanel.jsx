@@ -5,6 +5,8 @@ import { apiKeyAPI, webhookAPI } from '../services/api';
 const EVENT_TYPES = [
   { value: 'APPLICATION_SUBMITTED', label: 'Application submitted' },
   { value: 'OFFER_ACCEPTED', label: 'Offer accepted' },
+  { value: 'INTERVIEW_SCHEDULED', label: 'Interview scheduled / confirmed' },
+  { value: 'TEST_COMPLETED', label: 'Assessment / test completed' },
 ];
 
 const CopyBox = ({ value }) => {
@@ -28,6 +30,18 @@ const CopyBox = ({ value }) => {
   );
 };
 
+const getPlatformBadge = (url) => {
+  if (!url) return null;
+  const lower = url.toLowerCase();
+  if (lower.includes('hooks.slack.com')) {
+    return { name: 'Slack Block Kit', color: 'bg-emerald-100 text-emerald-800 border-emerald-300' };
+  }
+  if (lower.includes('discord.com/api/webhooks') || lower.includes('discordapp.com/api/webhooks')) {
+    return { name: 'Discord Embed', color: 'bg-indigo-100 text-indigo-800 border-indigo-300' };
+  }
+  return { name: 'Standard HMAC JSON', color: 'bg-gray-100 text-gray-700 border-gray-300' };
+};
+
 /** Developer-facing integrations for a recruiter's own account: API keys for calling the API as
  *  themselves, and webhooks to be notified of events without polling. Owner-only in the backend;
  *  this panel doesn't hide itself from team members, but every action here will 403 for them. */
@@ -40,6 +54,8 @@ const IntegrationsPanel = ({ recruiterId }) => {
   const [webhookUrl, setWebhookUrl] = useState('');
   const [webhookEvent, setWebhookEvent] = useState(EVENT_TYPES[0].value);
   const [justCreatedWebhook, setJustCreatedWebhook] = useState(null);
+  const [testResults, setTestResults] = useState({});
+  const [testingWebhookId, setTestingWebhookId] = useState(null);
 
   const fetchAll = async () => {
     try {
@@ -105,6 +121,27 @@ const IntegrationsPanel = ({ recruiterId }) => {
     }
   };
 
+  const handleTestPing = async (webhookId) => {
+    setTestingWebhookId(webhookId);
+    try {
+      const res = await webhookAPI.testPing(recruiterId, webhookId);
+      const isSuccess = res.data?.status === 'SUCCESS';
+      setTestResults(prev => ({
+        ...prev,
+        [webhookId]: { success: isSuccess, message: res.data?.message || 'Ping delivered!' }
+      }));
+    } catch (err) {
+      setTestResults(prev => ({
+        ...prev,
+        [webhookId]: { success: false, message: err.response?.data?.error || 'Ping delivery failed' }
+      }));
+    } finally {
+      setTestingWebhookId(null);
+    }
+  };
+
+  const detectedPlatform = getPlatformBadge(webhookUrl);
+
   return (
     <div className="space-y-8">
       {error && <p className="text-red-600 text-sm">{error}</p>}
@@ -161,11 +198,29 @@ const IntegrationsPanel = ({ recruiterId }) => {
       </div>
 
       <div>
-        <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2 mb-2">
-          <WebhookIcon className="h-5 w-5" /> Webhooks
-        </h3>
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+            <WebhookIcon className="h-5 w-5" /> Team Collaboration & Webhooks
+          </h3>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setWebhookUrl('https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK')}
+              className="text-xs px-2.5 py-1 bg-purple-50 text-purple-700 border border-purple-200 rounded hover:bg-purple-100 font-medium"
+            >
+              💬 Slack Preset
+            </button>
+            <button
+              type="button"
+              onClick={() => setWebhookUrl('https://discord.com/api/webhooks/YOUR/DISCORD/WEBHOOK')}
+              className="text-xs px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded hover:bg-indigo-100 font-medium"
+            >
+              🎮 Discord Preset
+            </button>
+          </div>
+        </div>
         <p className="text-sm text-gray-500 mb-3">
-          Get an HMAC-signed POST to your URL when one of these events happens, instead of polling the API.
+          Get real-time Slack Block Kit alerts, Discord channel embeds, or HMAC-signed JSON posts when candidate milestones occur.
         </p>
 
         {justCreatedWebhook && (
@@ -177,41 +232,85 @@ const IntegrationsPanel = ({ recruiterId }) => {
           </div>
         )}
 
-        <form onSubmit={handleRegisterWebhook} className="flex flex-wrap gap-2 mb-4">
-          <input
-            type="url"
-            required
-            value={webhookUrl}
-            onChange={(e) => setWebhookUrl(e.target.value)}
-            placeholder="https://your-app.com/webhook"
-            className="flex-1 min-w-[220px] border border-gray-300 rounded-md px-3 py-2"
-          />
-          <select
-            value={webhookEvent}
-            onChange={(e) => setWebhookEvent(e.target.value)}
-            className="border border-gray-300 rounded-md px-3 py-2"
-          >
-            {EVENT_TYPES.map((et) => (
-              <option key={et.value} value={et.value}>{et.label}</option>
-            ))}
-          </select>
-          <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2">
-            <Plus className="h-4 w-4" /> Add webhook
-          </button>
+        <form onSubmit={handleRegisterWebhook} className="space-y-2 mb-4">
+          <div className="flex flex-wrap gap-2">
+            <input
+              type="url"
+              required
+              value={webhookUrl}
+              onChange={(e) => setWebhookUrl(e.target.value)}
+              placeholder="https://your-app.com/webhook (or Slack / Discord webhook)"
+              className="flex-1 min-w-[220px] border border-gray-300 rounded-md px-3 py-2 text-sm"
+            />
+            <select
+              value={webhookEvent}
+              onChange={(e) => setWebhookEvent(e.target.value)}
+              className="border border-gray-300 rounded-md px-3 py-2 text-sm"
+            >
+              {EVENT_TYPES.map((et) => (
+                <option key={et.value} value={et.value}>{et.label}</option>
+              ))}
+            </select>
+            <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2 text-sm font-medium">
+              <Plus className="h-4 w-4" /> Add webhook
+            </button>
+          </div>
+          {webhookUrl && detectedPlatform && (
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-gray-500">Auto-detected formatting:</span>
+              <span className={`px-2 py-0.5 border rounded-full font-medium ${detectedPlatform.color}`}>
+                {detectedPlatform.name}
+              </span>
+            </div>
+          )}
         </form>
 
         <div className="space-y-2">
-          {webhooks.map((webhook) => (
-            <div key={webhook.id} className="bg-white border border-gray-200 rounded-lg p-3 flex items-center justify-between">
-              <div>
-                <p className="font-medium text-gray-900 break-all">{webhook.url}</p>
-                <p className="text-xs text-gray-500">{webhook.eventType}</p>
+          {webhooks.map((webhook) => {
+            const platform = getPlatformBadge(webhook.url);
+            const testResult = testResults[webhook.id];
+            const isTesting = testingWebhookId === webhook.id;
+            return (
+              <div key={webhook.id} className="bg-white border border-gray-200 rounded-lg p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-medium text-gray-900 break-all text-sm">{webhook.url}</p>
+                    {platform && (
+                      <span className={`px-2 py-0.5 text-[11px] border rounded-full font-medium ${platform.color}`}>
+                        {platform.name}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500">Event: <span className="font-mono text-gray-700">{webhook.eventType}</span></p>
+                  {testResult && (
+                    <div className={`text-xs p-1.5 rounded flex items-center gap-1.5 ${
+                      testResult.success ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'
+                    }`}>
+                      <span>{testResult.success ? '✓' : '⚠️'}</span>
+                      <span>{testResult.message}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0 self-end sm:self-center">
+                  <button
+                    type="button"
+                    onClick={() => handleTestPing(webhook.id)}
+                    disabled={isTesting}
+                    className="px-2.5 py-1.5 bg-gray-50 text-gray-700 border border-gray-300 rounded hover:bg-gray-100 text-xs font-medium flex items-center gap-1 disabled:opacity-50"
+                  >
+                    {isTesting ? 'Sending Ping...' : '⚡ Send Test Ping'}
+                  </button>
+                  <button
+                    onClick={() => handleRemoveWebhook(webhook.id)}
+                    aria-label="Remove webhook"
+                    className="text-red-500 hover:text-red-700 p-1.5"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
-              <button onClick={() => handleRemoveWebhook(webhook.id)} aria-label="Remove webhook" className="text-red-500 hover:text-red-700 flex-shrink-0">
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

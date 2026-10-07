@@ -2,6 +2,7 @@ package com.jobera.service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -123,6 +124,10 @@ public class OfferService {
     }
 
     public JobOffer acceptOffer(Long applicationId, Long callerId, String signatureName, String signatureIp) {
+        return acceptOffer(applicationId, callerId, signatureName, signatureIp, null);
+    }
+
+    public JobOffer acceptOffer(Long applicationId, Long callerId, String signatureName, String signatureIp, String signatureDataUrl) {
         Application application = requireApplication(applicationId);
         if (!callerId.equals(candidateUserId(application))) {
             throw new NotTheCandidateException();
@@ -135,6 +140,9 @@ public class OfferService {
         offer.setStatus("ACCEPTED");
         offer.setCandidateSignatureName(signatureName);
         offer.setCandidateSignatureIp(signatureIp);
+        if (signatureDataUrl != null && !signatureDataUrl.isBlank()) {
+            offer.setSignatureDataUrl(signatureDataUrl);
+        }
         offer.setSignedAt(LocalDateTime.now());
         JobOffer saved = jobOfferRepository.save(offer);
 
@@ -152,6 +160,37 @@ public class OfferService {
         }
 
         return saved;
+    }
+
+    public Map<String, Object> generateOfferLetter(Long applicationId) {
+        Application application = requireApplication(applicationId);
+        JobOffer offer = getOffer(applicationId);
+
+        String companyName = application.getJobPosting() != null && application.getJobPosting().getRecruiter() != null
+            ? application.getJobPosting().getRecruiter().getCompanyName()
+            : "DreamRole Partner";
+        String candidateName = application.getUser() != null ? application.getUser().getFullName() : "Candidate";
+        String candidateEmail = application.getUser() != null ? application.getUser().getEmail() : "";
+        String jobTitle = offer.getTitle();
+        String compensation = offer.getSalaryOffered();
+        String startDate = offer.getStartDate() != null ? offer.getStartDate().toString() : "To be mutually agreed";
+        String terms = offer.getAdditionalTerms() != null ? offer.getAdditionalTerms() : "Standard employment benefits, health insurance, and 401(k) eligibility.";
+
+        Map<String, Object> letter = new LinkedHashMap<>();
+        letter.put("applicationId", applicationId);
+        letter.put("companyName", companyName);
+        letter.put("candidateName", candidateName);
+        letter.put("candidateEmail", candidateEmail);
+        letter.put("jobTitle", jobTitle);
+        letter.put("compensation", compensation);
+        letter.put("startDate", startDate);
+        letter.put("terms", terms);
+        letter.put("status", offer.getStatus());
+        letter.put("signatureName", offer.getCandidateSignatureName());
+        letter.put("signatureDataUrl", offer.getSignatureDataUrl());
+        letter.put("signedAt", offer.getSignedAt() != null ? offer.getSignedAt().toString() : null);
+        letter.put("createdAt", offer.getCreatedAt() != null ? offer.getCreatedAt().toString() : null);
+        return letter;
     }
 
     public JobOffer declineOffer(Long applicationId, Long callerId, String reason) {
