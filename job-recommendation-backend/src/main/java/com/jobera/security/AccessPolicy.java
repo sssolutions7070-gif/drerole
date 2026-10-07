@@ -184,6 +184,8 @@ public class AccessPolicy {
         rule("PUT", "/api/recruiters/jobs/{jobId}", ownsJob("jobId"));
         rule("DELETE", "/api/recruiters/jobs/{jobId}", ownsJob("jobId"));
         rule("GET", "/api/recruiters/jobs/{jobId}/applications", ownsJob("jobId"));
+        rule("GET", "/api/recruiters/jobs/{jobId}/applications/export", ownsJob("jobId"));
+        rule("POST", "/api/recruiters/jobs/{jobId}/duplicate", ownsJob("jobId"));
 
         // Application tracking
         rule("GET", "/api/applications/user/{userId}", self("userId"));

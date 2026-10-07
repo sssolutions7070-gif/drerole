@@ -469,6 +469,16 @@ export const jobManagementAPI = {
   // Get job applications (recruiter)
   getJobApplications: (jobId, recruiterId) =>
     api.get(`/recruiters/jobs/${jobId}/applications?recruiterId=${recruiterId}`),
+
+  // Clone a job posting's content as a fresh pending draft
+  duplicateJob: (jobId, recruiterId) =>
+    api.post(`/recruiters/jobs/${jobId}/duplicate`, { recruiterId }),
+
+  // Download a job's applicants as a CSV file
+  exportApplicationsCsv: (jobId, recruiterId) =>
+    api.get(`/recruiters/jobs/${jobId}/applications/export?recruiterId=${recruiterId}`, {
+      responseType: 'blob',
+    }),
 };
 
 // Job Recommendation API calls

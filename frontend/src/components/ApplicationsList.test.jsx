@@ -59,6 +59,68 @@ describe('ApplicationsList bulk actions', () => {
     api.put.mockResolvedValue({ data: { success: true } });
   });
 
+  it('shows a Compare button once 2-4 candidates are selected and renders a comparison table', async () => {
+    const user = userEvent.setup();
+    render(<ApplicationsList job={mockJob} onClose={vi.fn()} />);
+
+    await screen.findByText('Bob Candidate');
+
+    const bobCheckbox = screen.getByLabelText(/Select Bob Candidate/i);
+    expect(screen.queryByRole('button', { name: /Compare \(/i })).not.toBeInTheDocument();
+    await user.click(bobCheckbox);
+    expect(screen.queryByRole('button', { name: /Compare \(/i })).not.toBeInTheDocument();
+
+    const charlieCheckbox = screen.getByLabelText(/Select Charlie Candidate/i);
+    await user.click(charlieCheckbox);
+
+    const compareBtn = screen.getByRole('button', { name: /Compare \(2\)/i });
+    await user.click(compareBtn);
+
+    expect(screen.getByText(/Comparing 2 candidates/i)).toBeInTheDocument();
+    expect(screen.getAllByText('Bob Candidate').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Charlie Candidate').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('85%').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('75%').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('exports the applicant list as a CSV file', async () => {
+    const user = userEvent.setup();
+    const clickSpy = vi.fn();
+    const originalCreateElement = document.createElement.bind(document);
+    vi.spyOn(document, 'createElement').mockImplementation((tag) => {
+      const el = originalCreateElement(tag);
+      if (tag === 'a') el.click = clickSpy;
+      return el;
+    });
+    api.get.mockImplementation((url) => {
+      if (url.includes('/applications/export')) {
+        return Promise.resolve({ data: new Blob(['Name,Email\nBob,bob@example.com']) });
+      }
+      if (url.includes('/resume-matching/job/') || url.includes('/applications/job/')) {
+        return Promise.resolve({ data: { applications: mockApplications } });
+      }
+      if (url.includes('/recruiters/user/')) {
+        return Promise.resolve({ data: { recruiter: { id: 5 } } });
+      }
+      return Promise.resolve({ data: [] });
+    });
+
+    render(<ApplicationsList job={mockJob} onClose={vi.fn()} />);
+    await screen.findByText('Bob Candidate');
+
+    await user.click(screen.getByRole('button', { name: /Export CSV/i }));
+
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith(
+        expect.stringContaining('/recruiters/jobs/10/applications/export?recruiterId=5'),
+        expect.objectContaining({ responseType: 'blob' })
+      );
+      expect(clickSpy).toHaveBeenCalled();
+    });
+
+    document.createElement.mockRestore();
+  });
+
   it('renders application list with bulk action controls', async () => {
     render(<ApplicationsList job={mockJob} onClose={vi.fn()} />);
 

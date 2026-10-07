@@ -5,7 +5,7 @@ import {
   Mail, Phone, Calendar, BookOpen, BarChart3, X, Upload,
   MapPin, CheckCircle, XCircle, Clock, TrendingUp, Award,
   Target, Send, Filter, Download, ChevronDown, ChevronUp,
-  Sparkles, UserCheck, Key, FileText, Loader, Star, CreditCard, Users2, MessageSquare, BadgeCheck
+  Sparkles, UserCheck, Key, FileText, Loader, Star, CreditCard, Users2, MessageSquare, BadgeCheck, Copy
 } from 'lucide-react';
 import api from '../services/api';
 import JobPostForm from '../components/JobPostForm';
@@ -191,6 +191,24 @@ const RecruiterDashboard = () => {
   const viewApplications = (job) => {
     setSelectedJob(job);
     setShowApplications(true);
+  };
+
+  const [duplicatingJobId, setDuplicatingJobId] = useState(null);
+
+  const handleDuplicateJob = async (job) => {
+    if (!window.confirm(`Duplicate "${job.title}" as a new draft you can edit and re-publish?`)) {
+      return;
+    }
+    setDuplicatingJobId(job.id);
+    try {
+      await api.post(`/recruiters/jobs/${job.id}/duplicate`, { recruiterId: recruiterProfile?.id });
+      await fetchRecruiterJobs();
+    } catch (error) {
+      console.error('Error duplicating job:', error);
+      alert('Failed to duplicate job: ' + (error.response?.data?.error || error.message));
+    } finally {
+      setDuplicatingJobId(null);
+    }
   };
 
   const navigateToInterviewPage = () => {
@@ -586,6 +604,16 @@ const RecruiterDashboard = () => {
                     >
                       <Trash2 className="h-4 w-4 mr-1" />
                       Delete
+                    </button>
+                  </div>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => handleDuplicateJob(job)}
+                      disabled={duplicatingJobId === job.id}
+                      className="flex-1 inline-flex items-center justify-center px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      <Copy className="h-4 w-4 mr-1" />
+                      {duplicatingJobId === job.id ? 'Duplicating…' : 'Duplicate'}
                     </button>
                   </div>
                 </div>

@@ -5,7 +5,7 @@ import {
   Briefcase, RefreshCw, Eye, Clock, CheckCircle, XCircle,
   Calendar as CalendarIcon, MapPin, MessageCircle, TrendingUp,
   FileText, Percent, Target, Award, Sparkles, Video, FileCheck,
-  Columns, GripVertical, List, Search, EyeOff, ShieldCheck
+  Columns, GripVertical, List, Search, EyeOff, ShieldCheck, GitCompare
 } from 'lucide-react';
 import api from '../services/api';
 import MessageThread from './MessageThread';
@@ -35,6 +35,8 @@ const ApplicationsList = ({ job, onClose }) => {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
   const [bulkResultMessage, setBulkResultMessage] = useState('');
+  const [showCompareModal, setShowCompareModal] = useState(false);
+  const [exportingCsv, setExportingCsv] = useState(false);
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'kanban'
   const [searchQuery, setSearchQuery] = useState('');
   const [draggedApp, setDraggedApp] = useState(null);
@@ -444,6 +446,35 @@ const ApplicationsList = ({ job, onClose }) => {
     fetchApplications();
   };
 
+  const handleExportCsv = async () => {
+    let rId = recruiterId;
+    if (!rId) {
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+      rId = currentUser?.recruiterId;
+    }
+    if (!rId) return;
+
+    setExportingCsv(true);
+    try {
+      const response = await api.get(`/recruiters/jobs/${job.id}/applications/export?recruiterId=${rId}`, {
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'text/csv' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `applicants_${(job.title || 'job').replace(/[^a-z0-9]+/gi, '_').toLowerCase()}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error exporting applicants:', error);
+      alert('Failed to export applicants: ' + (error.response?.data?.error || error.message));
+    } finally {
+      setExportingCsv(false);
+    }
+  };
+
   const KANBAN_COLUMNS = [
     {
       id: 'applied',
@@ -799,6 +830,78 @@ const ApplicationsList = ({ job, onClose }) => {
   };
 
   // Test Results Modal Component
+  const CompareModal = () => {
+    const compared = filteredApplications.filter((a) => selectedIds.has(a.id));
+    if (compared.length === 0) return null;
+
+    const rows = [
+      { label: 'Candidate', render: (a) => a.applicantName || a.applicant?.fullName || 'Unknown' },
+      { label: 'Match Score', render: (a) => a.matchPercentage > 0 ? `${a.matchPercentage}%` : '—' },
+      {
+        label: 'Status',
+        render: (a) => (
+          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(a.status)}`}>
+            {a.status?.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (l) => l.toUpperCase()) || 'Unknown'}
+          </span>
+        ),
+      },
+      { label: 'Experience', render: (a) => a.applicantExperience || '—' },
+      { label: 'Education', render: (a) => a.applicantEducation || '—' },
+      {
+        label: 'Skills',
+        render: (a) => (
+          <div className="flex flex-wrap gap-1">
+            {parseSkills(a.applicantSkills).length > 0
+              ? parseSkills(a.applicantSkills).map((skill, i) => (
+                  <span key={i} className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs">{skill}</span>
+                ))
+              : <span className="text-gray-400">—</span>}
+          </div>
+        ),
+      },
+      { label: 'Applied', render: (a) => formatDate(a.applicationDate) },
+    ];
+
+    return (
+      <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div className="relative top-10 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold flex items-center">
+              <GitCompare className="h-5 w-5 mr-2 text-blue-600" />
+              Comparing {compared.length} candidate{compared.length === 1 ? '' : 's'}
+            </h3>
+            <button
+              onClick={() => setShowCompareModal(false)}
+              aria-label="Close comparison"
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full border border-gray-200 rounded-lg">
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.label} className="border-b border-gray-100 last:border-0">
+                    <th className="text-left align-top px-3 py-3 bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wide w-32">
+                      {row.label}
+                    </th>
+                    {compared.map((application) => (
+                      <td key={application.id} className="px-3 py-3 text-sm text-gray-800 align-top border-l border-gray-100">
+                        {row.render(application)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const TestResultsModal = () => {
     if (!testResults) return null;
 
@@ -1554,36 +1657,57 @@ const ApplicationsList = ({ job, onClose }) => {
                   )}
                 </div>
 
-                {selectedIds.size > 0 && (
-                  <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2">
+                  {selectedIds.size >= 2 && selectedIds.size <= 4 && (
                     <button
                       type="button"
-                      onClick={() => handleBulkAction('shortlist')}
-                      disabled={bulkActionLoading}
-                      className="inline-flex items-center px-3 py-1.5 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition-colors shadow-sm"
+                      onClick={() => setShowCompareModal(true)}
+                      className="inline-flex items-center px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
                     >
-                      <CheckCircle className="h-4 w-4 mr-1.5" />
-                      Shortlist ({selectedIds.size})
+                      <GitCompare className="h-4 w-4 mr-1.5" />
+                      Compare ({selectedIds.size})
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => handleBulkAction('reject')}
-                      disabled={bulkActionLoading}
-                      className="inline-flex items-center px-3 py-1.5 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 disabled:opacity-50 transition-colors shadow-sm"
-                    >
-                      <XCircle className="h-4 w-4 mr-1.5" />
-                      Reject ({selectedIds.size})
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedIds(new Set())}
-                      disabled={bulkActionLoading}
-                      className="px-2.5 py-1.5 text-xs text-gray-500 hover:text-gray-700 underline"
-                    >
-                      Clear
-                    </button>
-                  </div>
-                )}
+                  )}
+                  {selectedIds.size > 0 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleBulkAction('shortlist')}
+                        disabled={bulkActionLoading}
+                        className="inline-flex items-center px-3 py-1.5 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition-colors shadow-sm"
+                      >
+                        <CheckCircle className="h-4 w-4 mr-1.5" />
+                        Shortlist ({selectedIds.size})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleBulkAction('reject')}
+                        disabled={bulkActionLoading}
+                        className="inline-flex items-center px-3 py-1.5 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 disabled:opacity-50 transition-colors shadow-sm"
+                      >
+                        <XCircle className="h-4 w-4 mr-1.5" />
+                        Reject ({selectedIds.size})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedIds(new Set())}
+                        disabled={bulkActionLoading}
+                        className="px-2.5 py-1.5 text-xs text-gray-500 hover:text-gray-700 underline"
+                      >
+                        Clear
+                      </button>
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleExportCsv}
+                    disabled={exportingCsv}
+                    className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors shadow-sm"
+                  >
+                    <Download className="h-4 w-4 mr-1.5" />
+                    {exportingCsv ? 'Exporting…' : 'Export CSV'}
+                  </button>
+                </div>
 
                 {bulkResultMessage && (
                   <div className="w-full text-sm font-medium text-blue-700 bg-blue-50 px-3 py-1.5 rounded border border-blue-200">
@@ -2003,6 +2127,7 @@ const ApplicationsList = ({ job, onClose }) => {
         {showStatusModal && <StatusUpdateModal />}
         {showTestModal && <TestAssignmentModal />}
         {showTestResultsModal && <TestResultsModal />}
+        {showCompareModal && <CompareModal />}
         {messageThreadApplication && (
           <MessageThread
             applicationId={messageThreadApplication.id}

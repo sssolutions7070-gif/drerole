@@ -6,9 +6,12 @@ import com.jobera.entity.Application;
 import com.jobera.entity.JobPosting;
 import com.jobera.service.JobPostingService;
 import com.jobera.service.RecruiterService;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -158,6 +161,70 @@ public class JobManagementController {
         }
     }
     
+    @PostMapping("/{jobId}/duplicate")
+    public ResponseEntity<Map<String, Object>> duplicateJob(
+            @PathVariable Long jobId,
+            @RequestBody Map<String, Object> request) {
+        try {
+            Long recruiterId = Long.valueOf(request.get("recruiterId").toString());
+            JobPosting copy = jobPostingService.duplicateJobPosting(jobId, recruiterId);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Job duplicated successfully");
+            response.put("job", createJobResponse(copy));
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Failed to duplicate job: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/{jobId}/applications/export")
+    public ResponseEntity<byte[]> exportApplications(
+            @PathVariable Long jobId,
+            @RequestParam Long recruiterId) {
+        try {
+            List<Application> applications = jobPostingService.getApplicationsForJob(jobId, recruiterId);
+            byte[] csv = buildApplicantsCsv(applications).getBytes(StandardCharsets.UTF_8);
+            return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"applicants_job_" + jobId + ".csv\"")
+                .contentType(MediaType.parseMediaType("text/csv"))
+                .body(csv);
+        } catch (Exception e) {
+            log.error("❌ ERROR exporting applications: " + e.getMessage());
+            return ResponseEntity.badRequest()
+                .body(("Failed to export applications: " + e.getMessage()).getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    private String buildApplicantsCsv(List<Application> applications) {
+        StringBuilder csv = new StringBuilder();
+        csv.append("Name,Email,Phone,Status,Match %,Applied Date,Skills\n");
+        for (Application application : applications) {
+            String name = application.getUser() != null ? application.getUser().getFullName() : application.getApplicantName();
+            String email = application.getUser() != null ? application.getUser().getEmail() : application.getApplicantEmail();
+            String phone = application.getUser() != null ? application.getUser().getPhone() : application.getApplicantPhone();
+            csv.append(csvField(name)).append(',')
+                .append(csvField(email)).append(',')
+                .append(csvField(phone)).append(',')
+                .append(csvField(application.getStatus())).append(',')
+                .append(application.getMatchPercentage() != null ? application.getMatchPercentage() : 0).append(',')
+                .append(application.getApplicationDate() != null ? application.getApplicationDate() : "").append(',')
+                .append(csvField(application.getApplicantSkills())).append('\n');
+        }
+        return csv.toString();
+    }
+
+    private String csvField(String value) {
+        if (value == null) {
+            return "";
+        }
+        String escaped = value.replace("\"", "\"\"");
+        if (escaped.contains(",") || escaped.contains("\"") || escaped.contains("\n")) {
+            return "\"" + escaped + "\"";
+        }
+        return escaped;
+    }
+
     private Map<String, Object> createJobResponse(JobPosting job) {
         Map<String, Object> response = new HashMap<>();
         response.put("id", job.getId());
