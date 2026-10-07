@@ -325,6 +325,44 @@ public class ApplicationStatusService {
         return analytics;
     }
 
+    public Application sendFollowUp(Long applicationId, String templateType, String customMessage) {
+        Application application = applicationRepository.findById(applicationId)
+            .orElseThrow(() -> new ApplicationStatusException("Application not found: " + applicationId));
+
+        int newCount = (application.getFollowUpCount() != null ? application.getFollowUpCount() : 0) + 1;
+        application.setFollowUpCount(newCount);
+        application.setLastFollowUpAt(LocalDateTime.now());
+        Application saved = applicationRepository.save(application);
+
+        String candidateName = application.getSafeApplicantName();
+        String jobTitle = jobTitleOf(application);
+        String company = (application.getJobPosting() != null && application.getJobPosting().getCompany() != null)
+            ? application.getJobPosting().getCompany()
+            : "our company";
+
+        String messageBody;
+        if (customMessage != null && !customMessage.isBlank()) {
+            messageBody = customMessage.trim();
+        } else if ("INTERVIEW_REMINDER".equalsIgnoreCase(templateType)) {
+            messageBody = "Hi " + candidateName + ", this is a friendly reminder regarding your interview for " + jobTitle + " at " + company + ". Please let us know if you have any questions or need to confirm your availability.";
+        } else if ("ASSESSMENT_NUDGE".equalsIgnoreCase(templateType)) {
+            messageBody = "Hi " + candidateName + ", friendly reminder to complete your pending DreamRole assessment for " + jobTitle + " so our hiring committee can review your submission.";
+        } else if ("NEXT_STEPS".equalsIgnoreCase(templateType)) {
+            messageBody = "Hi " + candidateName + ", our team has updated your application status for " + jobTitle + ". Please check your dashboard for the latest interview and pipeline schedule.";
+        } else {
+            messageBody = "Hi " + candidateName + ", following up on your application for " + jobTitle + " at " + company + ". We are actively reviewing submissions and will keep you informed of next steps!";
+        }
+
+        if (application.getUser() != null) {
+            notificationFeedService.record(application.getUser().getId(), "APPLICATION_FOLLOW_UP",
+                "Follow-Up on " + jobTitle,
+                messageBody,
+                "/applications");
+        }
+
+        return saved;
+    }
+
     public static class ApplicationStatusException extends RuntimeException {
         public ApplicationStatusException(String message) {
             super(message);

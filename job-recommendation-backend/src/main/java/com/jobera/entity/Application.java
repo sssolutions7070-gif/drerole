@@ -89,6 +89,12 @@ public class Application {
     @Column(name = "resume_parsed_text", columnDefinition = "LONGTEXT")
     private String resumeParsedText;
 
+    @Column(name = "follow_up_count")
+    private Integer followUpCount = 0;
+
+    @Column(name = "last_follow_up_at")
+    private LocalDateTime lastFollowUpAt;
+
     @PrePersist
     protected void onCreate() {
         applicationDate = LocalDateTime.now();
@@ -225,6 +231,12 @@ public class Application {
     
     public String getResumeParsedText() { return resumeParsedText; }
     public void setResumeParsedText(String resumeParsedText) { this.resumeParsedText = resumeParsedText; }
+
+    public Integer getFollowUpCount() { return followUpCount != null ? followUpCount : 0; }
+    public void setFollowUpCount(Integer followUpCount) { this.followUpCount = followUpCount; }
+
+    public LocalDateTime getLastFollowUpAt() { return lastFollowUpAt; }
+    public void setLastFollowUpAt(LocalDateTime lastFollowUpAt) { this.lastFollowUpAt = lastFollowUpAt; }
     
     // Helper Methods
     public String getSafeApplicantName() {

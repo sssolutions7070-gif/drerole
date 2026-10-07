@@ -1,7 +1,9 @@
 package com.jobera.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -313,5 +315,19 @@ class ApplicationStatusServiceTest {
 
         org.junit.jupiter.api.Assertions.assertThrows(ApplicationStatusService.ApplicationStatusException.class,
             () -> service.withdrawApplication(999L, 10L));
+    }
+
+    @Test
+    void sendFollowUpIncrementsCountAndRecordsNotification() {
+        Application application = applicationWithRecruiter(1L, 10L, 20L, "APPLICATION_SUBMITTED");
+        when(applicationRepository.findById(1L)).thenReturn(Optional.of(application));
+        when(applicationRepository.save(any(Application.class))).thenAnswer(i -> i.getArgument(0));
+
+        Application updated = service.sendFollowUp(1L, "INTERVIEW_REMINDER", null);
+
+        assertNotNull(updated);
+        assertEquals(1, updated.getFollowUpCount());
+        assertNotNull(updated.getLastFollowUpAt());
+        verify(notificationFeedService).record(eq(10L), eq("APPLICATION_FOLLOW_UP"), anyString(), anyString(), eq("/applications"));
     }
 }

@@ -456,6 +456,27 @@ public class ApplicationStatusController {
         }
     }
 
+    @PostMapping("/{applicationId}/follow-up")
+    public ResponseEntity<Map<String, Object>> sendFollowUp(
+            @PathVariable Long applicationId,
+            @RequestBody(required = false) Map<String, String> payload) {
+        try {
+            String templateType = payload != null ? payload.get("templateType") : "CHECK_IN";
+            String customMessage = payload != null ? payload.get("customMessage") : null;
+            Application application = applicationStatusService.sendFollowUp(applicationId, templateType, customMessage);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put(RESPONSE_KEY_MESSAGE, "Follow-up nudge sent successfully");
+            response.put("application", createApplicationResponse(application));
+            response.put("followUpCount", application.getFollowUpCount());
+            response.put("lastFollowUpAt", application.getLastFollowUpAt());
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(RESPONSE_KEY_ERROR, "Failed to send follow-up: " + e.getMessage()));
+        }
+    }
+
     private Map<String, Object> createApplicationResponse(Application application) {
         Map<String, Object> response = new HashMap<>();
         response.put("id", application.getId());
@@ -467,6 +488,8 @@ public class ApplicationStatusController {
         response.put("interviewDate", application.getInterviewDate());
         response.put("interviewLocation", application.getInterviewLocation());
         response.put("recruiterNotes", application.getRecruiterNotes());
+        response.put("followUpCount", application.getFollowUpCount() != null ? application.getFollowUpCount() : 0);
+        response.put("lastFollowUpAt", application.getLastFollowUpAt());
         response.put("coverLetter", application.getCoverLetter());
         response.put("applicantSkills", application.getApplicantSkills());
         response.put("applicantExperience", application.getApplicantExperience());

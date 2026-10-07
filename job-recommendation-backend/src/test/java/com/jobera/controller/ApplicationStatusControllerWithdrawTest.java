@@ -76,4 +76,31 @@ class ApplicationStatusControllerWithdrawTest {
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
     }
+
+    @Test
+    void sendFollowUpReturnsOkWithUpdatedApplication() {
+        Application application = new Application();
+        application.setId(1L);
+        application.setStatus("SHORTLISTED");
+        application.setFollowUpCount(1);
+        when(applicationStatusService.sendFollowUp(1L, "INTERVIEW_REMINDER", "Please confirm time")).thenReturn(application);
+
+        ResponseEntity<Map<String, Object>> response = controller.sendFollowUp(
+            1L, Map.of("templateType", "INTERVIEW_REMINDER", "customMessage", "Please confirm time"));
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals("Follow-up nudge sent successfully", response.getBody().get("message"));
+        assertEquals(1, response.getBody().get("followUpCount"));
+    }
+
+    @Test
+    void sendFollowUpReturnsBadRequestOnServiceError() {
+        when(applicationStatusService.sendFollowUp(999L, "CHECK_IN", null))
+            .thenThrow(new ApplicationStatusService.ApplicationStatusException("Application not found"));
+
+        ResponseEntity<Map<String, Object>> response = controller.sendFollowUp(
+            999L, Map.of("templateType", "CHECK_IN"));
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+    }
 }
