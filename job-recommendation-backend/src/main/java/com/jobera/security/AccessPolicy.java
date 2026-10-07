@@ -17,6 +17,7 @@ import com.jobera.entity.Recruiter;
 import com.jobera.entity.User;
 import com.jobera.repository.ApplicationRepository;
 import com.jobera.repository.AptitudeTestRepository;
+import com.jobera.repository.CompanyReviewRepository;
 import com.jobera.repository.DreamRoleTestAssignmentRepository;
 import com.jobera.repository.DreamRoleTestRepository;
 import com.jobera.repository.ExternalCandidateRepository;
@@ -71,6 +72,7 @@ public class AccessPolicy {
     private final ResumeRepository resumeRepository;
     private final InterviewRoundRepository interviewRoundRepository;
     private final RecruiterTeamMemberRepository recruiterTeamMemberRepository;
+    private final CompanyReviewRepository companyReviewRepository;
 
     public AccessPolicy(RecruiterRepository recruiterRepository,
                         JobPostingRepository jobPostingRepository,
@@ -84,7 +86,8 @@ public class AccessPolicy {
                         JobRatingRepository jobRatingRepository,
                         ResumeRepository resumeRepository,
                         InterviewRoundRepository interviewRoundRepository,
-                        RecruiterTeamMemberRepository recruiterTeamMemberRepository) {
+                        RecruiterTeamMemberRepository recruiterTeamMemberRepository,
+                        CompanyReviewRepository companyReviewRepository) {
         this.recruiterRepository = recruiterRepository;
         this.jobPostingRepository = jobPostingRepository;
         this.externalJobRepository = externalJobRepository;
@@ -98,6 +101,7 @@ public class AccessPolicy {
         this.resumeRepository = resumeRepository;
         this.interviewRoundRepository = interviewRoundRepository;
         this.recruiterTeamMemberRepository = recruiterTeamMemberRepository;
+        this.companyReviewRepository = companyReviewRepository;
         registerRules();
     }
 
@@ -166,6 +170,7 @@ public class AccessPolicy {
         rule("POST", "/api/recruiters/{recruiterId}/webhooks", ownRecruiterId("recruiterId"));
         rule("DELETE", "/api/recruiters/{recruiterId}/webhooks/{webhookId}", ownRecruiterId("recruiterId"));
         rule("POST", "/api/recruiters/{recruiterId}/webhooks/{webhookId}/test", ownRecruiterId("recruiterId"));
+        rule("POST", "/api/recruiters/{recruiterId}/company-reviews/{reviewId}/reply", c -> ownsCompanyReview(c, "reviewId"));
         rule("GET", "/api/recruiters/{recruiterId}/verification", ownRecruiterId("recruiterId"));
         rule("POST", "/api/recruiters/{recruiterId}/verification", ownRecruiterId("recruiterId"));
         rule("GET", "/api/recruiters/{recruiterId}/direct-messages", ownRecruiterId("recruiterId"));
@@ -185,6 +190,7 @@ public class AccessPolicy {
         rule("DELETE", "/api/recruiters/jobs/{jobId}", ownsJob("jobId"));
         rule("GET", "/api/recruiters/jobs/{jobId}/applications", ownsJob("jobId"));
         rule("GET", "/api/recruiters/jobs/{jobId}/applications/export", ownsJob("jobId"));
+        rule("PUT", "/api/recruiters/jobs/{jobId}/featured", ownsJob("jobId"));
         rule("POST", "/api/recruiters/jobs/{jobId}/duplicate", ownsJob("jobId"));
 
         // Application tracking
@@ -244,6 +250,7 @@ public class AccessPolicy {
         rule("POST", "/api/aptitude-tests/submit", authenticated,
             (c, body) -> isAptitudeApplicant(c.user(), AccessContext.toId(body.get("assignmentId"))));
         rule("GET", "/api/aptitude-tests/results/{assignmentId}", c -> participatesInAptitudeAssignment(c, "assignmentId"));
+        rule("GET", "/api/aptitude-tests/{assignmentId}/violations", c -> ownsAptitudeAssignment(c, "assignmentId"));
         rule("GET", "/api/aptitude-tests/test/{testId}/results/unscheduled", c -> ownsAptitudeTest(c, "testId"));
         rule("POST", "/api/aptitude-tests/{assignmentId}/violations", admin);
         rule("GET", "/api/aptitude-tests/{testId}/questions", c -> ownsAptitudeTest(c, "testId"));
@@ -396,6 +403,15 @@ public class AccessPolicy {
         return c -> recruiterSide.allow(c) || candidateSide.allow(c);
     }
 
+    /** The recruiter being path-scoped must be the company the review is actually about - not
+     *  just any recruiter, which ownRecruiterId alone would allow. */
+    private boolean ownsCompanyReview(AccessContext c, String var) {
+        Long reviewId = c.var(var);
+        return reviewId != null && isRecruiter(c.user()) && companyReviewRepository.findById(reviewId)
+            .map(r -> isRecruiterEntity(c.user(), r.getRecruiter()))
+            .orElse(false);
+    }
+
     private Check ownsJob(String var) {
         return c -> isAdmin(c.user()) || (isRecruiter(c.user()) && c.var(var) != null
             && jobPostingRepository.findById(c.var(var))
@@ -536,6 +552,16 @@ public class AccessPolicy {
         return isAptitudeApplicant(c.user(), id) || (id != null && assignmentRepository.findById(id)
             .map(a -> a.getTest() != null && isRecruiter(c.user()) && isRecruiterEntity(c.user(), a.getTest().getRecruiter()))
             .orElse(false));
+    }
+
+    /** Recruiter-only, unlike participatesInAptitudeAssignment: the candidate who took the test
+     *  never sees their own proctoring violation log, so they can't learn what the detector does
+     *  and doesn't catch for next time. */
+    private boolean ownsAptitudeAssignment(AccessContext c, String var) {
+        Long id = c.var(var);
+        return id != null && isRecruiter(c.user()) && assignmentRepository.findById(id)
+            .map(a -> a.getTest() != null && isRecruiterEntity(c.user(), a.getTest().getRecruiter()))
+            .orElse(false);
     }
 
     private boolean isDreamRoleApplicant(AccessContext c, String var) {

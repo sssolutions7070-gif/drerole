@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 
 import com.jobera.entity.Application;
 import com.jobera.entity.AptitudeTest;
+import com.jobera.entity.CompanyReview;
 import com.jobera.entity.DreamRoleTest;
 import com.jobera.entity.DreamRoleTestAssignment;
 import com.jobera.entity.ExternalCandidate;
@@ -34,6 +35,7 @@ import com.jobera.repository.InterviewRoundRepository;
 import com.jobera.repository.JobPostingRepository;
 import com.jobera.repository.JobRatingRepository;
 import com.jobera.repository.RecruiterRepository;
+import com.jobera.repository.CompanyReviewRepository;
 import com.jobera.repository.RecruiterTeamMemberRepository;
 import com.jobera.repository.ResumeRepository;
 import com.jobera.repository.TestAssignmentRepository;
@@ -55,6 +57,7 @@ class AccessPolicyTest {
     ResumeRepository resumeRepository = mock(ResumeRepository.class);
     InterviewRoundRepository interviewRoundRepository = mock(InterviewRoundRepository.class);
     RecruiterTeamMemberRepository recruiterTeamMemberRepository = mock(RecruiterTeamMemberRepository.class);
+    CompanyReviewRepository companyReviewRepository = mock(CompanyReviewRepository.class);
 
     AccessPolicy policy;
 
@@ -85,7 +88,7 @@ class AccessPolicyTest {
         policy = new AccessPolicy(recruiterRepository, jobRepository, externalJobRepository, externalCandidateRepository,
             aptitudeTestRepository, dreamRoleTestRepository, applicationRepository, assignmentRepository,
             dreamRoleAssignmentRepository, ratingRepository, resumeRepository, interviewRoundRepository,
-            recruiterTeamMemberRepository);
+            recruiterTeamMemberRepository, companyReviewRepository);
         lenient().when(recruiterRepository.findByUserId(20L)).thenReturn(Optional.of(recruiter));
         lenient().when(recruiterRepository.findByUserId(21L)).thenReturn(Optional.of(otherRecruiter));
         lenient().when(recruiterRepository.findByUserId(10L)).thenReturn(Optional.empty());
@@ -120,6 +123,14 @@ class AccessPolicyTest {
         round.setId(id);
         lenient().when(interviewRoundRepository.findById(id)).thenReturn(Optional.of(round));
         return round;
+    }
+
+    CompanyReview companyReviewOfCompany(long id, Recruiter owner) {
+        CompanyReview review = new CompanyReview();
+        review.setId(id);
+        review.setRecruiter(owner);
+        lenient().when(companyReviewRepository.findById(id)).thenReturn(Optional.of(review));
+        return review;
     }
 
     AptitudeTest aptitudeTestOwnedBy(long id, Recruiter owner) {
@@ -458,6 +469,27 @@ class AccessPolicyTest {
         assertTrue(allowed(recruiterUser, "GET", "/api/aptitude-tests/results/70"));
         assertFalse(allowed(otherCandidate, "GET", "/api/aptitude-tests/results/70"));
         assertFalse(allowed(otherRecruiterUser, "GET", "/api/aptitude-tests/results/70"));
+    }
+
+    @Test
+    void onlyTheReviewedCompanyCanReplyToItsOwnReview() {
+        companyReviewOfCompany(60, recruiter);
+
+        assertTrue(allowed(recruiterUser, "POST", "/api/recruiters/200/company-reviews/60/reply"));
+        assertFalse(allowed(otherRecruiterUser, "POST", "/api/recruiters/201/company-reviews/60/reply"));
+        assertFalse(allowed(candidate, "POST", "/api/recruiters/200/company-reviews/60/reply"));
+    }
+
+    @Test
+    void proctoringViolationsAreVisibleToTheTestOwnerOnlyNotTheApplicantWhoTookIt() {
+        JobPosting job = jobOwnedBy(5, recruiter);
+        Application application = applicationFor(9, candidate, job);
+        aptitudeAssignment(70, aptitudeTestOwnedBy(3, recruiter), application);
+
+        assertTrue(allowed(recruiterUser, "GET", "/api/aptitude-tests/70/violations"));
+        assertFalse(allowed(candidate, "GET", "/api/aptitude-tests/70/violations"));
+        assertFalse(allowed(otherRecruiterUser, "GET", "/api/aptitude-tests/70/violations"));
+        assertFalse(allowed(otherCandidate, "GET", "/api/aptitude-tests/70/violations"));
     }
 
     @Test

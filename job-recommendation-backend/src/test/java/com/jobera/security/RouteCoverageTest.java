@@ -27,6 +27,7 @@ import com.jobera.repository.InterviewRoundRepository;
 import com.jobera.repository.JobPostingRepository;
 import com.jobera.repository.JobRatingRepository;
 import com.jobera.repository.RecruiterRepository;
+import com.jobera.repository.CompanyReviewRepository;
 import com.jobera.repository.RecruiterTeamMemberRepository;
 import com.jobera.repository.ResumeRepository;
 import com.jobera.repository.TestAssignmentRepository;
@@ -48,7 +49,7 @@ class RouteCoverageTest {
             mock(AptitudeTestRepository.class), mock(DreamRoleTestRepository.class), mock(ApplicationRepository.class),
             mock(TestAssignmentRepository.class), mock(DreamRoleTestAssignmentRepository.class),
             mock(JobRatingRepository.class), mock(ResumeRepository.class), mock(InterviewRoundRepository.class),
-            mock(RecruiterTeamMemberRepository.class));
+            mock(RecruiterTeamMemberRepository.class), mock(CompanyReviewRepository.class));
     }
 
     private List<String[]> allRoutes() throws Exception {

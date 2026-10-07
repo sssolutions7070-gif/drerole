@@ -134,6 +134,62 @@ class CompanyReviewServiceTest {
     }
 
     @Test
+    void theReviewedCompanyCanReplyToAPublishedReview() {
+        CompanyReview review = new CompanyReview(user, recruiter, 4, "Good place");
+        review.setModerationStatus(CompanyReview.MODERATION_APPROVED);
+        when(companyReviewRepository.findById(5L)).thenReturn(Optional.of(review));
+        when(companyReviewRepository.save(any(CompanyReview.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        CompanyReview replied = service.replyToReview(5L, 10L, "Thanks for the feedback!");
+
+        assertEquals("Thanks for the feedback!", replied.getRecruiterReply());
+        assertEquals(java.time.LocalDate.now(), replied.getRecruiterReplyAt().toLocalDate());
+    }
+
+    @Test
+    void replyingRejectsARecruiterWhoIsNotTheReviewedCompany() {
+        CompanyReview review = new CompanyReview(user, recruiter, 4, "Good place");
+        review.setModerationStatus(CompanyReview.MODERATION_APPROVED);
+        when(companyReviewRepository.findById(5L)).thenReturn(Optional.of(review));
+
+        assertThrows(CompanyReviewService.NotTheReviewedCompanyException.class,
+            () -> service.replyToReview(5L, 999L, "Not yours to reply to"));
+    }
+
+    @Test
+    void replyingRejectsAReviewThatIsNotYetPublished() {
+        CompanyReview review = new CompanyReview(user, recruiter, 4, "Good place");
+        review.setModerationStatus(CompanyReview.MODERATION_PENDING);
+        when(companyReviewRepository.findById(5L)).thenReturn(Optional.of(review));
+
+        assertThrows(CompanyReviewService.ReviewException.class, () -> service.replyToReview(5L, 10L, "Thanks!"));
+    }
+
+    @Test
+    void replyingRejectsAnEmptyReply() {
+        CompanyReview review = new CompanyReview(user, recruiter, 4, "Good place");
+        review.setModerationStatus(CompanyReview.MODERATION_APPROVED);
+        when(companyReviewRepository.findById(5L)).thenReturn(Optional.of(review));
+
+        assertThrows(CompanyReviewService.ReviewException.class, () -> service.replyToReview(5L, 10L, "   "));
+    }
+
+    @Test
+    void publicViewIncludesTheRecruiterReplyWhenPresent() {
+        CompanyReview review = new CompanyReview(user, recruiter, 4, "Good");
+        review.setRecruiterReply("Thanks!");
+        review.setRecruiterReplyAt(java.time.LocalDateTime.now());
+        when(companyReviewRepository.findByRecruiterIdAndModerationStatusOrderByCreatedAtDesc(10L, "APPROVED"))
+            .thenReturn(List.of(review));
+
+        Map<String, Object> result = service.getPublicReviews(10L);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> reviews = (List<Map<String, Object>>) result.get("reviews");
+        assertEquals("Thanks!", reviews.get(0).get("recruiterReply"));
+    }
+
+    @Test
     void rejectingAReviewRecordsTheReason() {
         CompanyReview review = new CompanyReview(user, recruiter, 1, "spam spam spam");
         when(companyReviewRepository.findById(5L)).thenReturn(Optional.of(review));

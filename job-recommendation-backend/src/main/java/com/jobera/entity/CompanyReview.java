@@ -48,6 +48,15 @@ public class CompanyReview {
     @Column(name = "rejection_reason")
     private String rejectionReason;
 
+    /** The reviewed company's own public reply, visible alongside the review - unlike the review
+     *  itself, this is the recruiter's own words about their own company, so it doesn't go through
+     *  moderation. Null until they reply. */
+    @Column(name = "recruiter_reply", columnDefinition = "TEXT")
+    private String recruiterReply;
+
+    @Column(name = "recruiter_reply_at")
+    private LocalDateTime recruiterReplyAt;
+
     @Column(updatable = false)
     private LocalDateTime createdAt;
 
@@ -87,6 +96,10 @@ public class CompanyReview {
     public void setModerationStatus(String moderationStatus) { this.moderationStatus = moderationStatus; }
     public String getRejectionReason() { return rejectionReason; }
     public void setRejectionReason(String rejectionReason) { this.rejectionReason = rejectionReason; }
+    public String getRecruiterReply() { return recruiterReply; }
+    public void setRecruiterReply(String recruiterReply) { this.recruiterReply = recruiterReply; }
+    public LocalDateTime getRecruiterReplyAt() { return recruiterReplyAt; }
+    public void setRecruiterReplyAt(LocalDateTime recruiterReplyAt) { this.recruiterReplyAt = recruiterReplyAt; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }

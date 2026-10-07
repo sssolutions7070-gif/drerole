@@ -42,6 +42,10 @@ const CompanyProfile = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
+  const [ownRecruiterId, setOwnRecruiterId] = useState(null);
+  const [replyDrafts, setReplyDrafts] = useState({});
+  const [postingReplyId, setPostingReplyId] = useState(null);
+
   const [reviewRating, setReviewRating] = useState(0);
   const [reviewComment, setReviewComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -89,6 +93,16 @@ const CompanyProfile = () => {
           }
         } catch {
           // No existing report - fine, the form just starts blank.
+        }
+        if (currentUser.role === 'ROLE_RECRUITER') {
+          try {
+            const profile = await api.get(`/recruiters/user/${currentUser.id}`);
+            if (profile.data?.recruiter?.id) {
+              setOwnRecruiterId(profile.data.recruiter.id);
+            }
+          } catch {
+            // Not a recruiter, or no recruiter profile yet - the reply form just stays hidden.
+          }
         }
       }
     } catch (err) {
@@ -146,6 +160,21 @@ const CompanyProfile = () => {
       setExperienceSubmitMessage(err.response?.data?.error || 'Failed to submit your report');
     } finally {
       setSubmittingExperience(false);
+    }
+  };
+
+  const handlePostReply = async (reviewId) => {
+    const reply = (replyDrafts[reviewId] || '').trim();
+    if (!reply) return;
+    setPostingReplyId(reviewId);
+    try {
+      await api.post(`/recruiters/${ownRecruiterId}/company-reviews/${reviewId}/reply`, { reply });
+      setReplyDrafts((prev) => ({ ...prev, [reviewId]: '' }));
+      fetchAll();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to post reply');
+    } finally {
+      setPostingReplyId(null);
     }
   };
 
@@ -313,6 +342,36 @@ const CompanyProfile = () => {
                 <span className="text-xs text-gray-400">{formatDate(review.createdAt)}</span>
               </div>
               {review.comment && <p className="text-gray-700 text-sm">{review.comment}</p>}
+
+              {review.recruiterReply && (
+                <div className="mt-3 ml-4 pl-3 border-l-2 border-blue-200 bg-blue-50/50 rounded-r p-2">
+                  <p className="text-xs font-semibold text-blue-800">
+                    Response from {company.companyName}
+                    <span className="font-normal text-gray-400 ml-2">{formatDate(review.recruiterReplyAt)}</span>
+                  </p>
+                  <p className="text-sm text-gray-700 mt-1">{review.recruiterReply}</p>
+                </div>
+              )}
+
+              {!review.recruiterReply && ownRecruiterId === Number(recruiterId) && (
+                <div className="mt-3 ml-4 flex gap-2">
+                  <input
+                    type="text"
+                    value={replyDrafts[review.id] || ''}
+                    onChange={(e) => setReplyDrafts((prev) => ({ ...prev, [review.id]: e.target.value }))}
+                    placeholder="Reply as this company..."
+                    className="flex-1 text-sm border border-gray-300 rounded px-2 py-1"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handlePostReply(review.id)}
+                    disabled={postingReplyId === review.id || !(replyDrafts[review.id] || '').trim()}
+                    className="text-sm bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {postingReplyId === review.id ? 'Posting…' : 'Reply'}
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>
