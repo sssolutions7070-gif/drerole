@@ -32,13 +32,14 @@ class JobPostingServiceTest {
     @Mock SavedJobRepository savedJobRepository;
     @Mock SubscriptionService subscriptionService;
     @Mock WebhookService webhookService;
+    @Mock SilverMedalistService silverMedalistService;
 
     JobPostingService service;
 
     @BeforeEach
     void setUp() {
         service = new JobPostingService(jobPostingRepository, applicationRepository, userRepository,
-            recruiterRepository, savedJobRepository, subscriptionService, webhookService);
+            recruiterRepository, savedJobRepository, subscriptionService, webhookService, silverMedalistService);
     }
 
     @Test
@@ -82,6 +83,72 @@ class JobPostingServiceTest {
 
         assertEquals(JobPosting.MODERATION_APPROVED, approved.getModerationStatus());
         assertNull(approved.getRejectionReason());
+    }
+
+    @Test
+    void approvingAJobNotifiesPastNearMisses() {
+        JobPosting job = new JobPosting();
+        job.setId(1L);
+        job.setModerationStatus(JobPosting.MODERATION_PENDING);
+        when(jobPostingRepository.findById(1L)).thenReturn(Optional.of(job));
+        when(jobPostingRepository.save(any(JobPosting.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.approveJobPosting(1L);
+
+        org.mockito.Mockito.verify(silverMedalistService).notifyMatchingPastCandidates(job);
+    }
+
+    @Test
+    void approvingAJobSucceedsEvenWhenTheNotificationSweepFails() {
+        JobPosting job = new JobPosting();
+        job.setId(1L);
+        when(jobPostingRepository.findById(1L)).thenReturn(Optional.of(job));
+        when(jobPostingRepository.save(any(JobPosting.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(silverMedalistService.notifyMatchingPastCandidates(any())).thenThrow(new RuntimeException("boom"));
+
+        JobPosting approved = service.approveJobPosting(1L);
+
+        assertEquals(JobPosting.MODERATION_APPROVED, approved.getModerationStatus());
+    }
+
+    @Test
+    void duplicatingAJobCopiesItsContentAsAFreshPendingDraft() {
+        Recruiter recruiter = new Recruiter();
+        recruiter.setId(10L);
+        JobPosting original = new JobPosting();
+        original.setId(1L);
+        original.setTitle("Backend Developer");
+        original.setCompany("Acme");
+        original.setDescription("desc");
+        original.setRequiredSkills("java,spring");
+        original.setPreferredSkills("docker");
+        original.setLocation("Remote");
+        original.setSalaryRange("$100k");
+        original.setJobType("Full-time");
+        original.setExperienceLevel("Mid");
+        original.setRecruiter(recruiter);
+        original.setModerationStatus(JobPosting.MODERATION_APPROVED);
+        when(jobPostingRepository.findById(1L)).thenReturn(Optional.of(original));
+        when(jobPostingRepository.save(any(JobPosting.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        JobPosting copy = service.duplicateJobPosting(1L, 10L);
+
+        assertEquals("Backend Developer (Copy)", copy.getTitle());
+        assertEquals("java,spring", copy.getRequiredSkills());
+        assertEquals(JobPosting.MODERATION_PENDING, copy.getModerationStatus());
+    }
+
+    @Test
+    void duplicatingAJobRejectsANonOwningRecruiter() {
+        Recruiter recruiter = new Recruiter();
+        recruiter.setId(10L);
+        JobPosting original = new JobPosting();
+        original.setId(1L);
+        original.setRecruiter(recruiter);
+        when(jobPostingRepository.findById(1L)).thenReturn(Optional.of(original));
+
+        assertThrows(JobPostingService.JobPostingException.class, () -> service.duplicateJobPosting(1L, 999L));
+        org.mockito.Mockito.verify(jobPostingRepository, org.mockito.Mockito.never()).save(any());
     }
 
     @Test

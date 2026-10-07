@@ -34,6 +34,7 @@ public class JobPostingService {
     private final SavedJobRepository savedJobRepository;
     private final SubscriptionService subscriptionService;
     private final WebhookService webhookService;
+    private final SilverMedalistService silverMedalistService;
     private final ObjectMapper objectMapper;
 
     public JobPostingService(JobPostingRepository jobPostingRepository,
@@ -42,7 +43,8 @@ public class JobPostingService {
                            RecruiterRepository recruiterRepository,
                            SavedJobRepository savedJobRepository,
                            SubscriptionService subscriptionService,
-                           WebhookService webhookService) {
+                           WebhookService webhookService,
+                           SilverMedalistService silverMedalistService) {
         this.jobPostingRepository = jobPostingRepository;
         this.applicationRepository = applicationRepository;
         this.userRepository = userRepository;
@@ -50,6 +52,7 @@ public class JobPostingService {
         this.savedJobRepository = savedJobRepository;
         this.subscriptionService = subscriptionService;
         this.webhookService = webhookService;
+        this.silverMedalistService = silverMedalistService;
         this.objectMapper = new ObjectMapper();
     }
 
@@ -456,7 +459,44 @@ public class JobPostingService {
             .orElseThrow(() -> new JobPostingException("Job posting not found with ID: " + jobId));
         jobPosting.setModerationStatus(JobPosting.MODERATION_APPROVED);
         jobPosting.setRejectionReason(null);
-        return jobPostingRepository.save(jobPosting);
+        JobPosting saved = jobPostingRepository.save(jobPosting);
+
+        try {
+            silverMedalistService.notifyMatchingPastCandidates(saved);
+        } catch (RuntimeException e) {
+            log.warn("Silver-medalist notification failed for job {}: {}", jobId, e.getMessage());
+        }
+
+        return saved;
+    }
+
+    /** Clones a job posting's content as a fresh draft for a recruiter re-hiring a similar role, so
+     *  they don't have to retype title/description/skills/salary. The copy starts pending moderation
+     *  like any new posting; it isn't linked to the original's applications or history. */
+    public JobPosting duplicateJobPosting(Long jobId, Long recruiterId) {
+        JobPosting original = jobPostingRepository.findById(jobId)
+            .orElseThrow(() -> new JobPostingException("Job posting not found with ID: " + jobId));
+
+        if (original.getRecruiter() == null || !original.getRecruiter().getId().equals(recruiterId)) {
+            throw new JobPostingException("You are not authorized to duplicate this job posting");
+        }
+        subscriptionService.enforceActiveJobLimit(original.getRecruiter());
+
+        JobPosting copy = new JobPosting();
+        copy.setTitle(original.getTitle() + " (Copy)");
+        copy.setCompany(original.getCompany());
+        copy.setDescription(original.getDescription());
+        copy.setRequiredSkills(original.getRequiredSkills());
+        copy.setPreferredSkills(original.getPreferredSkills());
+        copy.setLocation(original.getLocation());
+        copy.setSalaryRange(original.getSalaryRange());
+        copy.setJobType(original.getJobType());
+        copy.setExperienceLevel(original.getExperienceLevel());
+        copy.setRecruiter(original.getRecruiter());
+        copy.setIsActive(true);
+        copy.setModerationStatus(JobPosting.MODERATION_PENDING);
+
+        return jobPostingRepository.save(copy);
     }
 
     public JobPosting rejectJobPosting(Long jobId, String reason) {
