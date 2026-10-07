@@ -4,7 +4,8 @@ import {
   X, Mail, Phone, Calendar, Download, Star, BookOpen, User,
   Briefcase, RefreshCw, Eye, Clock, CheckCircle, XCircle,
   Calendar as CalendarIcon, MapPin, MessageCircle, TrendingUp,
-  FileText, Percent, Target, Award, Sparkles, Video, FileCheck
+  FileText, Percent, Target, Award, Sparkles, Video, FileCheck,
+  Columns, GripVertical, List, Search, EyeOff, ShieldCheck
 } from 'lucide-react';
 import api from '../services/api';
 import MessageThread from './MessageThread';
@@ -31,6 +32,21 @@ const ApplicationsList = ({ job, onClose }) => {
   const [testResults, setTestResults] = useState(null);
   const [actionLoading, setActionLoading] = useState(null);
   const [recruiterId, setRecruiterId] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [bulkActionLoading, setBulkActionLoading] = useState(false);
+  const [bulkResultMessage, setBulkResultMessage] = useState('');
+  const [viewMode, setViewMode] = useState('list'); // 'list' | 'kanban'
+  const [searchQuery, setSearchQuery] = useState('');
+  const [draggedApp, setDraggedApp] = useState(null);
+  const [activeDropColumn, setActiveDropColumn] = useState(null);
+  const [kanbanToast, setKanbanToast] = useState(null);
+  const [blindScreening, setBlindScreening] = useState(false);
+
+  useEffect(() => {
+    if (!kanbanToast) return;
+    const timer = setTimeout(() => setKanbanToast(null), 4000);
+    return () => clearTimeout(timer);
+  }, [kanbanToast]);
 
   useEffect(() => {
     fetchApplications();
@@ -287,9 +303,10 @@ const ApplicationsList = ({ job, onClose }) => {
     }
   };
 
-  const handleStatusUpdate = async (applicationId, action, data = {}) => {
-    setActionLoading(applicationId);
-    
+  const handleStatusUpdate = async (applicationId, action, data = {}, options = {}) => {
+    const { silent = false } = options;
+    if (!silent) setActionLoading(applicationId);
+
     try {
       const currentUser = JSON.parse(localStorage.getItem('user'));
       let rId = job.recruiter?.id;
@@ -358,19 +375,220 @@ const ApplicationsList = ({ job, onClose }) => {
       }
 
       if (response && response.data) {
-        alert('Status updated successfully!');
-        fetchApplications();
-        setShowStatusModal(false);
-        setShowInterviewModal(false);
-        setShowTestModal(false);
+        if (!silent) {
+          alert('Status updated successfully!');
+          fetchApplications();
+          setShowStatusModal(false);
+          setShowInterviewModal(false);
+          setShowTestModal(false);
+        }
+        return { success: true };
       }
+      return { success: false, error: 'No response from server' };
     } catch (error) {
       console.error('Error updating status:', error);
-      alert('Failed to update status: ' + (error.response?.data?.error || error.message));
+      const message = error.response?.data?.error || error.message;
+      if (!silent) {
+        alert('Failed to update status: ' + message);
+      }
+      return { success: false, error: message };
     } finally {
-      setActionLoading(null);
+      if (!silent) setActionLoading(null);
     }
   };
+
+  const toggleSelected = (applicationId) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(applicationId)) {
+        next.delete(applicationId);
+      } else {
+        next.add(applicationId);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedIds((prev) =>
+      prev.size === filteredApplications.length ? new Set() : new Set(filteredApplications.map((a) => a.id))
+    );
+  };
+
+  const handleBulkAction = async (action) => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+
+    const label = action === 'shortlist' ? 'shortlist' : 'reject';
+    if (!window.confirm(`${label === 'shortlist' ? 'Shortlist' : 'Reject'} ${ids.length} selected application${ids.length === 1 ? '' : 's'}?`)) {
+      return;
+    }
+
+    setBulkActionLoading(true);
+    setBulkResultMessage('');
+    const data = action === 'shortlist'
+      ? { notes: 'Bulk shortlisted' }
+      : { rejectionReason: 'Application rejected' };
+
+    const results = await Promise.all(ids.map((id) => handleStatusUpdate(id, action, data, { silent: true })));
+    const succeeded = results.filter((r) => r.success).length;
+    const failed = results.length - succeeded;
+
+    setBulkResultMessage(
+      failed === 0
+        ? `${succeeded} application${succeeded === 1 ? '' : 's'} ${label}ed.`
+        : `${succeeded} ${label}ed, ${failed} failed.`
+    );
+    setSelectedIds(new Set());
+    setBulkActionLoading(false);
+    fetchApplications();
+  };
+
+  const KANBAN_COLUMNS = [
+    {
+      id: 'applied',
+      label: 'Applied',
+      icon: Clock,
+      color: 'border-blue-200 bg-blue-50/20',
+      badgeClass: 'bg-blue-100 text-blue-800 border-blue-200',
+      statuses: ['APPLICATION_SUBMITTED', 'VIEWED_BY_RECRUITER'],
+      description: 'New & unreviewed applicants',
+    },
+    {
+      id: 'shortlisted',
+      label: 'Shortlisted',
+      icon: CheckCircle,
+      color: 'border-emerald-200 bg-emerald-50/20',
+      badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+      statuses: ['SHORTLISTED'],
+      description: 'Passed initial screening',
+    },
+    {
+      id: 'assessment',
+      label: 'Assessment',
+      icon: BookOpen,
+      color: 'border-purple-200 bg-purple-50/20',
+      badgeClass: 'bg-purple-100 text-purple-800 border-purple-200',
+      statuses: ['TEST_ASSIGNED', 'TEST_IN_PROGRESS', 'TEST_COMPLETED', 'TEST_PASSED', 'TEST_FAILED'],
+      description: 'Tests assigned or completed',
+    },
+    {
+      id: 'interview',
+      label: 'Interview',
+      icon: Video,
+      color: 'border-amber-200 bg-amber-50/20',
+      badgeClass: 'bg-amber-100 text-amber-800 border-amber-200',
+      statuses: ['INTERVIEW_SCHEDULED', 'INTERVIEW_COMPLETED'],
+      description: 'Live or scheduled rounds',
+    },
+    {
+      id: 'offer',
+      label: 'Offer / Hired',
+      icon: Star,
+      color: 'border-teal-200 bg-teal-50/20',
+      badgeClass: 'bg-teal-100 text-teal-800 border-teal-200',
+      statuses: ['OFFER_SENT', 'OFFER_ACCEPTED'],
+      description: 'Offers extended or accepted',
+    },
+    {
+      id: 'rejected',
+      label: 'Rejected',
+      icon: XCircle,
+      color: 'border-rose-200 bg-rose-50/20',
+      badgeClass: 'bg-rose-100 text-rose-800 border-rose-200',
+      statuses: ['REJECTED', 'OFFER_DECLINED', 'WITHDRAWN'],
+      description: 'Not moving forward',
+    },
+  ];
+
+  const getColumnIdForStatus = (status) => {
+    for (const col of KANBAN_COLUMNS) {
+      if (col.statuses.includes(status)) return col.id;
+    }
+    return 'applied';
+  };
+
+  const handleDropOnColumn = async (targetColumnId) => {
+    if (!draggedApp) return;
+    const currentColumnId = getColumnIdForStatus(draggedApp.status);
+    const candidateName = draggedApp.applicantName || draggedApp.applicant?.fullName || 'Candidate';
+    const appId = draggedApp.id;
+    const appToMove = draggedApp;
+
+    if (currentColumnId === targetColumnId) {
+      setDraggedApp(null);
+      setActiveDropColumn(null);
+      return;
+    }
+
+    if (targetColumnId === 'shortlisted') {
+      setKanbanToast({ message: `Shortlisting ${candidateName}...`, type: 'info' });
+      setApplications((prev) =>
+        prev.map((a) => (a.id === appId ? { ...a, status: 'SHORTLISTED' } : a))
+      );
+      const res = await handleStatusUpdate(appId, 'shortlist', { notes: 'Shortlisted via Kanban' }, { silent: true });
+      if (res?.success) {
+        setKanbanToast({ message: `✓ ${candidateName} moved to Shortlisted!`, type: 'success' });
+      } else {
+        setKanbanToast({ message: `Failed to shortlist ${candidateName}`, type: 'error' });
+        fetchApplications();
+      }
+    } else if (targetColumnId === 'rejected') {
+      if (window.confirm(`Reject application for ${candidateName}?`)) {
+        setKanbanToast({ message: `Rejecting ${candidateName}...`, type: 'info' });
+        setApplications((prev) =>
+          prev.map((a) => (a.id === appId ? { ...a, status: 'REJECTED' } : a))
+        );
+        const res = await handleStatusUpdate(appId, 'reject', { rejectionReason: 'Rejected via Kanban' }, { silent: true });
+        if (res?.success) {
+          setKanbanToast({ message: `✓ ${candidateName} moved to Rejected`, type: 'success' });
+        } else {
+          setKanbanToast({ message: `Failed to reject ${candidateName}`, type: 'error' });
+          fetchApplications();
+        }
+      }
+    } else if (targetColumnId === 'assessment') {
+      handleAssignTest(appToMove);
+    } else if (targetColumnId === 'interview') {
+      setSelectedApplication(appToMove);
+      setShowInterviewModal(true);
+    } else if (targetColumnId === 'offer') {
+      setOfferApplicationId(appId);
+    } else if (targetColumnId === 'applied') {
+      const res = await handleStatusUpdate(appId, 'view', {}, { silent: true });
+      if (res?.success) {
+        setApplications((prev) =>
+          prev.map((a) => (a.id === appId ? { ...a, status: 'VIEWED_BY_RECRUITER' } : a))
+        );
+      }
+    }
+
+    setDraggedApp(null);
+    setActiveDropColumn(null);
+  };
+
+  const getCandidateDisplayName = (app) => {
+    if (blindScreening) {
+      return `Candidate #${app.id}`;
+    }
+    return app.applicantName || app.applicant?.fullName || 'Candidate';
+  };
+
+  const getCandidateDisplayEmail = (app) => {
+    if (blindScreening) {
+      return 'Identity & contact info hidden for blind screening';
+    }
+    return app.applicantEmail || app.applicant?.email || 'No email provided';
+  };
+
+  const filteredApplications = applications.filter((app) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    const name = (app.applicantName || app.applicant?.fullName || '').toLowerCase();
+    const email = (app.applicantEmail || app.applicant?.email || '').toLowerCase();
+    const skills = (app.applicantSkills || '').toLowerCase();
+    return name.includes(q) || email.includes(q) || skills.includes(q);
+  });
 
   const handleAssignTest = (application) => {
     setSelectedApplication(application);
@@ -968,36 +1186,146 @@ const ApplicationsList = ({ job, onClose }) => {
 
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-20 mx-auto p-5 border w-full max-w-6xl shadow-lg rounded-md bg-white">
-        <div className="flex justify-between items-center mb-6">
+      <div className={`relative top-10 mx-auto p-6 border w-full shadow-2xl rounded-xl bg-white transition-all ${
+        viewMode === 'kanban' ? 'max-w-[96vw] xl:max-w-[1550px]' : 'max-w-6xl'
+      }`}>
+        {/* Header */}
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-5 pb-4 border-b border-gray-200">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Applications for {job.title}</h2>
-            <p className="text-gray-600">
-              {applications.length} application{applications.length !== 1 ? 's' : ''} found
+            <div className="flex items-center space-x-3">
+              <h2 className="text-2xl font-bold text-gray-900">Applications for {job.title}</h2>
+              <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">
+                {applications.length} Total
+              </span>
+            </div>
+            <p className="text-gray-500 text-sm mt-0.5">
+              {job.company ? `${job.company} • ` : ''}Manage candidates across hiring pipeline stages
             </p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-2">
-            <X className="h-6 w-6" />
-          </button>
-        </div>
 
-        <div className="flex justify-between items-center mb-6">
-          <button
-            onClick={fetchApplications}
-            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
-          >
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </button>
-          
-          <div className="flex items-center space-x-2">
-            <Target className="h-5 w-5 text-green-600" />
-            <span className="text-sm text-gray-600">Sorted by AI Match Score</span>
+          <div className="flex items-center space-x-3">
+            {/* Blind Screening Toggle */}
+            <button
+              type="button"
+              onClick={() => setBlindScreening((prev) => !prev)}
+              aria-pressed={blindScreening}
+              aria-label={blindScreening ? 'Disable Blind Screening' : 'Enable Blind Screening'}
+              className={`inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border ${
+                blindScreening
+                  ? 'bg-purple-100 text-purple-800 border-purple-300 shadow-sm'
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+              }`}
+              title="Blind Screening masks candidate names, avatars, and contact information to promote bias-free evaluations"
+            >
+              {blindScreening ? (
+                <>
+                  <EyeOff className="h-3.5 w-3.5 mr-1.5 text-purple-600" />
+                  <span>Blind Screening: ON</span>
+                </>
+              ) : (
+                <>
+                  <Eye className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
+                  <span>Blind Screening</span>
+                </>
+              )}
+            </button>
+
+            {/* View Mode Toggle */}
+            <div className="inline-flex rounded-lg border border-gray-200 p-1 bg-gray-50" role="group" aria-label="View mode">
+              <button
+                type="button"
+                onClick={() => setViewMode('list')}
+                className={`inline-flex items-center px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                  viewMode === 'list'
+                    ? 'bg-white text-blue-700 shadow-sm font-semibold'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+                aria-pressed={viewMode === 'list'}
+              >
+                <List className="h-3.5 w-3.5 mr-1.5" />
+                List View
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('kanban')}
+                className={`inline-flex items-center px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                  viewMode === 'kanban'
+                    ? 'bg-white text-blue-700 shadow-sm font-semibold'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+                aria-pressed={viewMode === 'kanban'}
+              >
+                <Columns className="h-3.5 w-3.5 mr-1.5" />
+                Kanban Board
+              </button>
+            </div>
+
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-colors">
+              <X className="h-6 w-6" />
+            </button>
           </div>
         </div>
 
+        {/* Toolbar: Refresh, Search & Sort Info */}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+          <div className="flex items-center space-x-3 flex-1 min-w-[240px]">
+            <button
+              onClick={fetchApplications}
+              className="flex items-center px-3.5 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
+            >
+              <RefreshCw className="h-4 w-4 mr-1.5" />
+              Refresh
+            </button>
+
+            {/* Candidate Search */}
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search candidates or skills..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-8 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600"
+                  aria-label="Clear search"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-2 text-xs text-gray-500 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200">
+            <Target className="h-4 w-4 text-green-600" />
+            <span>Ranked by AI Match Score</span>
+          </div>
+        </div>
+
+        {/* Blind Screening Active Banner */}
+        {blindScreening && (
+          <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg flex items-center justify-between text-xs text-purple-900 shadow-sm animate-fade-in">
+            <div className="flex items-center space-x-2">
+              <ShieldCheck className="h-4 w-4 text-purple-600 flex-shrink-0" />
+              <span>
+                <strong>Blind Screening Active:</strong> Personal demographic identifiers, candidate names, and contact details are masked to evaluate candidates strictly on skills, assessment results, and match scores.
+              </span>
+            </div>
+            <button
+              onClick={() => setBlindScreening(false)}
+              className="text-purple-700 hover:text-purple-900 underline font-medium ml-2 flex-shrink-0"
+            >
+              Turn off
+            </button>
+          </div>
+        )}
+
+        {/* Error message */}
         {error && (
-          <div className="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+          <div className="mb-5 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
             <div className="flex items-center">
               <Mail className="h-5 w-5 mr-2" />
               <span>{error}</span>
@@ -1005,18 +1333,296 @@ const ApplicationsList = ({ job, onClose }) => {
           </div>
         )}
 
-        {applications.length === 0 ? (
-          <div className="text-center py-12">
-            <Mail className="mx-auto h-16 w-16 text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No applications yet</h3>
-            <p className="text-gray-500">Applications will appear here when candidates apply to this job.</p>
+        {/* Kanban Toast notification */}
+        {kanbanToast && (
+          <div
+            className={`mb-4 px-4 py-2.5 rounded-lg text-sm font-medium flex items-center justify-between shadow-sm animate-fade-in ${
+              kanbanToast.type === 'success'
+                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                : kanbanToast.type === 'error'
+                ? 'bg-rose-50 text-rose-800 border border-rose-200'
+                : 'bg-blue-50 text-blue-800 border border-blue-200'
+            }`}
+          >
+            <span>{kanbanToast.message}</span>
+            <button
+              onClick={() => setKanbanToast(null)}
+              className="ml-2 text-current opacity-60 hover:opacity-100"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
+        {viewMode === 'kanban' ? (
+          <div className="overflow-x-auto pb-4 pt-1">
+            <div className="flex gap-4 min-w-[1300px]">
+              {KANBAN_COLUMNS.map((col) => {
+                const ColIcon = col.icon;
+                const colApps = filteredApplications.filter((app) =>
+                  col.statuses.includes(app.status)
+                );
+                const isDropTarget = activeDropColumn === col.id;
+
+                return (
+                  <div
+                    key={col.id}
+                    data-testid={`kanban-column-${col.id}`}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      if (activeDropColumn !== col.id) {
+                        setActiveDropColumn(col.id);
+                      }
+                    }}
+                    onDragLeave={(e) => {
+                      if (!e.currentTarget.contains(e.relatedTarget)) {
+                        setActiveDropColumn(null);
+                      }
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      handleDropOnColumn(col.id);
+                    }}
+                    className={`flex flex-col rounded-xl border p-3 min-w-[220px] flex-1 transition-all ${
+                      col.color
+                    } ${
+                      isDropTarget
+                        ? 'ring-2 ring-blue-500 border-blue-400 bg-blue-50/70 shadow-lg scale-[1.01]'
+                        : 'border-gray-200'
+                    }`}
+                  >
+                    {/* Column Header */}
+                    <div className="flex items-center justify-between mb-3 px-1">
+                      <div className="flex items-center space-x-2">
+                        <ColIcon className="h-4 w-4" />
+                        <span className="font-semibold text-gray-800 text-sm">{col.label}</span>
+                      </div>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-bold border ${col.badgeClass}`}>
+                        {colApps.length}
+                      </span>
+                    </div>
+
+                    {/* Column Cards */}
+                    <div className="space-y-2.5 flex-1 min-h-[160px] overflow-y-auto max-h-[65vh] pr-1">
+                      {colApps.length === 0 ? (
+                        <div
+                          className={`h-full min-h-[140px] rounded-lg border-2 border-dashed flex flex-col items-center justify-center p-3 text-center transition-colors ${
+                            isDropTarget ? 'border-blue-400 bg-blue-100/50' : 'border-gray-300/80 bg-white/40'
+                          }`}
+                        >
+                          <p className="text-xs text-gray-500 font-medium">Drag candidates here</p>
+                          <p className="text-[10px] text-gray-400 mt-0.5">{col.description}</p>
+                        </div>
+                      ) : (
+                        colApps.map((app) => (
+                          <div
+                            key={app.id}
+                            data-testid={`kanban-card-${app.id}`}
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData('text/plain', String(app.id));
+                              setDraggedApp(app);
+                            }}
+                            onDragEnd={() => {
+                              setDraggedApp(null);
+                              setActiveDropColumn(null);
+                            }}
+                            className={`bg-white rounded-lg border p-3 shadow-sm hover:shadow-md transition-all cursor-grab active:cursor-grabbing ${
+                              draggedApp?.id === app.id
+                                ? 'opacity-40 border-dashed border-blue-400'
+                                : 'border-gray-200 hover:border-blue-300'
+                            }`}
+                          >
+                            {/* Card Top: Drag handle + Name + Match Badge */}
+                            <div className="flex items-start justify-between gap-1.5 mb-1.5">
+                              <div className="flex items-center space-x-1.5 min-w-0">
+                                <GripVertical className="h-4 w-4 text-gray-400 flex-shrink-0 cursor-grab" />
+                                {blindScreening && (
+                                  <ShieldCheck className="h-3.5 w-3.5 text-purple-600 flex-shrink-0" />
+                                )}
+                                <span className={`font-semibold text-sm truncate ${blindScreening ? 'text-purple-900 font-mono' : 'text-gray-900'}`}>
+                                  {getCandidateDisplayName(app)}
+                                </span>
+                              </div>
+                              {app.matchPercentage > 0 && (
+                                <span className={`flex-shrink-0 text-xs font-bold px-1.5 py-0.5 rounded-full border ${getMatchColor(app.matchPercentage)}`}>
+                                  {app.matchPercentage}%
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Email */}
+                            <p className="text-xs text-gray-500 truncate mb-2">
+                              {getCandidateDisplayEmail(app)}
+                            </p>
+
+                            {/* Skills pills */}
+                            {app.applicantSkills && (
+                              <div className="flex flex-wrap gap-1 mb-2.5">
+                                {parseSkills(app.applicantSkills).slice(0, 3).map((sk, idx) => (
+                                  <span key={idx} className="bg-slate-100 text-slate-700 text-[10px] px-1.5 py-0.5 rounded font-medium">
+                                    {sk}
+                                  </span>
+                                ))}
+                                {parseSkills(app.applicantSkills).length > 3 && (
+                                  <span className="text-[10px] text-gray-400">
+                                    +{parseSkills(app.applicantSkills).length - 3}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Footer: status and quick action icons */}
+                            <div className="pt-2 border-t border-gray-100 flex items-center justify-between text-xs">
+                              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${getStatusColor(app.status)}`}>
+                                {getStatusIcon(app.status)}
+                                <span className="ml-1 capitalize">{app.status?.replace(/_/g, ' ').toLowerCase()}</span>
+                              </span>
+
+                              <div className="flex items-center space-x-1">
+                                <button
+                                  type="button"
+                                  onClick={() => setMessageThreadApplication(app)}
+                                  title="Message Candidate"
+                                  className="p-1 text-gray-400 hover:text-blue-600 rounded hover:bg-gray-100 transition-colors"
+                                >
+                                  <MessageCircle className="h-3.5 w-3.5" />
+                                </button>
+                                {app.hasResume && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDownloadResume(app)}
+                                    title="Download Resume"
+                                    className="p-1 text-gray-400 hover:text-blue-600 rounded hover:bg-gray-100 transition-colors"
+                                  >
+                                    <Download className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => setPipelineApplicationId(app.id)}
+                                  title="Interview Pipeline"
+                                  className="p-1 text-gray-400 hover:text-teal-600 rounded hover:bg-gray-100 transition-colors"
+                                >
+                                  <Video className="h-3.5 w-3.5" />
+                                </button>
+                                {col.id === 'applied' && (
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      const res = await handleStatusUpdate(app.id, 'shortlist', { notes: 'Shortlisted from Kanban' });
+                                      if (res?.success) fetchApplications();
+                                    }}
+                                    title="Quick Shortlist"
+                                    className="p-1 text-gray-400 hover:text-emerald-600 rounded hover:bg-gray-100 transition-colors"
+                                  >
+                                    <CheckCircle className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         ) : (
-          <div className="space-y-6">
-            {applications.map((application, index) => (
-              <div key={application.id} className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
+          /* List View */
+          <>
+            {/* Bulk Action Bar */}
+            {applications.length > 0 && (
+              <div className="mb-4 p-4 bg-gray-50 border border-gray-200 rounded-lg flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center space-x-3">
+                  <label className="flex items-center space-x-2 cursor-pointer text-sm font-medium text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={filteredApplications.length > 0 && selectedIds.size === filteredApplications.length}
+                      onChange={toggleSelectAll}
+                      aria-label="Select all applications"
+                      className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
+                    />
+                    <span>Select All ({filteredApplications.length})</span>
+                  </label>
+                  {selectedIds.size > 0 && (
+                    <span className="text-sm text-gray-500">
+                      | {selectedIds.size} selected
+                    </span>
+                  )}
+                </div>
+
+                {selectedIds.size > 0 && (
+                  <div className="flex items-center space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => handleBulkAction('shortlist')}
+                      disabled={bulkActionLoading}
+                      className="inline-flex items-center px-3 py-1.5 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition-colors shadow-sm"
+                    >
+                      <CheckCircle className="h-4 w-4 mr-1.5" />
+                      Shortlist ({selectedIds.size})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleBulkAction('reject')}
+                      disabled={bulkActionLoading}
+                      className="inline-flex items-center px-3 py-1.5 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 disabled:opacity-50 transition-colors shadow-sm"
+                    >
+                      <XCircle className="h-4 w-4 mr-1.5" />
+                      Reject ({selectedIds.size})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedIds(new Set())}
+                      disabled={bulkActionLoading}
+                      className="px-2.5 py-1.5 text-xs text-gray-500 hover:text-gray-700 underline"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
+
+                {bulkResultMessage && (
+                  <div className="w-full text-sm font-medium text-blue-700 bg-blue-50 px-3 py-1.5 rounded border border-blue-200">
+                    {bulkResultMessage}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {filteredApplications.length === 0 ? (
+              <div className="text-center py-12">
+                <Mail className="mx-auto h-16 w-16 text-gray-400 mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  {searchQuery ? 'No matching candidates' : 'No applications yet'}
+                </h3>
+                <p className="text-gray-500">
+                  {searchQuery ? `No candidates found matching "${searchQuery}"` : 'Applications will appear here when candidates apply to this job.'}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {filteredApplications.map((application, index) => (
+              <div
+                key={application.id}
+                className={`border rounded-lg p-6 hover:shadow-md transition-shadow ${
+                  selectedIds.has(application.id) ? 'border-blue-500 bg-blue-50/20' : 'border-gray-200'
+                }`}
+              >
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex items-start space-x-4 flex-1">
+                    <div className="pt-2 flex-shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(application.id)}
+                        onChange={() => toggleSelected(application.id)}
+                        aria-label={`Select ${application.applicantName || 'applicant'}`}
+                        className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
+                      />
+                    </div>
                     {index < 3 && (
                       <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm ${
                         index === 0 ? 'bg-yellow-500' : 
@@ -1027,13 +1633,19 @@ const ApplicationsList = ({ job, onClose }) => {
                       </div>
                     )}
                     
-                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                      <User className="h-6 w-6 text-blue-600" />
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
+                      blindScreening ? 'bg-purple-100 border border-purple-200' : 'bg-blue-100'
+                    }`}>
+                      {blindScreening ? (
+                        <ShieldCheck className="h-6 w-6 text-purple-600" />
+                      ) : (
+                        <User className="h-6 w-6 text-blue-600" />
+                      )}
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center space-x-3 mb-2">
-                        <h3 className="text-xl font-semibold text-gray-900">
-                          {application.applicantName || application.applicant?.fullName || 'Unknown Applicant'}
+                        <h3 className={`text-xl font-semibold ${blindScreening ? 'text-purple-900 font-mono' : 'text-gray-900'}`}>
+                          {getCandidateDisplayName(application)}
                         </h3>
                         
                         {application.matchPercentage > 0 && (
@@ -1045,7 +1657,7 @@ const ApplicationsList = ({ job, onClose }) => {
                       </div>
                       
                       <p className="text-gray-600">
-                        {application.applicantEmail || application.applicant?.email || 'No email provided'}
+                        {getCandidateDisplayEmail(application)}
                       </p>
                       
                       <div className="mt-2">
@@ -1193,18 +1805,25 @@ const ApplicationsList = ({ job, onClose }) => {
                       <Briefcase className="h-4 w-4 mr-2" />
                       Contact Information
                     </h4>
-                    <div className="space-y-2">
-                      <div className="flex items-center text-sm text-gray-600">
-                        <Mail className="h-4 w-4 mr-2" />
-                        {application.applicantEmail || application.applicant?.email || 'No email'}
+                    {blindScreening ? (
+                      <div className="p-3 bg-purple-50/80 border border-purple-200 rounded-md text-xs text-purple-800 flex items-center gap-2">
+                        <ShieldCheck className="h-4 w-4 text-purple-600 flex-shrink-0" />
+                        <span>Contact details and personal identifiers hidden in Blind Screening Mode.</span>
                       </div>
-                      {(application.applicantPhone || application.applicant?.phone) && (
+                    ) : (
+                      <div className="space-y-2">
                         <div className="flex items-center text-sm text-gray-600">
-                          <Phone className="h-4 w-4 mr-2" />
-                          {application.applicantPhone || application.applicant?.phone}
+                          <Mail className="h-4 w-4 mr-2" />
+                          {application.applicantEmail || application.applicant?.email || 'No email'}
                         </div>
-                      )}
-                    </div>
+                        {(application.applicantPhone || application.applicant?.phone) && (
+                          <div className="flex items-center text-sm text-gray-600">
+                            <Phone className="h-4 w-4 mr-2" />
+                            {application.applicantPhone || application.applicant?.phone}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-3">
@@ -1362,6 +1981,8 @@ const ApplicationsList = ({ job, onClose }) => {
             ))}
           </div>
         )}
+      </>
+    )}
 
         {/* Modals */}
         {showInterviewModal && <InterviewModal />}
