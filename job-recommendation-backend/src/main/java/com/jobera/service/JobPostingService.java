@@ -19,6 +19,7 @@ import com.jobera.entity.Webhook;
 import com.jobera.repository.ApplicationRepository;
 import com.jobera.repository.JobPostingRepository;
 import com.jobera.repository.RecruiterRepository;
+import com.jobera.repository.ReferralRepository;
 import com.jobera.repository.SavedJobRepository;
 import com.jobera.repository.UserRepository;
 
@@ -35,6 +36,7 @@ public class JobPostingService {
     private final SubscriptionService subscriptionService;
     private final WebhookService webhookService;
     private final SilverMedalistService silverMedalistService;
+    private final ReferralRepository referralRepository;
     private final ObjectMapper objectMapper;
 
     public JobPostingService(JobPostingRepository jobPostingRepository,
@@ -44,7 +46,8 @@ public class JobPostingService {
                            SavedJobRepository savedJobRepository,
                            SubscriptionService subscriptionService,
                            WebhookService webhookService,
-                           SilverMedalistService silverMedalistService) {
+                           SilverMedalistService silverMedalistService,
+                           ReferralRepository referralRepository) {
         this.jobPostingRepository = jobPostingRepository;
         this.applicationRepository = applicationRepository;
         this.userRepository = userRepository;
@@ -53,6 +56,7 @@ public class JobPostingService {
         this.subscriptionService = subscriptionService;
         this.webhookService = webhookService;
         this.silverMedalistService = silverMedalistService;
+        this.referralRepository = referralRepository;
         this.objectMapper = new ObjectMapper();
     }
 
@@ -81,9 +85,15 @@ public class JobPostingService {
     }
     
     // Updated method with additional applicant information and enhanced logging
-    public void applyForJob(Long userId, Long jobId, String coverLetter, 
-                           String applicantSkills, Integer applicantExperience, 
+    public void applyForJob(Long userId, Long jobId, String coverLetter,
+                           String applicantSkills, Integer applicantExperience,
                            String applicantEducation) {
+        applyForJob(userId, jobId, coverLetter, applicantSkills, applicantExperience, applicantEducation, null);
+    }
+
+    public void applyForJob(Long userId, Long jobId, String coverLetter,
+                           String applicantSkills, Integer applicantExperience,
+                           String applicantEducation, String requestedSource) {
         log.debug("=== JOB POSTING SERVICE - APPLY FOR JOB ===");
         log.debug("User ID: " + userId);
         log.debug("Job ID: " + jobId);
@@ -109,7 +119,8 @@ public class JobPostingService {
                     applicantExperience,
                     applicantEducation
                 );
-                
+                application.setSource(resolveApplicationSource(requestedSource, userId));
+
                 log.debug("Application entity created, saving to database...");
                 Application savedApplication = applicationRepository.save(application);
                 log.debug("✅ Application saved successfully with ID: " + savedApplication.getId());
@@ -138,10 +149,18 @@ public class JobPostingService {
     }
 
     // ENHANCED: Apply for job with resume matching
-    public Application applyForJobWithResume(Long userId, Long jobId, String coverLetter, 
-                                            String applicantSkills, Integer applicantExperience, 
-                                            String applicantEducation, String resumeFilePath, 
+    public Application applyForJobWithResume(Long userId, Long jobId, String coverLetter,
+                                            String applicantSkills, Integer applicantExperience,
+                                            String applicantEducation, String resumeFilePath,
                                             String resumeParsedText) {
+        return applyForJobWithResume(userId, jobId, coverLetter, applicantSkills, applicantExperience,
+            applicantEducation, resumeFilePath, resumeParsedText, null);
+    }
+
+    public Application applyForJobWithResume(Long userId, Long jobId, String coverLetter,
+                                            String applicantSkills, Integer applicantExperience,
+                                            String applicantEducation, String resumeFilePath,
+                                            String resumeParsedText, String requestedSource) {
         log.debug("=== JOB POSTING SERVICE - APPLY FOR JOB WITH RESUME ===");
         log.debug("User ID: " + userId);
         log.debug("Job ID: " + jobId);
@@ -164,7 +183,8 @@ public class JobPostingService {
                     applicantExperience,
                     applicantEducation
                 );
-                
+                application.setSource(resolveApplicationSource(requestedSource, userId));
+
                 // Set resume data
                 application.setResumeFilePath(resumeFilePath);
                 application.setResumeParsedText(resumeParsedText);
@@ -197,6 +217,25 @@ public class JobPostingService {
             log.error("❌ " + errorMsg);
             throw new JobApplicationException(errorMsg);
         }
+    }
+
+    private static final Set<String> VALID_APPLICATION_SOURCES = Set.of(
+        Application.SOURCE_DIRECT, Application.SOURCE_SILVER_MEDALIST, Application.SOURCE_REFERRAL);
+
+    /** An explicit, recognized source (e.g. a candidate clicking through a silver-medalist
+     *  notification) wins; otherwise, an account that was itself referred counts as a referral
+     *  hire; otherwise it's a plain direct application. */
+    private String resolveApplicationSource(String requestedSource, Long userId) {
+        if (requestedSource != null) {
+            String normalized = requestedSource.trim().toUpperCase();
+            if (VALID_APPLICATION_SOURCES.contains(normalized)) {
+                return normalized;
+            }
+        }
+        if (referralRepository.existsByReferredUserId(userId)) {
+            return Application.SOURCE_REFERRAL;
+        }
+        return Application.SOURCE_DIRECT;
     }
 
     // Calculate resume match percentage
@@ -621,8 +660,25 @@ public class JobPostingService {
     
     // Add this method to JobPostingService class
     public List<JobPosting> getActiveJobPostingsSortedByDate() {
-        return jobPostingRepository.findByIsActiveTrueAndModerationStatusOrderByPostedDateDesc(
+        return jobPostingRepository.findByIsActiveTrueAndModerationStatusOrderByFeaturedDescPostedDateDesc(
             JobPosting.MODERATION_APPROVED);
+    }
+
+    /** Toggles whether a posting is featured - a Pro-tier perk that sorts it ahead of everything
+     *  else in the public listing (see getActiveJobPostingsSortedByDate). */
+    public JobPosting setFeatured(Long jobId, Long recruiterId, boolean featured) {
+        JobPosting job = jobPostingRepository.findById(jobId)
+            .orElseThrow(() -> new JobPostingException("Job posting not found with ID: " + jobId));
+
+        if (job.getRecruiter() == null || !job.getRecruiter().getId().equals(recruiterId)) {
+            throw new JobPostingException("You are not authorized to feature this job posting");
+        }
+        if (featured && !SubscriptionService.PRO_TIER.equals(job.getRecruiter().getSubscriptionTier())) {
+            throw new JobPostingException("Featuring a job requires a Pro subscription");
+        }
+
+        job.setFeatured(featured);
+        return jobPostingRepository.save(job);
     }
     
     // Helper method to check if user is recruiter

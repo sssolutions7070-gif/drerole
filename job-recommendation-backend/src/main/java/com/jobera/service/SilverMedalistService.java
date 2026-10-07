@@ -102,7 +102,7 @@ public class SilverMedalistService {
         String message = (job.getCompany() != null ? job.getCompany() : "A recruiter you applied to before")
             + " just opened \"" + job.getTitle() + "\", and your skills look like a strong match.";
         notificationFeedService.record(candidate.getId(), "SILVER_MEDALIST_MATCH", title, message,
-            "/jobs/" + job.getId());
+            "/jobs/" + job.getId() + "?source=silver_medalist");
         realtimeNotifier.notifyUser(candidate.getId(), "SILVER_MEDALIST_MATCH", Map.of(
             "jobId", job.getId(),
             "jobTitle", job.getTitle()

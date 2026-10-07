@@ -772,6 +772,12 @@ const Jobs = () => {
                   <div className="flex-1">
                     <div className="flex items-center space-x-2 mb-1 flex-wrap gap-2">
                       <h3 className="text-xl font-semibold text-gray-800">{job.title}</h3>
+                      {job.featured && (
+                        <span className="px-2 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 flex items-center">
+                          <Star className="h-3 w-3 mr-1 fill-amber-600" />
+                          Featured
+                        </span>
+                      )}
                       {job.matchScore > 0 && (
                         <span className={`px-2 py-1 rounded-full text-xs font-semibold border ${getMatchColor(job.matchScore)}`}>
                           {job.matchScore}% Match
@@ -1106,9 +1112,10 @@ const Jobs = () => {
       </div>
 
       {showApplicationModal && selectedJobForApplication && (
-        <JobApplicationModal 
-          job={selectedJobForApplication} 
-          onClose={() => { setShowApplicationModal(false); setSelectedJobForApplication(null); }} 
+        <JobApplicationModal
+          job={selectedJobForApplication}
+          source={searchParams.get('source') === 'silver_medalist' ? 'SILVER_MEDALIST' : 'DIRECT'}
+          onClose={() => { setShowApplicationModal(false); setSelectedJobForApplication(null); }}
           onSuccess={handleApplicationSuccess}
         />
       )}

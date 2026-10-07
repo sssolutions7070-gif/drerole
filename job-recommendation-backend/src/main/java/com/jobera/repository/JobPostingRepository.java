@@ -26,6 +26,10 @@ public interface JobPostingRepository extends JpaRepository<JobPosting, Long> {
     // rejected job is only visible to the recruiter who owns it (via findByRecruiterId*).
     List<JobPosting> findByIsActiveTrueAndModerationStatusOrderByPostedDateDesc(String moderationStatus);
 
+    // Same listing, but featured (a Pro-tier perk) sorts first; everything else falls back to
+    // newest-first. Used for the public/candidate-facing listing specifically.
+    List<JobPosting> findByIsActiveTrueAndModerationStatusOrderByFeaturedDescPostedDateDesc(String moderationStatus);
+
     @Query("SELECT jp FROM JobPosting jp WHERE jp.isActive = true AND jp.moderationStatus = 'APPROVED' AND " +
            "(LOWER(jp.title) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
            "LOWER(jp.company) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +

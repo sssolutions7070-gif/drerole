@@ -82,6 +82,11 @@ public class PlatformAnalyticsService {
                 a -> a.getStatus() == null ? "UNKNOWN" : a.getStatus(),
                 LinkedHashMap::new, Collectors.counting()));
         counts.put("byStatus", byStatus);
+        Map<String, Long> bySource = applications.stream()
+            .collect(Collectors.groupingBy(
+                a -> a.getSource() == null ? Application.SOURCE_DIRECT : a.getSource(),
+                LinkedHashMap::new, Collectors.counting()));
+        counts.put("bySource", bySource);
         return counts;
     }
 

@@ -178,6 +178,24 @@ public class JobManagementController {
         }
     }
 
+    @PutMapping("/{jobId}/featured")
+    public ResponseEntity<Map<String, Object>> setFeatured(
+            @PathVariable Long jobId,
+            @RequestBody Map<String, Object> request) {
+        try {
+            Long recruiterId = Long.valueOf(request.get("recruiterId").toString());
+            boolean featured = Boolean.parseBoolean(String.valueOf(request.get("featured")));
+            JobPosting job = jobPostingService.setFeatured(jobId, recruiterId, featured);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", featured ? "Job featured" : "Job unfeatured");
+            response.put("job", createJobResponse(job));
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
     @GetMapping("/{jobId}/applications/export")
     public ResponseEntity<byte[]> exportApplications(
             @PathVariable Long jobId,
@@ -239,6 +257,7 @@ public class JobManagementController {
         response.put("experienceLevel", job.getExperienceLevel());
         response.put("postedDate", job.getPostedDate());
         response.put("isActive", job.getIsActive());
+        response.put("featured", job.getFeatured());
         response.put("moderationStatus", job.getModerationStatus());
         response.put("rejectionReason", job.getRejectionReason());
 

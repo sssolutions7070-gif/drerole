@@ -111,6 +111,27 @@ class PlatformAnalyticsServiceTest {
     }
 
     @Test
+    void aggregatesApplicationCountsBySource() {
+        when(jobPostingRepository.findAll()).thenReturn(List.of());
+        Application direct = application("APPLICATION_SUBMITTED", false, LocalDateTime.now());
+        Application referral1 = application("APPLICATION_SUBMITTED", false, LocalDateTime.now());
+        referral1.setSource(Application.SOURCE_REFERRAL);
+        Application referral2 = application("APPLICATION_SUBMITTED", false, LocalDateTime.now());
+        referral2.setSource(Application.SOURCE_REFERRAL);
+        Application silverMedalist = application("APPLICATION_SUBMITTED", false, LocalDateTime.now());
+        silverMedalist.setSource(Application.SOURCE_SILVER_MEDALIST);
+        when(applicationRepository.findAll()).thenReturn(List.of(direct, referral1, referral2, silverMedalist));
+
+        Map<String, Object> overview = service.getOverview();
+        Map<String, Object> applications = (Map<String, Object>) overview.get("applications");
+        Map<String, Long> bySource = (Map<String, Long>) applications.get("bySource");
+
+        assertEquals(1L, bySource.get(Application.SOURCE_DIRECT));
+        assertEquals(2L, bySource.get(Application.SOURCE_REFERRAL));
+        assertEquals(1L, bySource.get(Application.SOURCE_SILVER_MEDALIST));
+    }
+
+    @Test
     void applicationsByDayZeroFillsTheTrailingThirtyDays() {
         when(jobPostingRepository.findAll()).thenReturn(List.of());
         when(applicationRepository.findAll()).thenReturn(List.of(

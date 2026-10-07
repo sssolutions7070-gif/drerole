@@ -155,6 +155,20 @@ const PlatformAnalyticsPanel = () => {
           <span className="text-red-700">Rejected: {overview.jobPostings.rejected}</span>
         </div>
       </div>
+
+      <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
+        <p className="text-sm font-semibold text-gray-700 mb-3">Source of hire</p>
+        <div className="flex flex-wrap gap-4 text-sm">
+          {Object.entries(overview.applications.bySource || {}).map(([source, count]) => (
+            <span key={source} className="text-gray-700">
+              {`${source.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (l) => l.toUpperCase())}: ${count}`}
+            </span>
+          ))}
+          {Object.keys(overview.applications.bySource || {}).length === 0 && (
+            <span className="text-gray-400">No applications yet</span>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

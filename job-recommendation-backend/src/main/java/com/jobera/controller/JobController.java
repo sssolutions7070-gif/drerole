@@ -147,10 +147,11 @@ public class JobController {
             String resumeFilePath = getStringValue(applicationData, "resumeFilePath", "");
             String resumeParsedText = getStringValue(applicationData, "resumeParsedText", "");
             Integer applicantExperience = parseExperienceSafely(applicationData.get("applicantExperience"));
-            
+            String source = getStringValue(applicationData, "source", null);
+
             Application application = jobPostingService.applyForJobWithResume(
-                userId, jobId, coverLetter, applicantSkills, applicantExperience, 
-                applicantEducation, resumeFilePath, resumeParsedText);
+                userId, jobId, coverLetter, applicantSkills, applicantExperience,
+                applicantEducation, resumeFilePath, resumeParsedText, source);
             
             return ResponseEntity.ok(Map.of(
                 "message", "Application submitted successfully with resume analysis",
@@ -176,10 +177,11 @@ public class JobController {
             String applicantSkills = getStringValue(applicationData, "applicantSkills", "[]");
             String applicantEducation = getStringValue(applicationData, "applicantEducation", "Not specified");
             Integer applicantExperience = parseExperienceSafely(applicationData.get("applicantExperience"));
-            
-            jobPostingService.applyForJob(userId, jobId, coverLetter, 
-                                        applicantSkills, applicantExperience, 
-                                        applicantEducation);
+            String source = getStringValue(applicationData, "source", null);
+
+            jobPostingService.applyForJob(userId, jobId, coverLetter,
+                                        applicantSkills, applicantExperience,
+                                        applicantEducation, source);
             
             return ResponseEntity.ok(Map.of(
                 MESSAGE_KEY, "Application submitted successfully",

@@ -56,6 +56,11 @@ public class JobPosting {
     
     private Boolean isActive;
 
+    // A Pro-tier perk: sorts the posting ahead of everything else in the active job listing.
+    // See SubscriptionService.PRO_TIER and JobPostingService.setFeatured.
+    @Column(nullable = false)
+    private Boolean featured = false;
+
     // Java default (PENDING) applies to postings created from here on; the SQL-level default
     // (APPROVED) only matters for the one-time ALTER TABLE backfill of rows that existed before
     // this column did, so moderation doesn't retroactively hide anything already live.
@@ -165,6 +170,8 @@ public class JobPosting {
     public void setRejectionReason(String rejectionReason) { this.rejectionReason = rejectionReason; }
     public boolean isApproved() { return MODERATION_APPROVED.equals(moderationStatus); }
     public void setIsActive(Boolean isActive) { this.isActive = isActive; }
+    public Boolean getFeatured() { return featured != null && featured; }
+    public void setFeatured(Boolean featured) { this.featured = featured != null && featured; }
     public Double getAverageRating() { return averageRating; }
     public void setAverageRating(Double averageRating) { this.averageRating = averageRating; }
     public Integer getTotalRatings() { return totalRatings; }

@@ -194,6 +194,23 @@ const RecruiterDashboard = () => {
   };
 
   const [duplicatingJobId, setDuplicatingJobId] = useState(null);
+  const [featuringJobId, setFeaturingJobId] = useState(null);
+
+  const handleToggleFeatured = async (job) => {
+    setFeaturingJobId(job.id);
+    try {
+      await api.put(`/recruiters/jobs/${job.id}/featured`, {
+        recruiterId: recruiterProfile?.id,
+        featured: !job.featured,
+      });
+      await fetchRecruiterJobs();
+    } catch (error) {
+      console.error('Error updating featured status:', error);
+      alert(error.response?.data?.error || 'Failed to update featured status');
+    } finally {
+      setFeaturingJobId(null);
+    }
+  };
 
   const handleDuplicateJob = async (job) => {
     if (!window.confirm(`Duplicate "${job.title}" as a new draft you can edit and re-publish?`)) {
@@ -520,6 +537,12 @@ const RecruiterDashboard = () => {
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2 flex-wrap">
                     <h3 className="text-xl font-semibold text-gray-800">{job.title}</h3>
+                    {job.featured && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
+                        <Star className="h-3 w-3 mr-1 fill-amber-600" />
+                        Featured
+                      </span>
+                    )}
                     <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
                       job.moderationStatus === 'APPROVED' || !job.moderationStatus ? 'bg-green-100 text-green-800' :
                       job.moderationStatus === 'REJECTED' ? 'bg-red-100 text-red-800' :
@@ -614,6 +637,19 @@ const RecruiterDashboard = () => {
                     >
                       <Copy className="h-4 w-4 mr-1" />
                       {duplicatingJobId === job.id ? 'Duplicating…' : 'Duplicate'}
+                    </button>
+                    <button
+                      onClick={() => handleToggleFeatured(job)}
+                      disabled={featuringJobId === job.id}
+                      title={job.featured ? 'Remove from featured' : 'Feature this job (Pro)'}
+                      className={`flex-1 inline-flex items-center justify-center px-3 py-1 border rounded-md text-sm font-medium disabled:opacity-50 ${
+                        job.featured
+                          ? 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                          : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      <Star className={`h-4 w-4 mr-1 ${job.featured ? 'fill-amber-500' : ''}`} />
+                      {featuringJobId === job.id ? 'Updating…' : job.featured ? 'Featured' : 'Feature'}
                     </button>
                   </div>
                 </div>

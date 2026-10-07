@@ -33,7 +33,16 @@ public class Application {
     
     @Column(nullable = false)
     private String status = "APPLICATION_SUBMITTED";
-    
+
+    public static final String SOURCE_DIRECT = "DIRECT";
+    public static final String SOURCE_REFERRAL = "REFERRAL";
+    public static final String SOURCE_SILVER_MEDALIST = "SILVER_MEDALIST";
+
+    /** How the candidate found this job - "source of hire" for recruiter/admin analytics.
+     *  Set once at application time; see JobPostingService.resolveApplicationSource. */
+    @Column(nullable = false)
+    private String source = SOURCE_DIRECT;
+
     @Column(columnDefinition = "LONGTEXT")
     private String coverLetter;
     
@@ -177,6 +186,8 @@ public class Application {
     
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
+    public String getSource() { return source; }
+    public void setSource(String source) { this.source = source; }
     
     public String getCoverLetter() { return coverLetter; }
     public void setCoverLetter(String coverLetter) { this.coverLetter = coverLetter; }

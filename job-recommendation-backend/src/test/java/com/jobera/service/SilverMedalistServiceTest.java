@@ -81,7 +81,7 @@ class SilverMedalistServiceTest {
         int notified = service.notifyMatchingPastCandidates(job);
 
         assertEquals(1, notified);
-        verify(notificationFeedService).record(eq(50L), eq("SILVER_MEDALIST_MATCH"), any(), any(), eq("/jobs/1"));
+        verify(notificationFeedService).record(eq(50L), eq("SILVER_MEDALIST_MATCH"), any(), any(), eq("/jobs/1?source=silver_medalist"));
         verify(realtimeNotifier).notifyUser(eq(50L), eq("SILVER_MEDALIST_MATCH"), any());
     }
 

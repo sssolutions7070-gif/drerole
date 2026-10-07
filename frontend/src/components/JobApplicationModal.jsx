@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Upload, FileText, CheckCircle, Loader, Plus, X as XIcon } from 'lucide-react';
 import api from '../services/api';
 
-const JobApplicationModal = ({ job, onClose, onSuccess }) => {
+const JobApplicationModal = ({ job, onClose, onSuccess, source = 'DIRECT' }) => {
   const [formData, setFormData] = useState({
     coverLetter: 'I am very interested in this position and believe my skills are a great match.',
     skills: [],
@@ -236,7 +236,8 @@ const JobApplicationModal = ({ job, onClose, onSuccess }) => {
         applicantEducation:  formData.education,
         resumeId:            uploadedResumeId,
         resumeFilePath:      uploadedResumePath,
-        resumeParsedText:    'Resume content'
+        resumeParsedText:    'Resume content',
+        source
       };
 
       const response = await api.post(

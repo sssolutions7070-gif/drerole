@@ -49,6 +49,19 @@ describe('PlatformAnalyticsPanel', () => {
     expect(screen.getByText(/99.1% Clean/i)).toBeInTheDocument();
   });
 
+  it('shows the source-of-hire breakdown', async () => {
+    platformAnalyticsAPI.getOverview.mockResolvedValue({
+      data: overview({ applications: { total: 20, byStatus: {}, bySource: { DIRECT: 12, REFERRAL: 5, SILVER_MEDALIST: 3 } } }),
+    });
+
+    render(<PlatformAnalyticsPanel />);
+
+    expect(await screen.findByText(/Source of hire/i)).toBeInTheDocument();
+    expect(screen.getByText('Direct: 12')).toBeInTheDocument();
+    expect(screen.getByText('Referral: 5')).toBeInTheDocument();
+    expect(screen.getByText('Silver Medalist: 3')).toBeInTheDocument();
+  });
+
   it('shows an error message when the request fails', async () => {
     platformAnalyticsAPI.getOverview.mockRejectedValue({ response: { data: { error: 'boom' } } });
 
