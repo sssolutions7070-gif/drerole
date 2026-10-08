@@ -1,8 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter, useNavigate } from 'react-router-dom';
 import AdminDashboard from './AdminDashboard';
 import api from '../services/api';
+
+// Simulates another page (e.g. the voice assistant) navigating here a second time with a new
+// initialTab, while AdminDashboard stays mounted the whole time (same route, no remount) - the
+// scenario that caught a real bug: reading location.state only in useState's initializer missed
+// this entirely, since that initializer runs once and never again.
+const DeepLinkHarness = ({ tab }) => {
+  const navigate = useNavigate();
+  return (
+    <>
+      <button onClick={() => navigate('/admin/dashboard', { state: { initialTab: tab } })}>
+        Simulate deep link to {tab}
+      </button>
+      <AdminDashboard />
+    </>
+  );
+};
 
 vi.mock('../services/api');
 
@@ -27,7 +44,7 @@ describe('AdminDashboard - bulk moderation of pending jobs', () => {
 
   it('bulk-approves selected pending jobs', async () => {
     const user = userEvent.setup();
-    render(<AdminDashboard />);
+    render(<MemoryRouter><AdminDashboard /></MemoryRouter>);
 
     await user.click(await screen.findByRole('button', { name: /Pending Jobs \(2\)/i }));
     await screen.findByText('Backend Engineer');
@@ -49,7 +66,7 @@ describe('AdminDashboard - bulk moderation of pending jobs', () => {
   it('bulk-rejects selected pending jobs with a shared reason', async () => {
     const user = userEvent.setup();
     window.prompt = vi.fn(() => 'Looks spammy');
-    render(<AdminDashboard />);
+    render(<MemoryRouter><AdminDashboard /></MemoryRouter>);
 
     await user.click(await screen.findByRole('button', { name: /Pending Jobs \(2\)/i }));
     const jobCheckbox = await screen.findByLabelText('Select Backend Engineer');
@@ -65,11 +82,35 @@ describe('AdminDashboard - bulk moderation of pending jobs', () => {
 
   it('does not show bulk buttons until something is selected', async () => {
     const user = userEvent.setup();
-    render(<AdminDashboard />);
+    render(<MemoryRouter><AdminDashboard /></MemoryRouter>);
 
     await user.click(await screen.findByRole('button', { name: /Pending Jobs \(2\)/i }));
     await screen.findByText('Backend Engineer');
 
     expect(screen.queryByRole('button', { name: /Approve Selected/i })).not.toBeInTheDocument();
+  });
+});
+
+describe('AdminDashboard - deep-linking to a tab without a remount', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    api.get.mockResolvedValue({ data: [] });
+  });
+
+  it('switches tabs when re-navigated to the same route with a new initialTab', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={['/admin/dashboard']}>
+        <DeepLinkHarness tab="pending-reviews" />
+      </MemoryRouter>
+    );
+
+    // Starts on the default tab - the pending-reviews heading isn't rendered yet.
+    await screen.findByRole('button', { name: /Simulate deep link/i });
+    expect(screen.queryByText(/Pending Company Reviews \(/i)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Simulate deep link/i }));
+
+    expect(await screen.findByText(/Pending Company Reviews \(/i)).toBeInTheDocument();
   });
 });

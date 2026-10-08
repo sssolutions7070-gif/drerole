@@ -1,16 +1,26 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, act } from '@testing-library/react';
+import { render, screen, act, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import VoiceAssistant from './VoiceAssistant';
+import api from '../services/api';
+import authService from '../services/auth';
+
+vi.mock('../services/api');
+vi.mock('../services/auth');
 
 class MockSpeechRecognition {
   start() {}
   stop() {}
 }
 
+const setUser = (overrides = {}) => {
+  localStorage.setItem('user', JSON.stringify({ id: 1, fullName: 'Test User', role: 'ROLE_USER', ...overrides }));
+};
+
 describe('VoiceAssistant', () => {
   beforeEach(() => {
+    vi.resetAllMocks();
     localStorage.clear();
     vi.stubGlobal('SpeechRecognition', MockSpeechRecognition);
     vi.stubGlobal('speechSynthesis', { getVoices: () => [], cancel: vi.fn(), speak: vi.fn(), onvoiceschanged: null });
@@ -18,6 +28,7 @@ describe('VoiceAssistant', () => {
       configurable: true,
       value: { getUserMedia: vi.fn().mockResolvedValue({ getTracks: () => [] }) },
     });
+    api.get.mockResolvedValue({ data: [] });
   });
 
   const openAssistant = async () => {
@@ -34,6 +45,14 @@ describe('VoiceAssistant', () => {
     return user;
   };
 
+  // Types into the "Or type a command..." fallback and submits it - the same pipeline speech
+  // recognition uses, so every assertion below also covers the spoken-command path.
+  const typeCommand = async (user, text) => {
+    const input = screen.getByPlaceholderText(/type a command/i);
+    await user.type(input, text);
+    await user.click(screen.getByRole('button', { name: /^Send$/i }));
+  };
+
   it('opens the assistant panel after the microphone is granted', async () => {
     await openAssistant();
 
@@ -47,5 +66,137 @@ describe('VoiceAssistant', () => {
 
     expect(screen.getByText(/apply to job 1/i)).toBeInTheDocument();
     expect(screen.getByText(/rate job 1 five stars/i)).toBeInTheDocument();
+  });
+
+  describe('typed command fallback', () => {
+    it('opens the panel and shows the not-supported message when speech recognition is unavailable', async () => {
+      // The outer beforeEach stubs SpeechRecognition for every other test; `in` checks for the
+      // property's existence regardless of its value, so stubbing it to undefined wouldn't make
+      // the component think it's unsupported - the property has to be removed outright.
+      delete window.SpeechRecognition;
+      delete window.webkitSpeechRecognition;
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter>
+          <VoiceAssistant />
+        </MemoryRouter>
+      );
+
+      await user.click(screen.getByTitle('Start voice assistant'));
+
+      // Previously this message was added to a panel that never opened, so the user never saw it.
+      expect(await screen.findByText(/not supported/i)).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(/type a command/i)).toBeInTheDocument();
+    });
+
+    it('runs a typed command through the same pipeline as a spoken one', async () => {
+      const user = await openAssistant();
+
+      await typeCommand(user, 'go to home');
+
+      expect(await screen.findByText('Going to home page.')).toBeInTheDocument();
+    });
+  });
+
+  describe('role-aware behavior', () => {
+    it('shows recruiter tools and hides job-search commands in the help popup for a recruiter', async () => {
+      setUser({ role: 'ROLE_RECRUITER' });
+      const user = await openAssistant();
+
+      await user.click(screen.getByText(/click for all voice commands/i));
+
+      expect(screen.getByText(/discover candidates.*Browse open-to-work/i)).toBeInTheDocument();
+      expect(screen.getByText(/post a job.*Open your jobs tab/i)).toBeInTheDocument();
+      expect(screen.queryByText(/apply to job 1/i)).not.toBeInTheDocument();
+    });
+
+    it('shows admin tools in the help popup for an admin', async () => {
+      setUser({ role: 'ROLE_ADMIN' });
+      const user = await openAssistant();
+
+      await user.click(screen.getByText(/click for all voice commands/i));
+
+      // Matched on the help-popup's exact bullet formatting - the admin welcome message also
+      // happens to mention "pending jobs" and "moderation queue" in a different sentence.
+      expect(screen.getByText(/"pending jobs" - Open the moderation queue/i)).toBeInTheDocument();
+      expect(screen.queryByText(/apply to job 1/i)).not.toBeInTheDocument();
+    });
+
+    it('every role sees the Account section with "my profile" and "log out"', async () => {
+      const user = await openAssistant();
+
+      await user.click(screen.getByText(/click for all voice commands/i));
+
+      expect(screen.getByText(/my profile.*Open your profile page/i)).toBeInTheDocument();
+      expect(screen.getByText(/log out.*Sign out/i)).toBeInTheDocument();
+    });
+
+    it('"my applications" fetches the candidate\'s own applications', async () => {
+      setUser({ role: 'ROLE_USER' });
+      api.get.mockImplementation((url) => {
+        if (url === '/applications/user/1') return Promise.resolve({ data: { applications: [] } });
+        return Promise.resolve({ data: [] });
+      });
+      const user = await openAssistant();
+
+      await typeCommand(user, 'my applications');
+
+      expect(await screen.findByText(/haven't applied to any jobs yet/i)).toBeInTheDocument();
+    });
+
+    it('"my applications" sends a recruiter to their dashboard instead of fetching candidate data', async () => {
+      setUser({ role: 'ROLE_RECRUITER' });
+      const user = await openAssistant();
+
+      await typeCommand(user, 'my applications');
+
+      expect(await screen.findByText(/View Applications.*on a job/i)).toBeInTheDocument();
+      expect(api.get).not.toHaveBeenCalledWith('/applications/user/1');
+    });
+  });
+
+  describe('a failed applications fetch shows a real message, not a raw key', () => {
+    it('shows a human-readable error instead of the literal "error_fetching_applications" key', async () => {
+      setUser({ role: 'ROLE_USER' });
+      api.get.mockImplementation((url) => {
+        if (url === '/applications/user/1') return Promise.reject(new Error('network down'));
+        return Promise.resolve({ data: [] });
+      });
+      const user = await openAssistant();
+
+      await typeCommand(user, 'my applications');
+
+      expect(await screen.findByText(/trouble checking your applications/i)).toBeInTheDocument();
+      expect(screen.queryByText('error_fetching_applications')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('account commands', () => {
+    it('"my profile" navigates to the profile page', async () => {
+      const user = await openAssistant();
+
+      await typeCommand(user, 'my profile');
+
+      expect(await screen.findByText('Opening your profile.')).toBeInTheDocument();
+    });
+
+    it('"log out" signs the user out', async () => {
+      const onAuthChange = vi.fn();
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter>
+          <VoiceAssistant onAuthChange={onAuthChange} />
+        </MemoryRouter>
+      );
+      await act(async () => {
+        await user.click(screen.getByTitle('Start voice assistant'));
+      });
+
+      await typeCommand(user, 'log out');
+
+      expect(await screen.findByText(/logging you out/i)).toBeInTheDocument();
+      expect(authService.logout).toHaveBeenCalled();
+      await waitFor(() => expect(onAuthChange).toHaveBeenCalledWith(null));
+    });
   });
 });

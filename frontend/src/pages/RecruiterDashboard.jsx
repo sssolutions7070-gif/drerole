@@ -1,6 +1,7 @@
 // src/pages/RecruiterDashboard.jsx
 import React, { useState, useEffect } from 'react';
-import { 
+import { useLocation } from 'react-router-dom';
+import {
   Plus, Users, Eye, Edit, Trash2, Briefcase, Building, 
   Mail, Phone, Calendar, BookOpen, BarChart3, X, Upload,
   MapPin, CheckCircle, XCircle, Clock, TrendingUp, Award,
@@ -22,6 +23,9 @@ import DirectMessagesInbox from '../components/DirectMessagesInbox';
 import VerificationPanel from '../components/VerificationPanel';
 
 const RecruiterDashboard = () => {
+  // Lets another page (e.g. the voice assistant navigating here) land directly on a specific
+  // tab instead of always the default - navigate('/recruiter/dashboard', { state: { initialTab: 'discover' } }).
+  const location = useLocation();
   const [jobs, setJobs] = useState([]);
   const [showJobForm, setShowJobForm] = useState(false);
   const [editingJob, setEditingJob] = useState(null);
@@ -33,7 +37,7 @@ const RecruiterDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [recruiterProfile, setRecruiterProfile] = useState(null);
-  const [activeTab, setActiveTab] = useState('jobs');
+  const [activeTab, setActiveTab] = useState(location.state?.initialTab || 'jobs');
   const [analyticsData, setAnalyticsData] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsError, setAnalyticsError] = useState('');
@@ -50,6 +54,16 @@ const RecruiterDashboard = () => {
     fetchRecruiterJobs();
     fetchRecruiterProfile();
   }, []);
+
+  // location.state is only read as useState's initializer above, which runs once on mount - a
+  // navigate() to this same route (no remount) with a new initialTab would otherwise be ignored.
+  // location.key changes on every navigation, even to an identical path, so it's a reliable signal.
+  useEffect(() => {
+    if (location.state?.initialTab) {
+      setActiveTab(location.state.initialTab);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.key]);
 
   const fetchRecruiterJobs = async () => {
     try {

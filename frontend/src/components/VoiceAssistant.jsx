@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Mic, MicOff, X, Volume2, VolumeX, HelpCircle, Search, Briefcase, MapPin, DollarSign, Clock } from 'lucide-react';
 import api from '../services/api';
+import authService from '../services/auth';
 import { useNavigate } from 'react-router-dom';
 import JobApplicationModal from './JobApplicationModal';
 import { extractStarRating, resolveJobFromCommand } from '../utils/voiceCommandParsing';
@@ -71,13 +72,47 @@ const COMMAND_MAPPINGS = {
     'en-US': ['hello', 'hi', 'hey', 'good morning', 'good afternoon', 'good evening'],
     'hi-IN': ['नमस्ते', 'नमस्कार', 'हाय', 'हेलो', 'सुप्रभात', 'शुभ संध्या'],
     'mr-IN': ['नमस्कार', 'हाय', 'हेलो', 'शुभ प्रभात', 'शुभ संध्या']
+  },
+  // Available to every role.
+  'my profile': {
+    'en-US': ['my profile', 'open my profile', 'view my profile', 'profile page', 'go to profile'],
+    'hi-IN': ['मेरी प्रोफाइल', 'प्रोफाइल खोलें', 'प्रोफाइल पेज'],
+    'mr-IN': ['माझी प्रोफाइल', 'प्रोफाइल उघडा', 'प्रोफाइल पेज']
+  },
+  'logout': {
+    'en-US': ['log out', 'logout', 'sign out', 'log me out'],
+    'hi-IN': ['लॉग आउट करें', 'साइन आउट करें', 'लॉगआउट'],
+    'mr-IN': ['लॉग आउट करा', 'साइन आउट करा', 'लॉगआउट']
+  },
+  // Recruiter-only.
+  'post job': {
+    'en-US': ['post a job', 'post job', 'create a job', 'new job posting', 'add a job'],
+    'hi-IN': ['नौकरी पोस्ट करें', 'नई नौकरी जोड़ें'],
+    'mr-IN': ['नोकरी पोस्ट करा', 'नवीन नोकरी जोडा']
+  },
+  'discover candidates': {
+    'en-US': ['discover candidates', 'find candidates', 'search candidates', 'candidate search'],
+    'hi-IN': ['उम्मीदवार खोजें', 'कैंडिडेट खोजें'],
+    'mr-IN': ['उमेदवार शोधा', 'कँडिडेट शोधा']
+  },
+  // Shared phrasing; routed to the recruiter's or admin's own analytics view by role.
+  'view analytics': {
+    'en-US': ['show analytics', 'view analytics', 'my analytics', 'hiring analytics', 'open analytics'],
+    'hi-IN': ['एनालिटिक्स दिखाएं', 'विश्लेषण दिखाएं'],
+    'mr-IN': ['अॅनालिटिक्स दाखवा', 'विश्लेषण दाखवा']
+  },
+  // Admin-only.
+  'pending moderation': {
+    'en-US': ['pending jobs', 'moderation queue', 'pending reviews', 'review queue', 'pending approvals'],
+    'hi-IN': ['लंबित नौकरियां', 'मॉडरेशन क्यू'],
+    'mr-IN': ['प्रलंबित नोकऱ्या', 'मॉडरेशन क्यू']
   }
 };
 
 // Complete command list for help popup with click handlers - UPDATED with all commands
 const ALL_COMMANDS = {
   'en-US': [
-    { category: '🔍 Job Search', commands: [
+    { key: 'job_search', category: '🔍 Job Search', commands: [
       { text: '• "recommend jobs" - Go to jobs page with recommendations', action: 'recommend jobs' },
       { text: '• "browse jobs" - Go to jobs page', action: 'browse jobs' },
       { text: '• "search jobs" - Search for jobs', action: 'search jobs' },
@@ -90,7 +125,7 @@ const ALL_COMMANDS = {
       { text: '• "application status" - View applied jobs', action: 'my applications' },
       { text: '• "my jobs" - See your job applications', action: 'my applications' }
     ]},
-    { category: '🎯 Job Actions (after a search)', commands: [
+    { key: 'job_actions', category: '🎯 Job Actions (after a search)', commands: [
       { text: '• "apply to job 1" / "apply to the first job" - Apply to a listed job', action: 'apply_to_job' },
       { text: '• "rate job 1 five stars" - Rate a listed job', action: 'rate_job' }
     ]},
@@ -111,7 +146,7 @@ const ALL_COMMANDS = {
   ],
   
   'hi-IN': [
-    { category: '🔍 नौकरी खोज', commands: [
+    { key: 'job_search', category: '🔍 नौकरी खोज', commands: [
       { text: '• "recommend jobs" - अनुशंसाओं के साथ जॉब पेज पर जाएं', action: 'recommend jobs' },
       { text: '• "browse jobs" - जॉब पेज पर जाएं', action: 'browse jobs' },
       { text: '• "search jobs" - नौकरियां खोजें', action: 'search jobs' },
@@ -124,7 +159,7 @@ const ALL_COMMANDS = {
       { text: '• "आवेदन स्थिति" - अप्लाइड जॉब्स देखें', action: 'my applications' },
       { text: '• "मेरी नौकरियां" - आपके नौकरी आवेदन देखें', action: 'my applications' }
     ]},
-    { category: '🎯 नौकरी क्रियाएं (खोज के बाद)', commands: [
+    { key: 'job_actions', category: '🎯 नौकरी क्रियाएं (खोज के बाद)', commands: [
       { text: '• "apply to job 1" - सूची से किसी नौकरी के लिए आवेदन करें', action: 'apply_to_job' },
       { text: '• "rate job 1 five stars" - सूची से किसी नौकरी को रेट करें', action: 'rate_job' }
     ]},
@@ -145,7 +180,7 @@ const ALL_COMMANDS = {
   ],
   
   'mr-IN': [
-    { category: '🔍 नोकरी शोध', commands: [
+    { key: 'job_search', category: '🔍 नोकरी शोध', commands: [
       { text: '• "recommend jobs" - शिफारशींसह जॉब पेजवर जा', action: 'recommend jobs' },
       { text: '• "browse jobs" - जॉब पेजवर जा', action: 'browse jobs' },
       { text: '• "search jobs" - नोकऱ्या शोधा', action: 'search jobs' },
@@ -158,7 +193,7 @@ const ALL_COMMANDS = {
       { text: '• "अर्ज स्थिती" - अप्लाइड नोकऱ्या पहा', action: 'my applications' },
       { text: '• "माझ्या नोकऱ्या" - तुमचे नोकरी अर्ज पहा', action: 'my applications' }
     ]},
-    { category: '🎯 नोकरी क्रिया (शोधल्यानंतर)', commands: [
+    { key: 'job_actions', category: '🎯 नोकरी क्रिया (शोधल्यानंतर)', commands: [
       { text: '• "apply to job 1" - यादीतील नोकरीसाठी अर्ज करा', action: 'apply_to_job' },
       { text: '• "rate job 1 five stars" - यादीतील नोकरीला रेट करा', action: 'rate_job' }
     ]},
@@ -177,6 +212,81 @@ const ALL_COMMANDS = {
       { text: '• "शुभ प्रभात" / "शुभ संध्या" - वेळेनुसार अभिवादन', action: 'hello' }
     ]}
   ]
+};
+
+// Commands only a recruiter or admin account can use, appended onto ALL_COMMANDS by
+// getCommandSections() below - the job-search/apply/rate sections above are candidate-only and
+// are filtered back out for those two roles, since they hit endpoints a recruiter/admin account
+// can't meaningfully use.
+const RECRUITER_COMMANDS = {
+  'en-US': { key: 'recruiter', category: '🧑‍💼 Recruiter Tools', commands: [
+    { text: '• "post a job" - Open your jobs tab to create one', action: 'post job' },
+    { text: '• "discover candidates" - Browse open-to-work candidates', action: 'discover candidates' },
+    { text: '• "view applications" - See applicants on your jobs', action: 'my applications' },
+    { text: '• "show analytics" - Open your hiring analytics', action: 'view analytics' },
+  ]},
+  'hi-IN': { key: 'recruiter', category: '🧑‍💼 रिक्रूटर टूल्स', commands: [
+    { text: '• "post a job" - नौकरी बनाने के लिए जॉब्स टैब खोलें', action: 'post job' },
+    { text: '• "discover candidates" - उम्मीदवार खोजें', action: 'discover candidates' },
+    { text: '• "view applications" - अपनी नौकरियों के आवेदक देखें', action: 'my applications' },
+    { text: '• "show analytics" - अपनी हायरिंग एनालिटिक्स खोलें', action: 'view analytics' },
+  ]},
+  'mr-IN': { key: 'recruiter', category: '🧑‍💼 रिक्रूटर टूल्स', commands: [
+    { text: '• "post a job" - नोकरी तयार करण्यासाठी जॉब्स टॅब उघडा', action: 'post job' },
+    { text: '• "discover candidates" - उमेदवार शोधा', action: 'discover candidates' },
+    { text: '• "view applications" - तुमच्या नोकऱ्यांचे अर्जदार पहा', action: 'my applications' },
+    { text: '• "show analytics" - तुमची हायरिंग अॅनालिटिक्स उघडा', action: 'view analytics' },
+  ]},
+};
+
+const ADMIN_COMMANDS = {
+  'en-US': { key: 'admin', category: '🛡️ Admin Tools', commands: [
+    { text: '• "pending jobs" - Open the moderation queue', action: 'pending moderation' },
+    { text: '• "view applications" - See every application on the platform', action: 'my applications' },
+    { text: '• "show analytics" - Open platform-wide analytics', action: 'view analytics' },
+  ]},
+  'hi-IN': { key: 'admin', category: '🛡️ एडमिन टूल्स', commands: [
+    { text: '• "pending jobs" - मॉडरेशन क्यू खोलें', action: 'pending moderation' },
+    { text: '• "view applications" - प्लेटफ़ॉर्म पर सभी आवेदन देखें', action: 'my applications' },
+    { text: '• "show analytics" - प्लेटफ़ॉर्म-व्यापी एनालिटिक्स खोलें', action: 'view analytics' },
+  ]},
+  'mr-IN': { key: 'admin', category: '🛡️ अॅडमिन टूल्स', commands: [
+    { text: '• "pending jobs" - मॉडरेशन क्यू उघडा', action: 'pending moderation' },
+    { text: '• "view applications" - प्लॅटफॉर्मवरील सर्व अर्ज पहा', action: 'my applications' },
+    { text: '• "show analytics" - प्लॅटफॉर्म-व्यापी अॅनालिटिक्स उघडा', action: 'view analytics' },
+  ]},
+};
+
+// Universally useful, added for every role.
+const ACCOUNT_COMMANDS = {
+  'en-US': { key: 'account', category: '👤 Account', commands: [
+    { text: '• "my profile" - Open your profile page', action: 'my profile' },
+    { text: '• "log out" - Sign out of your account', action: 'logout' },
+  ]},
+  'hi-IN': { key: 'account', category: '👤 खाता', commands: [
+    { text: '• "my profile" - अपनी प्रोफाइल खोलें', action: 'my profile' },
+    { text: '• "log out" - अपने खाते से साइन आउट करें', action: 'logout' },
+  ]},
+  'mr-IN': { key: 'account', category: '👤 खाते', commands: [
+    { text: '• "my profile" - तुमची प्रोफाइल उघडा', action: 'my profile' },
+    { text: '• "log out" - तुमच्या खात्यातून साइन आउट करा', action: 'logout' },
+  ]},
+};
+
+/** The help-popup sections for the given language and role: candidate-only job-search/apply/rate
+ *  sections are dropped for a recruiter or admin account (those hit endpoints that account can't
+ *  use), and a role-specific tools section plus the universal Account section are appended. */
+const getCommandSections = (language, { isRecruiter, isAdmin } = {}) => {
+  const base = ALL_COMMANDS[language] || ALL_COMMANDS['en-US'];
+  const sections = (isRecruiter || isAdmin)
+    ? base.filter((section) => section.key !== 'job_search' && section.key !== 'job_actions')
+    : [...base];
+
+  if (isRecruiter) sections.push(RECRUITER_COMMANDS[language] || RECRUITER_COMMANDS['en-US']);
+  if (isAdmin) sections.push(ADMIN_COMMANDS[language] || ADMIN_COMMANDS['en-US']);
+  sections.push(ACCOUNT_COMMANDS[language] || ACCOUNT_COMMANDS['en-US']);
+
+  return sections;
 };
 
 // Response templates in different languages
@@ -221,6 +331,64 @@ const RESPONSES = {
     'hi-IN': 'क्षमा करें, मुझे नौकरियां ढूंढने में समस्या हुई।',
     'mr-IN': 'क्षमस्व, मला नोकऱ्या शोधताना अडचण आली.'
   },
+  // Was previously missing - fetchApplications()'s catch block referenced this key, but with no
+  // entry here getResponse() fell back to returning the literal key string as the spoken/shown
+  // message instead of a real sentence.
+  'error_fetching_applications': {
+    'en-US': "Sorry, I had trouble checking your applications.",
+    'hi-IN': 'क्षमा करें, आपके आवेदन जांचने में समस्या हुई।',
+    'mr-IN': 'क्षमस्व, तुमचे अर्ज तपासताना अडचण आली.'
+  },
+  'opening_profile': {
+    'en-US': 'Opening your profile.',
+    'hi-IN': 'आपकी प्रोफाइल खोल रहा हूँ।',
+    'mr-IN': 'तुमची प्रोफाइल उघडत आहे.'
+  },
+  'logging_out': {
+    'en-US': 'Logging you out. See you next time!',
+    'hi-IN': 'लॉग आउट कर रहा हूँ। फिर मिलेंगे!',
+    'mr-IN': 'लॉग आउट करत आहे. पुन्हा भेटू!'
+  },
+  'opening_recruiter_dashboard': {
+    'en-US': 'Opening your recruiter dashboard.',
+    'hi-IN': 'आपका रिक्रूटर डैशबोर्ड खोल रहा हूँ।',
+    'mr-IN': 'तुमचा रिक्रूटर डॅशबोर्ड उघडत आहे.'
+  },
+  'opening_discover': {
+    'en-US': 'Opening Discover Candidates.',
+    'hi-IN': 'उम्मीदवार खोज खोल रहा हूँ।',
+    'mr-IN': 'उमेदवार शोध उघडत आहे.'
+  },
+  'opening_post_job': {
+    'en-US': "Opening your jobs tab - click 'Post New Job' to create one.",
+    'hi-IN': "आपका जॉब्स टैब खोल रहा हूँ - नई नौकरी बनाने के लिए 'Post New Job' पर क्लिक करें।",
+    'mr-IN': "तुमचे जॉब्स टॅब उघडत आहे - नवीन नोकरी तयार करण्यासाठी 'Post New Job' वर क्लिक करा."
+  },
+  'opening_analytics': {
+    'en-US': 'Opening analytics.',
+    'hi-IN': 'एनालिटिक्स खोल रहा हूँ।',
+    'mr-IN': 'अॅनालिटिक्स उघडत आहे.'
+  },
+  'opening_admin_dashboard': {
+    'en-US': 'Opening the admin dashboard.',
+    'hi-IN': 'एडमिन डैशबोर्ड खोल रहा हूँ।',
+    'mr-IN': 'अॅडमिन डॅशबोर्ड उघडत आहे.'
+  },
+  'opening_pending_moderation': {
+    'en-US': 'Opening the pending jobs moderation queue.',
+    'hi-IN': 'लंबित नौकरी मॉडरेशन क्यू खोल रहा हूँ।',
+    'mr-IN': 'प्रलंबित नोकरी मॉडरेशन क्यू उघडत आहे.'
+  },
+  'recruiter_applications_hint': {
+    'en-US': "Opening your dashboard - click 'View Applications' on a job to see its applicants.",
+    'hi-IN': "आपका डैशबोर्ड खोल रहा हूँ - आवेदकों को देखने के लिए किसी नौकरी पर 'View Applications' पर क्लिक करें।",
+    'mr-IN': "तुमचा डॅशबोर्ड उघडत आहे - अर्जदार पाहण्यासाठी एखाद्या नोकरीवर 'View Applications' वर क्लिक करा."
+  },
+  'admin_applications_hint': {
+    'en-US': 'Opening all applications.',
+    'hi-IN': 'सभी आवेदन खोल रहा हूँ।',
+    'mr-IN': 'सर्व अर्ज उघडत आहे.'
+  },
   'opening_dashboard': {
     'en-US': 'Opening dashboard.',
     'hi-IN': 'डैशबोर्ड खोल रहा हूँ।',
@@ -258,7 +426,7 @@ const RESPONSES = {
   }
 };
 
-const VoiceAssistant = () => {
+const VoiceAssistant = ({ onAuthChange }) => {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [isOpen, setIsOpen] = useState(false);
@@ -287,6 +455,10 @@ const VoiceAssistant = () => {
   const messagesEndRef = useRef(null);
 
   const currentUser = JSON.parse(localStorage.getItem('user'));
+  const userRole = currentUser?.role; // 'ROLE_USER' | 'ROLE_RECRUITER' | 'ROLE_ADMIN'
+  const isRecruiter = userRole === 'ROLE_RECRUITER';
+  const isAdmin = userRole === 'ROLE_ADMIN';
+  const [textInput, setTextInput] = useState('');
 
   // Load available voices
   useEffect(() => {
@@ -301,18 +473,26 @@ const VoiceAssistant = () => {
     }
   }, []);
 
-  // Welcome message
+  // Welcome message - what it suggests trying first depends on who's logged in.
   useEffect(() => {
-    const welcomeMessages = {
+    const welcomeMessages = isRecruiter ? {
+      'en-US': "Hello! I'm your DreamRole assistant. Say 'post a job', 'discover candidates', or 'show analytics' - or 'help' to see everything I can do.",
+      'hi-IN': "नमस्ते! मैं आपका DreamRole सहायक हूँ। 'post a job', 'discover candidates', या 'show analytics' कहें - या सभी कमांड देखने के लिए 'help' कहें।",
+      'mr-IN': "नमस्कार! मी तुमचा DreamRole सहाय्यक आहे. 'post a job', 'discover candidates', किंवा 'show analytics' म्हणा - किंवा सर्व कमांड पाहण्यासाठी 'help' म्हणा."
+    } : isAdmin ? {
+      'en-US': "Hello! I'm your DreamRole assistant. Say 'pending jobs' to open the moderation queue, or 'help' to see everything I can do.",
+      'hi-IN': "नमस्ते! मैं आपका DreamRole सहायक हूँ। मॉडरेशन क्यू खोलने के लिए 'pending jobs' कहें, या सभी कमांड देखने के लिए 'help' कहें।",
+      'mr-IN': "नमस्कार! मी तुमचा DreamRole सहाय्यक आहे. मॉडरेशन क्यू उघडण्यासाठी 'pending jobs' म्हणा, किंवा सर्व कमांड पाहण्यासाठी 'help' म्हणा."
+    } : {
       'en-US': "Hello! I'm your DreamRole assistant. Say 'recommend jobs' or 'browse jobs' to go to jobs page, or search for specific jobs like 'find data scientist jobs'.",
       'hi-IN': "नमस्ते! मैं आपका DreamRole सहायक हूँ। जॉब पेज पर जाने के लिए 'recommend jobs' या 'browse jobs' कहें, या विशिष्ट नौकरियां खोजें जैसे 'डाटा साइंटिस्ट नौकरी'।",
       'mr-IN': "नमस्कार! मी तुमचा DreamRole सहाय्यक आहे. जॉब पेजवर जाण्यासाठी 'recommend jobs' किंवा 'browse jobs' म्हणा, किंवा विशिष्ट नोकऱ्या शोधा जसे 'डेटा सायंटिस्ट नोकरी'."
     };
-    
-    setMessages([{ 
-      type: 'assistant', 
+
+    setMessages([{
+      type: 'assistant',
       text: welcomeMessages[currentLanguage],
-      language: currentLanguage 
+      language: currentLanguage
     }]);
     
     // Fetch all jobs on load (only once a user is logged in; the API requires auth)
@@ -777,6 +957,65 @@ const VoiceAssistant = () => {
     }
   };
 
+  // "Dashboard" means something different depending on who's asking - route to each role's own
+  // dashboard instead of always the candidate one.
+  const goToDashboard = () => {
+    if (isAdmin) {
+      navigate('/admin/dashboard');
+      const msg = getResponse('opening_admin_dashboard', currentLanguage);
+      addMessage('assistant', msg, currentLanguage);
+      speakResponse(msg, currentLanguage);
+    } else {
+      // /dashboard itself already renders RecruiterDashboard vs the candidate Dashboard
+      // depending on role (see App.jsx), so this one route covers both.
+      navigate('/dashboard');
+      const key = isRecruiter ? 'opening_recruiter_dashboard' : 'opening_dashboard';
+      const msg = getResponse(key, currentLanguage);
+      addMessage('assistant', msg, currentLanguage);
+      speakResponse(msg, currentLanguage);
+    }
+  };
+
+  // Likewise, "my applications" means "applications I submitted" for a candidate, but "the
+  // applicants on my jobs" for a recruiter and "every application on the platform" for an admin -
+  // recruiter/admin dashboards don't have a single aggregate list to fetch, so these just land on
+  // the right screen with a spoken pointer to where the data actually lives.
+  const goToApplications = () => {
+    if (isRecruiter) {
+      navigate('/recruiter/dashboard', { state: { initialTab: 'jobs' } });
+      const msg = getResponse('recruiter_applications_hint', currentLanguage);
+      addMessage('assistant', msg, currentLanguage);
+      speakResponse(msg, currentLanguage);
+    } else if (isAdmin) {
+      navigate('/admin/dashboard', { state: { initialTab: 'applications' } });
+      const msg = getResponse('admin_applications_hint', currentLanguage);
+      addMessage('assistant', msg, currentLanguage);
+      speakResponse(msg, currentLanguage);
+    } else {
+      fetchApplications();
+    }
+  };
+
+  const goToAnalytics = () => {
+    if (isAdmin) {
+      navigate('/admin/dashboard', { state: { initialTab: 'analytics' } });
+    } else {
+      navigate('/recruiter/dashboard', { state: { initialTab: 'analytics' } });
+    }
+    const msg = getResponse('opening_analytics', currentLanguage);
+    addMessage('assistant', msg, currentLanguage);
+    speakResponse(msg, currentLanguage);
+  };
+
+  const logOutByVoice = () => {
+    const msg = getResponse('logging_out', currentLanguage);
+    addMessage('assistant', msg, currentLanguage);
+    speakResponse(msg, currentLanguage);
+    authService.logout();
+    if (onAuthChange) onAuthChange(null);
+    setTimeout(() => navigate('/'), 300);
+  };
+
   // Execute command from click
   const executeCommand = (command) => {
     setShowHelpPopup(false);
@@ -805,12 +1044,36 @@ const VoiceAssistant = () => {
         speakResponse('Search for jobs first, then say rate job 1 five stars', currentLanguage);
         break;
       case 'my applications':
-        fetchApplications();
+        goToApplications();
         break;
       case 'go to dashboard':
-        navigate('/dashboard');
-        addMessage('assistant', getResponse('opening_dashboard', currentLanguage), currentLanguage);
-        speakResponse(getResponse('opening_dashboard', currentLanguage), currentLanguage);
+        goToDashboard();
+        break;
+      case 'my profile':
+        navigate('/profile');
+        addMessage('assistant', getResponse('opening_profile', currentLanguage), currentLanguage);
+        speakResponse(getResponse('opening_profile', currentLanguage), currentLanguage);
+        break;
+      case 'logout':
+        logOutByVoice();
+        break;
+      case 'post job':
+        navigate('/recruiter/dashboard', { state: { initialTab: 'jobs' } });
+        addMessage('assistant', getResponse('opening_post_job', currentLanguage), currentLanguage);
+        speakResponse(getResponse('opening_post_job', currentLanguage), currentLanguage);
+        break;
+      case 'discover candidates':
+        navigate('/recruiter/dashboard', { state: { initialTab: 'discover' } });
+        addMessage('assistant', getResponse('opening_discover', currentLanguage), currentLanguage);
+        speakResponse(getResponse('opening_discover', currentLanguage), currentLanguage);
+        break;
+      case 'view analytics':
+        goToAnalytics();
+        break;
+      case 'pending moderation':
+        navigate('/admin/dashboard', { state: { initialTab: 'pending-jobs' } });
+        addMessage('assistant', getResponse('opening_pending_moderation', currentLanguage), currentLanguage);
+        speakResponse(getResponse('opening_pending_moderation', currentLanguage), currentLanguage);
         break;
       case 'upload resume':
         navigate('/upload');
@@ -977,16 +1240,40 @@ const VoiceAssistant = () => {
       }
     }
     
-    // Applications command
+    // Applications command - what this means depends on the caller's role (see goToApplications)
     else if (detectedCommand === 'my applications') {
-      fetchApplications();
+      goToApplications();
     }
-    
-    // Navigation commands
+
+    // Navigation commands - also role-aware (see goToDashboard)
     else if (detectedCommand === 'go to dashboard') {
-      navigate('/dashboard');
-      addMessage('assistant', getResponse('opening_dashboard', currentLanguage), currentLanguage);
-      speakResponse(getResponse('opening_dashboard', currentLanguage), currentLanguage);
+      goToDashboard();
+    }
+    else if (detectedCommand === 'my profile') {
+      navigate('/profile');
+      addMessage('assistant', getResponse('opening_profile', currentLanguage), currentLanguage);
+      speakResponse(getResponse('opening_profile', currentLanguage), currentLanguage);
+    }
+    else if (detectedCommand === 'logout') {
+      logOutByVoice();
+    }
+    else if (detectedCommand === 'post job') {
+      navigate('/recruiter/dashboard', { state: { initialTab: 'jobs' } });
+      addMessage('assistant', getResponse('opening_post_job', currentLanguage), currentLanguage);
+      speakResponse(getResponse('opening_post_job', currentLanguage), currentLanguage);
+    }
+    else if (detectedCommand === 'discover candidates') {
+      navigate('/recruiter/dashboard', { state: { initialTab: 'discover' } });
+      addMessage('assistant', getResponse('opening_discover', currentLanguage), currentLanguage);
+      speakResponse(getResponse('opening_discover', currentLanguage), currentLanguage);
+    }
+    else if (detectedCommand === 'view analytics') {
+      goToAnalytics();
+    }
+    else if (detectedCommand === 'pending moderation') {
+      navigate('/admin/dashboard', { state: { initialTab: 'pending-jobs' } });
+      addMessage('assistant', getResponse('opening_pending_moderation', currentLanguage), currentLanguage);
+      speakResponse(getResponse('opening_pending_moderation', currentLanguage), currentLanguage);
     }
     else if (detectedCommand === 'upload resume') {
       navigate('/upload');
@@ -1017,8 +1304,23 @@ const VoiceAssistant = () => {
     }
   };
 
+  // A typed alternative to speaking - same command pipeline as a finished speech-recognition
+  // result, so every command above works here too. Useful on browsers without Web Speech API
+  // support (Firefox has none), in a noisy or shared space, or just when typing is faster.
+  const handleTextSubmit = (e) => {
+    e.preventDefault();
+    const value = textInput.trim();
+    if (!value) return;
+    setTextInput('');
+    handleVoiceCommand(value, currentLanguage);
+  };
+
   const toggleListening = () => {
     if (!recognitionRef.current) {
+      // Previously this added a message to a panel the user never saw opening - the only visible
+      // effect of clicking the mic on an unsupported browser (e.g. Firefox) was nothing at all.
+      // Open the panel so they actually see the message and can fall back to the text input below.
+      setIsOpen(true);
       addMessage('assistant', getResponse('not_supported', currentLanguage), currentLanguage);
       return;
     }
@@ -1215,8 +1517,9 @@ const VoiceAssistant = () => {
               {currentLanguage === 'hi-IN' && 'सभी वॉयस कमांड'}
               {currentLanguage === 'mr-IN' && 'सर्व व्हॉइस कमांड'}
             </span>
-            <button 
+            <button
               onClick={() => setShowHelpPopup(false)}
+              aria-label="Close help"
               className="hover:bg-white hover:bg-opacity-20 rounded p-1"
             >
               <X className="h-4 w-4" />
@@ -1224,7 +1527,7 @@ const VoiceAssistant = () => {
           </div>
           
           <div className="p-4 max-h-96 overflow-y-auto">
-            {ALL_COMMANDS[currentLanguage].map((section, idx) => (
+            {getCommandSections(currentLanguage, { isRecruiter, isAdmin }).map((section, idx) => (
               <div key={idx} className="mb-4">
                 <h3 className="font-bold text-gray-700 mb-2">{section.category}</h3>
                 <div className="space-y-1">
@@ -1393,6 +1696,30 @@ const VoiceAssistant = () => {
             
             <div ref={messagesEndRef} />
           </div>
+
+          {/* Type a command - works identically to speaking one, and is the only option on
+              browsers (e.g. Firefox) with no Web Speech API support. */}
+          <form onSubmit={handleTextSubmit} className="flex items-center gap-2 p-2 border-t">
+            <input
+              type="text"
+              value={textInput}
+              onChange={(e) => setTextInput(e.target.value)}
+              placeholder={
+                currentLanguage === 'hi-IN' ? 'कमांड टाइप करें...'
+                  : currentLanguage === 'mr-IN' ? 'कमांड टाइप करा...'
+                  : 'Or type a command...'
+              }
+              aria-label="Type a voice assistant command"
+              className="flex-1 text-sm border border-gray-300 rounded-full px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+            <button
+              type="submit"
+              disabled={!textInput.trim()}
+              className="text-sm font-medium text-blue-600 hover:text-blue-800 disabled:opacity-40 disabled:cursor-not-allowed px-2"
+            >
+              {currentLanguage === 'hi-IN' ? 'भेजें' : currentLanguage === 'mr-IN' ? 'पाठवा' : 'Send'}
+            </button>
+          </form>
 
           {/* Footer */}
           <div className="p-2 border-t text-center text-xs text-gray-500">

@@ -206,7 +206,7 @@ function App() {
           </Routes>
           </Suspense>
         </main>
-        <VoiceAssistant />
+        <VoiceAssistant onAuthChange={handleAuthChange} />
         <NotificationToast />
       </div>
     </Router>

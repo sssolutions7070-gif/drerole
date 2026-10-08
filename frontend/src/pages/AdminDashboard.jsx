@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Users, Building, Briefcase, FileText, Trash2, ToggleLeft, ToggleRight, BarChart3, ScrollText, Clock, CheckCircle, XCircle, Star, MessageSquare, TrendingUp, BadgeCheck } from 'lucide-react';
 import api from '../services/api';
 import PlatformAnalyticsPanel from '../components/PlatformAnalyticsPanel';
 import PendingVerificationsPanel from '../components/PendingVerificationsPanel';
 
 const AdminDashboard = () => {
+  // Lets another page (e.g. the voice assistant navigating here) land directly on a specific
+  // tab instead of always the default - navigate('/admin/dashboard', { state: { initialTab: 'pending-jobs' } }).
+  const location = useLocation();
   const [stats, setStats] = useState({});
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState(location.state?.initialTab || 'dashboard');
   const [users, setUsers] = useState([]);
   const [recruiters, setRecruiters] = useState([]);
   const [jobs, setJobs] = useState([]);
@@ -104,6 +108,16 @@ const AdminDashboard = () => {
     fetchPendingReviews();
     fetchPendingExperiences();
   }, []);
+
+  // location.state is only read as useState's initializer above, which runs once on mount - a
+  // navigate() to this same route (no remount) with a new initialTab would otherwise be ignored.
+  // location.key changes on every navigation, even to an identical path, so it's a reliable signal.
+  useEffect(() => {
+    if (location.state?.initialTab) {
+      setActiveTab(location.state.initialTab);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.key]);
 
   useEffect(() => {
     if (activeTab === 'users') fetchUsers();
