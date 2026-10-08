@@ -3,6 +3,14 @@ import subprocess
 import sys
 import os
 
+# Windows' default console codepage (cp1252) can't encode the emoji used in the status
+# messages below, which crashes the whole service before it even starts (UnicodeEncodeError) -
+# both when run directly in a legacy-codepage terminal and when stdout is redirected to a file.
+# Force UTF-8 so the messages print correctly everywhere.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+
 def main():
     print("=" * 60)
     print("Starting Camera Proctoring Service")
