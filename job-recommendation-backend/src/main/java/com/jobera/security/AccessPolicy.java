@@ -145,6 +145,7 @@ public class AccessPolicy {
         // same as any recruiter being able to post a job in the first place.
         rule("GET", "/api/candidates/discover", recruiter);
         rule("GET", "/api/candidates/discover/ai-search", recruiter);
+        rule("POST", "/api/candidates/{candidateUserId}/views", recruiter);
 
         // Internships
         rule("GET", "/api/internships", authenticated);

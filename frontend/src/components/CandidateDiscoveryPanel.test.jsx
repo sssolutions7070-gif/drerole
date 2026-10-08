@@ -123,4 +123,45 @@ describe('CandidateDiscoveryPanel', () => {
       alertEnabled: true
     }));
   });
+
+  it('records a profile view and opens a detail modal when View Profile is clicked', async () => {
+    candidateDiscoveryAPI.discover.mockResolvedValue({ data: [candidate()] });
+    candidateDiscoveryAPI.recordView.mockResolvedValue({});
+
+    const user = userEvent.setup();
+    render(<CandidateDiscoveryPanel />);
+
+    await user.click(await screen.findByRole('button', { name: /View Profile/i }));
+
+    expect(candidateDiscoveryAPI.recordView).toHaveBeenCalledWith(1);
+    expect(screen.getAllByText('Loves distributed systems').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Alice Anderson').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('does not block opening the profile modal when recording the view fails', async () => {
+    candidateDiscoveryAPI.discover.mockResolvedValue({ data: [candidate()] });
+    candidateDiscoveryAPI.recordView.mockRejectedValue(new Error('network error'));
+
+    const user = userEvent.setup();
+    render(<CandidateDiscoveryPanel />);
+
+    await user.click(await screen.findByRole('button', { name: /View Profile/i }));
+
+    expect((await screen.findAllByText('Loves distributed systems')).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('can message a candidate directly from the profile modal', async () => {
+    candidateDiscoveryAPI.discover.mockResolvedValue({ data: [candidate()] });
+    candidateDiscoveryAPI.recordView.mockResolvedValue({});
+    const { directMessageAPI: dmAPI } = await import('../services/api');
+    dmAPI.getThread.mockResolvedValue({ data: [] });
+
+    const user = userEvent.setup();
+    render(<CandidateDiscoveryPanel recruiterId={100} />);
+
+    await user.click(await screen.findByRole('button', { name: /View Profile/i }));
+    await user.click(screen.getByRole('button', { name: /Message Candidate/i }));
+
+    expect(dmAPI.getThread).toHaveBeenCalledWith(100, 1);
+  });
 });

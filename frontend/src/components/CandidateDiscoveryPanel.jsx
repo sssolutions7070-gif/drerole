@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Search, MapPin, FileText, MessageCircle, Sparkles, Bookmark, Bell, BellOff, Trash2, X, Check } from 'lucide-react';
+import { Search, MapPin, FileText, MessageCircle, Sparkles, Bookmark, Bell, BellOff, Trash2, X, Check, UserCircle } from 'lucide-react';
 import { candidateDiscoveryAPI, savedCandidateSearchAPI } from '../services/api';
 import DirectMessageThread from './DirectMessageThread';
 
@@ -14,6 +14,14 @@ const CandidateDiscoveryPanel = ({ recruiterId }) => {
   const [aiQuery, setAiQuery] = useState('');
   const [aiSearching, setAiSearching] = useState(false);
   const [messagingCandidate, setMessagingCandidate] = useState(null);
+  const [viewingCandidate, setViewingCandidate] = useState(null);
+
+  const handleViewProfile = (candidate) => {
+    setViewingCandidate(candidate);
+    candidateDiscoveryAPI.recordView(candidate.userId).catch(() => {
+      // Best-effort - a failed view record shouldn't block the recruiter from seeing the profile.
+    });
+  };
 
   // Saved Searches state
   const [savedSearches, setSavedSearches] = useState([]);
@@ -351,6 +359,12 @@ const CandidateDiscoveryPanel = ({ recruiterId }) => {
                     </span>
                   )}
                   <button
+                    onClick={() => handleViewProfile(candidate)}
+                    className="inline-flex items-center gap-1 text-xs text-gray-600 hover:text-gray-800 border border-gray-200 rounded-full px-2 py-1"
+                  >
+                    <UserCircle className="h-3 w-3" /> View Profile
+                  </button>
+                  <button
                     onClick={() => setMessagingCandidate(candidate)}
                     className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 border border-blue-200 rounded-full px-2 py-1"
                   >
@@ -378,6 +392,51 @@ const CandidateDiscoveryPanel = ({ recruiterId }) => {
           title={messagingCandidate.fullName}
           onClose={() => setMessagingCandidate(null)}
         />
+      )}
+
+      {viewingCandidate && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-6 border w-full max-w-lg shadow-lg rounded-md bg-white">
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">{viewingCandidate.fullName}</h3>
+                {viewingCandidate.headline && <p className="text-sm text-gray-600">{viewingCandidate.headline}</p>}
+              </div>
+              <button onClick={() => setViewingCandidate(null)} className="text-gray-400 hover:text-gray-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            {viewingCandidate.location && (
+              <p className="text-sm text-gray-500 flex items-center gap-1 mb-3">
+                <MapPin className="h-4 w-4" /> {viewingCandidate.location}
+              </p>
+            )}
+            {viewingCandidate.bio && <p className="text-sm text-gray-700 mb-3">{viewingCandidate.bio}</p>}
+            {viewingCandidate.skills?.length > 0 && (
+              <div className="mb-3">
+                <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Skills</p>
+                <div className="flex flex-wrap gap-1">
+                  {viewingCandidate.skills.map((s) => (
+                    <span key={s} className="px-2 py-0.5 rounded-full text-xs bg-indigo-100 text-indigo-700">{s}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {viewingCandidate.hasResume && (
+              <span className="inline-flex items-center gap-1 text-xs text-green-700 bg-green-100 px-2 py-1 rounded-full mb-3">
+                <FileText className="h-3 w-3" /> Resume on file
+              </span>
+            )}
+            <div className="flex justify-end pt-2 border-t border-gray-100 mt-3">
+              <button
+                onClick={() => { setMessagingCandidate(viewingCandidate); setViewingCandidate(null); }}
+                className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 border border-blue-200 rounded-full px-3 py-1.5"
+              >
+                <MessageCircle className="h-4 w-4" /> Message Candidate
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
