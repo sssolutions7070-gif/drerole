@@ -46,14 +46,17 @@ public class JobManagementController {
             String salaryRange = (String) request.get("salaryRange");
             String jobType = (String) request.get("jobType");
             String experienceLevel = (String) request.get("experienceLevel");
-            
+            java.time.LocalDateTime scheduledFor = request.get("scheduledFor") != null && !request.get("scheduledFor").toString().isBlank()
+                ? java.time.LocalDateTime.parse(request.get("scheduledFor").toString())
+                : null;
+
             log.debug("Recruiter ID: " + recruiterId);
             log.debug("Title: " + title);
             log.debug("Company: " + company);
-            
+
             JobPosting job = jobPostingService.createJobPosting(
-                recruiterId, title, company, description, requiredSkills, 
-                preferredSkills, location, salaryRange, jobType, experienceLevel
+                recruiterId, title, company, description, requiredSkills,
+                preferredSkills, location, salaryRange, jobType, experienceLevel, scheduledFor
             );
             
             Map<String, Object> response = new HashMap<>();
@@ -258,6 +261,7 @@ public class JobManagementController {
         response.put("postedDate", job.getPostedDate());
         response.put("isActive", job.getIsActive());
         response.put("featured", job.getFeatured());
+        response.put("scheduledFor", job.getScheduledFor());
         response.put("moderationStatus", job.getModerationStatus());
         response.put("rejectionReason", job.getRejectionReason());
 

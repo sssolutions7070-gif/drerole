@@ -11,7 +11,8 @@ const JobPostForm = ({ job, onSubmit, onCancel }) => {
     location: '',
     salaryRange: '',
     jobType: '',
-    experienceLevel: ''
+    experienceLevel: '',
+    scheduledFor: ''
   });
 
   // FIXED: Proper useEffect to set form data when job prop changes
@@ -26,7 +27,8 @@ const JobPostForm = ({ job, onSubmit, onCancel }) => {
         location: job.location || '',
         salaryRange: job.salaryRange || '',
         jobType: job.jobType || '',
-        experienceLevel: job.experienceLevel || ''
+        experienceLevel: job.experienceLevel || '',
+        scheduledFor: ''
       });
     } else {
       // Reset form when creating new job
@@ -39,7 +41,8 @@ const JobPostForm = ({ job, onSubmit, onCancel }) => {
         location: '',
         salaryRange: '',
         jobType: '',
-        experienceLevel: ''
+        experienceLevel: '',
+        scheduledFor: ''
       });
     }
   }, [job]);
@@ -262,6 +265,26 @@ const JobPostForm = ({ job, onSubmit, onCancel }) => {
               ))}
             </select>
           </div>
+
+          {!job && (
+            <div>
+              <label htmlFor="scheduledFor" className="block text-sm font-medium text-gray-700">
+                Schedule for later (optional)
+              </label>
+              <input
+                type="datetime-local"
+                name="scheduledFor"
+                id="scheduledFor"
+                value={formData.scheduledFor}
+                onChange={handleChange}
+                min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Leave blank to go live as soon as it's approved. Otherwise it stays hidden from candidates until this date/time, even once approved.
+              </p>
+            </div>
+          )}
 
           <div className="flex justify-end space-x-4 pt-6 border-t border-gray-200">
             <button

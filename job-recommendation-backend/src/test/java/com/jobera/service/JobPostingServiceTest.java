@@ -76,6 +76,48 @@ class JobPostingServiceTest {
     }
 
     @Test
+    void aJobCanBeScheduledForAFutureMoment() {
+        Recruiter recruiter = new Recruiter();
+        recruiter.setId(10L);
+        when(recruiterRepository.findById(10L)).thenReturn(Optional.of(recruiter));
+        when(jobPostingRepository.save(any(JobPosting.class))).thenAnswer(inv -> inv.getArgument(0));
+        java.time.LocalDateTime future = java.time.LocalDateTime.now().plusDays(3);
+
+        JobPosting created = service.createJobPosting(10L, "Backend Developer", "Acme", "desc",
+            "[\"java\"]", "[]", "Remote", "$100k", "Full-time", "Mid", future);
+
+        assertEquals(future, created.getScheduledFor());
+        assertEquals(JobPosting.MODERATION_PENDING, created.getModerationStatus());
+    }
+
+    @Test
+    void schedulingAJobInThePastIsRejected() {
+        Recruiter recruiter = new Recruiter();
+        recruiter.setId(10L);
+        when(recruiterRepository.findById(10L)).thenReturn(Optional.of(recruiter));
+        java.time.LocalDateTime past = java.time.LocalDateTime.now().minusDays(1);
+
+        assertThrows(JobPostingService.JobPostingException.class, () ->
+            service.createJobPosting(10L, "Backend Developer", "Acme", "desc",
+                "[\"java\"]", "[]", "Remote", "$100k", "Full-time", "Mid", past));
+
+        org.mockito.Mockito.verify(jobPostingRepository, org.mockito.Mockito.never()).save(any());
+    }
+
+    @Test
+    void notSchedulingAJobLeavesScheduledForNull() {
+        Recruiter recruiter = new Recruiter();
+        recruiter.setId(10L);
+        when(recruiterRepository.findById(10L)).thenReturn(Optional.of(recruiter));
+        when(jobPostingRepository.save(any(JobPosting.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        JobPosting created = service.createJobPosting(10L, "Backend Developer", "Acme", "desc",
+            "[\"java\"]", "[]", "Remote", "$100k", "Full-time", "Mid");
+
+        assertEquals(null, created.getScheduledFor());
+    }
+
+    @Test
     void approvingAJobClearsAnyPriorRejectionReason() {
         JobPosting job = new JobPosting();
         job.setId(1L);

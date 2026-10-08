@@ -61,6 +61,11 @@ public class JobPosting {
     @Column(nullable = false)
     private Boolean featured = false;
 
+    // When set to a future moment, the posting is approved/active as normal but stays out of
+    // every public listing query until this passes - see JobPostingRepository's public queries.
+    @Column(name = "scheduled_for")
+    private LocalDateTime scheduledFor;
+
     // Java default (PENDING) applies to postings created from here on; the SQL-level default
     // (APPROVED) only matters for the one-time ALTER TABLE backfill of rows that existed before
     // this column did, so moderation doesn't retroactively hide anything already live.
@@ -172,6 +177,8 @@ public class JobPosting {
     public void setIsActive(Boolean isActive) { this.isActive = isActive; }
     public Boolean getFeatured() { return featured != null && featured; }
     public void setFeatured(Boolean featured) { this.featured = featured != null && featured; }
+    public LocalDateTime getScheduledFor() { return scheduledFor; }
+    public void setScheduledFor(LocalDateTime scheduledFor) { this.scheduledFor = scheduledFor; }
     public Double getAverageRating() { return averageRating; }
     public void setAverageRating(Double averageRating) { this.averageRating = averageRating; }
     public Integer getTotalRatings() { return totalRatings; }

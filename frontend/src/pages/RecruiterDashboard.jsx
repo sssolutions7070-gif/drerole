@@ -543,6 +543,12 @@ const RecruiterDashboard = () => {
                         Featured
                       </span>
                     )}
+                    {job.scheduledFor && new Date(job.scheduledFor) > new Date() && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-sky-100 text-sky-800">
+                        <Calendar className="h-3 w-3 mr-1" />
+                        Scheduled for {new Date(job.scheduledFor).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                      </span>
+                    )}
                     <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
                       job.moderationStatus === 'APPROVED' || !job.moderationStatus ? 'bg-green-100 text-green-800' :
                       job.moderationStatus === 'REJECTED' ? 'bg-red-100 text-red-800' :

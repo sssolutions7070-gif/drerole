@@ -466,11 +466,25 @@ public class JobPostingService {
     public JobPosting createJobPosting(Long recruiterId, String title, String company, String description,
                                       String requiredSkills, String preferredSkills, String location,
                                       String salaryRange, String jobType, String experienceLevel) {
+        return createJobPosting(recruiterId, title, company, description, requiredSkills, preferredSkills,
+            location, salaryRange, jobType, experienceLevel, null);
+    }
+
+    /** @param scheduledFor if set, the posting still goes through moderation immediately like any
+     *   other, but stays out of every public listing until this moment arrives, even once
+     *   approved - see JobPostingRepository's public listing queries. Must be in the future. */
+    public JobPosting createJobPosting(Long recruiterId, String title, String company, String description,
+                                      String requiredSkills, String preferredSkills, String location,
+                                      String salaryRange, String jobType, String experienceLevel,
+                                      LocalDateTime scheduledFor) {
         Optional<Recruiter> recruiter = recruiterRepository.findById(recruiterId);
         if (recruiter.isEmpty()) {
             throw new JobPostingException("Recruiter not found with ID: " + recruiterId);
         }
         subscriptionService.enforceActiveJobLimit(recruiter.get());
+        if (scheduledFor != null && !scheduledFor.isAfter(LocalDateTime.now())) {
+            throw new JobPostingException("scheduledFor must be in the future");
+        }
 
         JobPosting jobPosting = new JobPosting();
         jobPosting.setTitle(title);
@@ -485,6 +499,7 @@ public class JobPostingService {
         jobPosting.setRecruiter(recruiter.get());
         jobPosting.setIsActive(true);
         jobPosting.setModerationStatus(JobPosting.MODERATION_PENDING);
+        jobPosting.setScheduledFor(scheduledFor);
 
         return jobPostingRepository.save(jobPosting);
     }
