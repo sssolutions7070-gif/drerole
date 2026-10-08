@@ -17,6 +17,87 @@ const AdminDashboard = () => {
   const [auditLog, setAuditLog] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const [selectedJobIds, setSelectedJobIds] = useState(new Set());
+  const [selectedReviewIds, setSelectedReviewIds] = useState(new Set());
+  const [selectedExperienceIds, setSelectedExperienceIds] = useState(new Set());
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkJobMessage, setBulkJobMessage] = useState('');
+  const [bulkReviewMessage, setBulkReviewMessage] = useState('');
+  const [bulkExperienceMessage, setBulkExperienceMessage] = useState('');
+
+  const toggleSelected = (setIds, id) => {
+    setIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = (setIds, items) => {
+    setIds((prev) => (prev.size === items.length ? new Set() : new Set(items.map((i) => i.id))));
+  };
+
+  /** Fires `requestFn` for every selected id in parallel, tolerating individual failures, then
+   *  reports how many succeeded and refetches the queue. Shared by every bulk approve/reject
+   *  action below - the per-item endpoints are already admin-gated, so no new backend route was
+   *  needed, same as the recruiter-side bulk actions this mirrors. */
+  const runBulkModeration = async (ids, setIds, requestFn, refetch, setMessage, label) => {
+    setBulkLoading(true);
+    setMessage('');
+    const results = await Promise.allSettled(Array.from(ids).map((id) => requestFn(id)));
+    const succeeded = results.filter((r) => r.status === 'fulfilled').length;
+    const failed = results.length - succeeded;
+    setMessage(`${succeeded} ${label}${succeeded === 1 ? '' : 's'} processed${failed === 0 ? '' : `, ${failed} failed`}.`);
+    setIds(new Set());
+    setBulkLoading(false);
+    refetch();
+  };
+
+  const bulkApproveJobs = () => {
+    if (selectedJobIds.size === 0) return;
+    if (!window.confirm(`Approve ${selectedJobIds.size} selected job posting(s)?`)) return;
+    runBulkModeration(selectedJobIds, setSelectedJobIds, (id) => api.put(`/admin/jobs/${id}/approve`),
+      fetchPendingJobs, setBulkJobMessage, 'job');
+  };
+
+  const bulkRejectJobs = () => {
+    if (selectedJobIds.size === 0) return;
+    const reason = window.prompt(`Reason for rejecting ${selectedJobIds.size} selected posting(s):`);
+    if (reason === null) return;
+    runBulkModeration(selectedJobIds, setSelectedJobIds, (id) => api.put(`/admin/jobs/${id}/reject`, { reason }),
+      fetchPendingJobs, setBulkJobMessage, 'job');
+  };
+
+  const bulkApproveReviews = () => {
+    if (selectedReviewIds.size === 0) return;
+    if (!window.confirm(`Approve ${selectedReviewIds.size} selected review(s)?`)) return;
+    runBulkModeration(selectedReviewIds, setSelectedReviewIds, (id) => api.put(`/admin/company-reviews/${id}/approve`),
+      fetchPendingReviews, setBulkReviewMessage, 'review');
+  };
+
+  const bulkRejectReviews = () => {
+    if (selectedReviewIds.size === 0) return;
+    const reason = window.prompt(`Reason for rejecting ${selectedReviewIds.size} selected review(s):`);
+    if (reason === null) return;
+    runBulkModeration(selectedReviewIds, setSelectedReviewIds, (id) => api.put(`/admin/company-reviews/${id}/reject`, { reason }),
+      fetchPendingReviews, setBulkReviewMessage, 'review');
+  };
+
+  const bulkApproveExperiences = () => {
+    if (selectedExperienceIds.size === 0) return;
+    if (!window.confirm(`Approve ${selectedExperienceIds.size} selected report(s)?`)) return;
+    runBulkModeration(selectedExperienceIds, setSelectedExperienceIds, (id) => api.put(`/admin/interview-experiences/${id}/approve`),
+      fetchPendingExperiences, setBulkExperienceMessage, 'report');
+  };
+
+  const bulkRejectExperiences = () => {
+    if (selectedExperienceIds.size === 0) return;
+    const reason = window.prompt(`Reason for rejecting ${selectedExperienceIds.size} selected report(s):`);
+    if (reason === null) return;
+    runBulkModeration(selectedExperienceIds, setSelectedExperienceIds, (id) => api.put(`/admin/interview-experiences/${id}/reject`, { reason }),
+      fetchPendingExperiences, setBulkExperienceMessage, 'report');
+  };
+
   useEffect(() => {
     fetchDashboardStats();
     fetchPendingJobs();
@@ -594,6 +675,40 @@ const AdminDashboard = () => {
             <h3 className="text-lg font-semibold text-gray-800">Pending Job Postings ({pendingJobs.length})</h3>
             <p className="text-sm text-gray-500 mt-1">New postings wait here until approved, so nothing unreviewed reaches public job listings.</p>
           </div>
+          {pendingJobs.length > 0 && (
+            <div className="px-6 py-3 bg-gray-50 border-b border-gray-200 flex flex-wrap items-center gap-3">
+              <label className="flex items-center space-x-2 text-sm font-medium text-gray-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={selectedJobIds.size === pendingJobs.length}
+                  onChange={() => toggleSelectAll(setSelectedJobIds, pendingJobs)}
+                  aria-label="Select all pending jobs"
+                  className="h-4 w-4 text-blue-600 rounded border-gray-300"
+                />
+                <span>Select All</span>
+              </label>
+              {selectedJobIds.size > 0 && (
+                <>
+                  <span className="text-sm text-gray-500">{selectedJobIds.size} selected</span>
+                  <button
+                    onClick={bulkApproveJobs}
+                    disabled={bulkLoading}
+                    className="inline-flex items-center px-3 py-1.5 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+                  >
+                    <CheckCircle className="h-4 w-4 mr-1.5" /> Approve Selected
+                  </button>
+                  <button
+                    onClick={bulkRejectJobs}
+                    disabled={bulkLoading}
+                    className="inline-flex items-center px-3 py-1.5 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+                  >
+                    <XCircle className="h-4 w-4 mr-1.5" /> Reject Selected
+                  </button>
+                </>
+              )}
+              {bulkJobMessage && <span className="text-sm text-blue-700">{bulkJobMessage}</span>}
+            </div>
+          )}
           {pendingJobs.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
               <Clock className="mx-auto h-12 w-12 text-gray-300 mb-3" />
@@ -603,12 +718,21 @@ const AdminDashboard = () => {
             <div className="divide-y divide-gray-200">
               {pendingJobs.map((job) => (
                 <div key={job.id} className="px-6 py-4 flex items-start justify-between">
-                  <div>
+                  <div className="flex items-start">
+                    <input
+                      type="checkbox"
+                      checked={selectedJobIds.has(job.id)}
+                      onChange={() => toggleSelected(setSelectedJobIds, job.id)}
+                      aria-label={`Select ${job.title}`}
+                      className="h-4 w-4 mt-1 mr-3 text-blue-600 rounded border-gray-300"
+                    />
+                    <div>
                     <div className="text-sm font-medium text-gray-900">{job.title}</div>
                     <div className="text-sm text-gray-500">
                       {job.company} • {job.location || 'No location specified'} • {job.jobType}
                     </div>
                     <p className="text-sm text-gray-600 mt-2 max-w-xl line-clamp-2">{job.description}</p>
+                    </div>
                   </div>
                   <div className="flex items-center space-x-3 flex-shrink-0 ml-4">
                     <button
@@ -639,6 +763,40 @@ const AdminDashboard = () => {
             <h3 className="text-lg font-semibold text-gray-800">Pending Company Reviews ({pendingReviews.length})</h3>
             <p className="text-sm text-gray-500 mt-1">A new or edited review waits here until approved, so nothing unreviewed reaches a company's public profile.</p>
           </div>
+          {pendingReviews.length > 0 && (
+            <div className="px-6 py-3 bg-gray-50 border-b border-gray-200 flex flex-wrap items-center gap-3">
+              <label className="flex items-center space-x-2 text-sm font-medium text-gray-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={selectedReviewIds.size === pendingReviews.length}
+                  onChange={() => toggleSelectAll(setSelectedReviewIds, pendingReviews)}
+                  aria-label="Select all pending reviews"
+                  className="h-4 w-4 text-blue-600 rounded border-gray-300"
+                />
+                <span>Select All</span>
+              </label>
+              {selectedReviewIds.size > 0 && (
+                <>
+                  <span className="text-sm text-gray-500">{selectedReviewIds.size} selected</span>
+                  <button
+                    onClick={bulkApproveReviews}
+                    disabled={bulkLoading}
+                    className="inline-flex items-center px-3 py-1.5 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+                  >
+                    <CheckCircle className="h-4 w-4 mr-1.5" /> Approve Selected
+                  </button>
+                  <button
+                    onClick={bulkRejectReviews}
+                    disabled={bulkLoading}
+                    className="inline-flex items-center px-3 py-1.5 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+                  >
+                    <XCircle className="h-4 w-4 mr-1.5" /> Reject Selected
+                  </button>
+                </>
+              )}
+              {bulkReviewMessage && <span className="text-sm text-blue-700">{bulkReviewMessage}</span>}
+            </div>
+          )}
           {pendingReviews.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
               <Star className="mx-auto h-12 w-12 text-gray-300 mb-3" />
@@ -648,7 +806,15 @@ const AdminDashboard = () => {
             <div className="divide-y divide-gray-200">
               {pendingReviews.map((review) => (
                 <div key={review.id} className="px-6 py-4 flex items-start justify-between">
-                  <div>
+                  <div className="flex items-start">
+                    <input
+                      type="checkbox"
+                      checked={selectedReviewIds.has(review.id)}
+                      onChange={() => toggleSelected(setSelectedReviewIds, review.id)}
+                      aria-label={`Select review by ${review.user?.email || 'unknown reviewer'}`}
+                      className="h-4 w-4 mt-1 mr-3 text-blue-600 rounded border-gray-300"
+                    />
+                    <div>
                     <div className="text-sm font-medium text-gray-900">
                       {review.recruiter?.companyName || 'Unknown company'} - {review.rating}/5
                     </div>
@@ -656,6 +822,7 @@ const AdminDashboard = () => {
                       by {review.user?.email || 'unknown reviewer'}
                     </div>
                     <p className="text-sm text-gray-600 mt-2 max-w-xl">{review.comment}</p>
+                    </div>
                   </div>
                   <div className="flex items-center space-x-3 flex-shrink-0 ml-4">
                     <button
@@ -686,6 +853,40 @@ const AdminDashboard = () => {
             <h3 className="text-lg font-semibold text-gray-800">Pending Interview Experience Reports ({pendingExperiences.length})</h3>
             <p className="text-sm text-gray-500 mt-1">A new or edited report waits here until approved, so nothing unreviewed reaches a company's public profile.</p>
           </div>
+          {pendingExperiences.length > 0 && (
+            <div className="px-6 py-3 bg-gray-50 border-b border-gray-200 flex flex-wrap items-center gap-3">
+              <label className="flex items-center space-x-2 text-sm font-medium text-gray-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={selectedExperienceIds.size === pendingExperiences.length}
+                  onChange={() => toggleSelectAll(setSelectedExperienceIds, pendingExperiences)}
+                  aria-label="Select all pending interview reports"
+                  className="h-4 w-4 text-blue-600 rounded border-gray-300"
+                />
+                <span>Select All</span>
+              </label>
+              {selectedExperienceIds.size > 0 && (
+                <>
+                  <span className="text-sm text-gray-500">{selectedExperienceIds.size} selected</span>
+                  <button
+                    onClick={bulkApproveExperiences}
+                    disabled={bulkLoading}
+                    className="inline-flex items-center px-3 py-1.5 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+                  >
+                    <CheckCircle className="h-4 w-4 mr-1.5" /> Approve Selected
+                  </button>
+                  <button
+                    onClick={bulkRejectExperiences}
+                    disabled={bulkLoading}
+                    className="inline-flex items-center px-3 py-1.5 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+                  >
+                    <XCircle className="h-4 w-4 mr-1.5" /> Reject Selected
+                  </button>
+                </>
+              )}
+              {bulkExperienceMessage && <span className="text-sm text-blue-700">{bulkExperienceMessage}</span>}
+            </div>
+          )}
           {pendingExperiences.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
               <MessageSquare className="mx-auto h-12 w-12 text-gray-300 mb-3" />
@@ -695,7 +896,15 @@ const AdminDashboard = () => {
             <div className="divide-y divide-gray-200">
               {pendingExperiences.map((experience) => (
                 <div key={experience.id} className="px-6 py-4 flex items-start justify-between">
-                  <div>
+                  <div className="flex items-start">
+                    <input
+                      type="checkbox"
+                      checked={selectedExperienceIds.has(experience.id)}
+                      onChange={() => toggleSelected(setSelectedExperienceIds, experience.id)}
+                      aria-label={`Select report by ${experience.user?.email || 'unknown reporter'}`}
+                      className="h-4 w-4 mt-1 mr-3 text-blue-600 rounded border-gray-300"
+                    />
+                    <div>
                     <div className="text-sm font-medium text-gray-900">
                       {experience.recruiter?.companyName || 'Unknown company'} - difficulty {experience.difficultyRating}/5 - {experience.outcome}
                     </div>
@@ -703,6 +912,7 @@ const AdminDashboard = () => {
                       by {experience.user?.email || 'unknown reporter'}
                     </div>
                     <p className="text-sm text-gray-600 mt-2 max-w-xl">{experience.processDescription}</p>
+                    </div>
                   </div>
                   <div className="flex items-center space-x-3 flex-shrink-0 ml-4">
                     <button
