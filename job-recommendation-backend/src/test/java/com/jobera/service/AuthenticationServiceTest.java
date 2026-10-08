@@ -9,19 +9,24 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.jobera.entity.AuthToken;
 import com.jobera.entity.User;
 import com.jobera.repository.AuthTokenRepository;
 import com.jobera.repository.UserRepository;
 import com.jobera.util.PasswordEncoder;
 import com.jobera.util.PasswordEncoderTest;
+import com.jobera.util.TokenHasher;
 
 @ExtendWith(MockitoExtension.class)
 class AuthenticationServiceTest {
@@ -120,5 +125,69 @@ class AuthenticationServiceTest {
 
         assertEquals("ABCD1234", created.getReferralCode());
         verify(referralService).recordReferralIfValid("REFCODE1", created);
+    }
+
+    @Test
+    void generateAuthTokenRecordsTheDeviceAndIp() {
+        User user = userWithPassword("hash");
+
+        service.generateAuthToken(user, "Mozilla/5.0 Chrome/120", "10.0.0.1");
+
+        ArgumentCaptor<AuthToken> captor = ArgumentCaptor.forClass(AuthToken.class);
+        verify(authTokenRepository).save(captor.capture());
+        assertEquals("Mozilla/5.0 Chrome/120", captor.getValue().getUserAgent());
+        assertEquals("10.0.0.1", captor.getValue().getIpAddress());
+    }
+
+    @Test
+    void validatingAValidTokenTouchesLastUsedAt() {
+        AuthToken token = new AuthToken(userWithPassword("hash"), TokenHasher.hash("raw"), LocalDateTime.now().plusDays(1));
+        when(authTokenRepository.findByToken(TokenHasher.hash("raw"))).thenReturn(Optional.of(token));
+
+        service.validateToken("raw");
+
+        ArgumentCaptor<AuthToken> captor = ArgumentCaptor.forClass(AuthToken.class);
+        verify(authTokenRepository).save(captor.capture());
+        assertNotNull(captor.getValue().getLastUsedAt());
+    }
+
+    @Test
+    void validatingAnExpiredTokenDeletesItAndReturnsEmpty() {
+        AuthToken token = new AuthToken(userWithPassword("hash"), TokenHasher.hash("raw"), LocalDateTime.now().minusDays(1));
+        when(authTokenRepository.findByToken(TokenHasher.hash("raw"))).thenReturn(Optional.of(token));
+
+        Optional<User> result = service.validateToken("raw");
+
+        assertTrue(result.isEmpty());
+        verify(authTokenRepository).delete(token);
+    }
+
+    @Test
+    void listSessionsReturnsOnlyThisUsersActiveSessions() {
+        User user = userWithPassword("hash");
+        AuthToken token = new AuthToken(user, "h", LocalDateTime.now().plusDays(1));
+        when(authTokenRepository.findByUserIdAndExpiryDateAfterOrderByLastUsedAtDesc(any(), any()))
+            .thenReturn(List.of(token));
+
+        List<AuthToken> sessions = service.listSessions(7L);
+
+        assertEquals(1, sessions.size());
+    }
+
+    @Test
+    void revokingAnOwnedSessionDeletesIt() {
+        AuthToken token = new AuthToken(userWithPassword("hash"), "h", LocalDateTime.now().plusDays(1));
+        when(authTokenRepository.findByIdAndUserId(3L, 7L)).thenReturn(Optional.of(token));
+
+        service.revokeSession(7L, 3L);
+
+        verify(authTokenRepository).delete(token);
+    }
+
+    @Test
+    void revokingAnUnownedOrMissingSessionThrows() {
+        when(authTokenRepository.findByIdAndUserId(3L, 7L)).thenReturn(Optional.empty());
+
+        assertThrows(AuthenticationService.SessionNotFoundException.class, () -> service.revokeSession(7L, 3L));
     }
 }

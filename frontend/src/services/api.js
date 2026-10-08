@@ -70,6 +70,15 @@ export const accountAPI = {
 
   deleteMyAccount: (userId, password) =>
     api.delete(`/users/${userId}/account`, { data: { password } }),
+
+  getSessions: (userId) =>
+    api.get(`/users/${userId}/sessions`),
+
+  revokeSession: (userId, sessionId) =>
+    api.delete(`/users/${userId}/sessions/${sessionId}`),
+
+  getProfileViews: (userId) =>
+    api.get(`/users/${userId}/profile-views`),
 };
 
 // Saved Jobs API calls
@@ -252,6 +261,9 @@ export const candidateDiscoveryAPI = {
 
   aiSearch: (query) =>
     api.get('/candidates/discover/ai-search', { params: { query } }),
+
+  recordView: (candidateUserId) =>
+    api.post(`/candidates/${candidateUserId}/views`),
 };
 
 // Saved candidate discovery searches and alert settings

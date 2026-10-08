@@ -6,7 +6,7 @@ import {
   Loader, CheckCircle, XCircle, Award,
   Linkedin, Github, Globe,
   Trash2, Code, Heart, Cake, Plus, ExternalLink, Download, ShieldAlert, ShieldCheck, ShieldOff,
-  Gift, Copy, Check
+  Gift, Copy, Check, Monitor, Eye
 } from 'lucide-react';
 import api, { accountAPI } from '../services/api';
 import { BACKEND_ORIGIN } from '../config';
@@ -14,6 +14,8 @@ import DeleteAccountModal from '../components/DeleteAccountModal';
 import TwoFactorSetupModal from '../components/TwoFactorSetupModal';
 import DisableTwoFactorModal from '../components/DisableTwoFactorModal';
 import SkillBadgesPanel from '../components/SkillBadgesPanel';
+import ActiveSessionsPanel from '../components/ActiveSessionsPanel';
+import ProfileViewsPanel from '../components/ProfileViewsPanel';
 
 const UserProfile = () => {
   const [profile, setProfile] = useState(null);
@@ -943,6 +945,31 @@ const UserProfile = () => {
                 </button>
               )}
             </div>
+
+            {/* Active Sessions Section */}
+            <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-1 flex items-center">
+                <Monitor className="h-5 w-5 text-gray-600 mr-2" />
+                Active Sessions
+              </h3>
+              <p className="text-sm text-gray-500 mb-4">
+                Every device currently signed into your account. Sign out any you don't recognize.
+              </p>
+              <ActiveSessionsPanel userId={currentUser.id} />
+            </div>
+
+            {currentUser?.role === 'ROLE_USER' && (
+              <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-6">
+                <h3 className="text-lg font-semibold text-gray-800 mb-1 flex items-center">
+                  <Eye className="h-5 w-5 text-gray-600 mr-2" />
+                  Profile Views
+                </h3>
+                <p className="text-sm text-gray-500 mb-4">
+                  Recruiters who viewed your profile while browsing Discover Candidates.
+                </p>
+                <ProfileViewsPanel userId={currentUser.id} />
+              </div>
+            )}
 
             {/* Privacy & Data Section */}
             <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-6">

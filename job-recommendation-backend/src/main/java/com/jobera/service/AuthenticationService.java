@@ -1,6 +1,7 @@
 package com.jobera.service;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.stereotype.Service;
@@ -86,10 +87,16 @@ public class AuthenticationService {
     }
     
     public String generateAuthToken(User user) {
+        return generateAuthToken(user, null, null);
+    }
+
+    public String generateAuthToken(User user, String userAgent, String ipAddress) {
         String token = TokenHasher.generate();
         LocalDateTime expiryDate = LocalDateTime.now().plusDays(TOKEN_VALIDITY_DAYS);
 
         AuthToken authToken = new AuthToken(user, TokenHasher.hash(token), expiryDate);
+        authToken.setUserAgent(userAgent);
+        authToken.setIpAddress(ipAddress);
         authTokenRepository.save(authToken);
 
         return token;
@@ -108,16 +115,39 @@ public class AuthenticationService {
             authTokenRepository.delete(authToken);
             return Optional.empty();
         }
-        
+
+        authToken.setLastUsedAt(LocalDateTime.now());
+        authTokenRepository.save(authToken);
+
         return Optional.of(authToken.getUser());
     }
-    
+
     public void logout(String token) {
         authTokenRepository.deleteByToken(TokenHasher.hash(token));
     }
-    
+
     public void logoutAllUserSessions(Long userId) {
         authTokenRepository.deleteByUserId(userId);
+    }
+
+    /** Every still-valid session for a user, most recently active first - the data behind the
+     *  "active sessions" security page. */
+    public List<AuthToken> listSessions(Long userId) {
+        return authTokenRepository.findByUserIdAndExpiryDateAfterOrderByLastUsedAtDesc(userId, LocalDateTime.now());
+    }
+
+    public static class SessionNotFoundException extends RuntimeException {
+        public SessionNotFoundException() {
+            super("Session not found");
+        }
+    }
+
+    /** Signs a single session out remotely - e.g. a lost phone or a shared computer - without
+     *  touching the caller's own current session. */
+    public void revokeSession(Long userId, Long sessionId) {
+        AuthToken authToken = authTokenRepository.findByIdAndUserId(sessionId, userId)
+            .orElseThrow(SessionNotFoundException::new);
+        authTokenRepository.delete(authToken);
     }
     // Add this method to your existing AuthenticationService class
 public boolean isUserRecruiter(Long userId) {

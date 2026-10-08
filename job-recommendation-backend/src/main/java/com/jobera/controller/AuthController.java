@@ -65,7 +65,8 @@ public class AuthController {
     }
     
     @PostMapping("/register")
-    public ResponseEntity<Map<String, Object>> register(@RequestBody Map<String, String> request) {
+    public ResponseEntity<Map<String, Object>> register(@RequestBody Map<String, String> request,
+                                                        HttpServletRequest httpRequest) {
         try {
             String email = request.get(EMAIL);
             String password = request.get("password");
@@ -74,7 +75,8 @@ public class AuthController {
             String referralCode = request.get("referralCode");
 
             User user = authenticationService.registerUser(email, password, fullName, phone, referralCode);
-            String authToken = authenticationService.generateAuthToken(user);
+            String authToken = authenticationService.generateAuthToken(user,
+                httpRequest.getHeader("User-Agent"), httpRequest.getRemoteAddr());
             notificationService.sendWelcome(user.getEmail(), user.getFullName());
 
             Map<String, Object> response = new HashMap<>();
@@ -119,7 +121,8 @@ public class AuthController {
                 ));
             }
 
-            String authToken = authenticationService.generateAuthToken(user);
+            String authToken = authenticationService.generateAuthToken(user,
+                httpRequest.getHeader("User-Agent"), address);
             Map<String, Object> response = new HashMap<>();
             response.put(MESSAGE, "Login successful");
             response.put(USER, createUserResponse(user));
@@ -135,7 +138,8 @@ public class AuthController {
     }
 
     @PostMapping("/login/2fa")
-    public ResponseEntity<Map<String, Object>> loginTwoFactor(@RequestBody Map<String, Object> request) {
+    public ResponseEntity<Map<String, Object>> loginTwoFactor(@RequestBody Map<String, Object> request,
+                                                              HttpServletRequest httpRequest) {
         Long userId;
         try {
             userId = Long.valueOf(String.valueOf(request.get("userId")));
@@ -163,7 +167,8 @@ public class AuthController {
         }
         twoFactorAttemptService.recordSuccess(userId);
 
-        String authToken = authenticationService.generateAuthToken(user);
+        String authToken = authenticationService.generateAuthToken(user,
+            httpRequest.getHeader("User-Agent"), httpRequest.getRemoteAddr());
         Map<String, Object> response = new HashMap<>();
         response.put(MESSAGE, "Login successful");
         response.put(USER, createUserResponse(user));

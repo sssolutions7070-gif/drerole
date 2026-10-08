@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -61,7 +62,7 @@ class AuthControllerTwoFactorLoginTest {
     void loginWithoutTwoFactorIssuesATokenImmediately() {
         User user = userWithTwoFactor(false);
         when(authenticationService.loginUser("a@b.com", "pw")).thenReturn(user);
-        when(authenticationService.generateAuthToken(user)).thenReturn("real-token");
+        when(authenticationService.generateAuthToken(eq(user), any(), any())).thenReturn("real-token");
 
         ResponseEntity<Map<String, Object>> response =
             controller.login(Map.of("email", "a@b.com", "password", "pw"), new MockHttpServletRequest());
@@ -90,10 +91,10 @@ class AuthControllerTwoFactorLoginTest {
         when(twoFactorAttemptService.isBlocked(5L)).thenReturn(false);
         when(authenticationService.findById(5L)).thenReturn(Optional.of(user));
         when(twoFactorService.verifyLoginCode(user, "123456")).thenReturn(true);
-        when(authenticationService.generateAuthToken(user)).thenReturn("real-token");
+        when(authenticationService.generateAuthToken(eq(user), any(), any())).thenReturn("real-token");
 
         ResponseEntity<Map<String, Object>> response =
-            controller.loginTwoFactor(Map.of("userId", 5, "code", "123456"));
+            controller.loginTwoFactor(Map.of("userId", 5, "code", "123456"), new MockHttpServletRequest());
 
         assertEquals(200, response.getStatusCode().value());
         assertEquals("real-token", response.getBody().get("token"));
@@ -108,7 +109,7 @@ class AuthControllerTwoFactorLoginTest {
         when(twoFactorService.verifyLoginCode(user, "000000")).thenReturn(false);
 
         ResponseEntity<Map<String, Object>> response =
-            controller.loginTwoFactor(Map.of("userId", 5, "code", "000000"));
+            controller.loginTwoFactor(Map.of("userId", 5, "code", "000000"), new MockHttpServletRequest());
 
         assertEquals(400, response.getStatusCode().value());
         verify(twoFactorAttemptService).recordFailure(5L);
@@ -121,7 +122,7 @@ class AuthControllerTwoFactorLoginTest {
         when(twoFactorAttemptService.retryAfterMinutes(5L)).thenReturn(7L);
 
         ResponseEntity<Map<String, Object>> response =
-            controller.loginTwoFactor(Map.of("userId", 5, "code", "123456"));
+            controller.loginTwoFactor(Map.of("userId", 5, "code", "123456"), new MockHttpServletRequest());
 
         assertEquals(429, response.getStatusCode().value());
         verify(twoFactorService, never()).verifyLoginCode(any(), anyString());
@@ -134,7 +135,7 @@ class AuthControllerTwoFactorLoginTest {
         when(authenticationService.findById(5L)).thenReturn(Optional.of(user));
 
         ResponseEntity<Map<String, Object>> response =
-            controller.loginTwoFactor(Map.of("userId", 5, "code", "123456"));
+            controller.loginTwoFactor(Map.of("userId", 5, "code", "123456"), new MockHttpServletRequest());
 
         assertEquals(400, response.getStatusCode().value());
         verify(twoFactorService, never()).verifyLoginCode(any(), anyString());
