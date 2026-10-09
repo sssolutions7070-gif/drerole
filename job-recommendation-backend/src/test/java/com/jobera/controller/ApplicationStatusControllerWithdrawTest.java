@@ -18,6 +18,7 @@ import org.springframework.http.ResponseEntity;
 import com.jobera.entity.Application;
 import com.jobera.entity.User;
 import com.jobera.service.ApplicationStatusService;
+import com.jobera.service.CandidateAnalyticsService;
 import com.jobera.service.JobPostingService;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -29,12 +30,13 @@ class ApplicationStatusControllerWithdrawTest {
 
     @Mock ApplicationStatusService applicationStatusService;
     @Mock JobPostingService jobPostingService;
+    @Mock CandidateAnalyticsService candidateAnalyticsService;
 
     ApplicationStatusController controller;
 
     @BeforeEach
     void setUp() {
-        controller = new ApplicationStatusController(applicationStatusService, jobPostingService);
+        controller = new ApplicationStatusController(applicationStatusService, jobPostingService, candidateAnalyticsService);
     }
 
     private HttpServletRequest requestFor(long userId) {

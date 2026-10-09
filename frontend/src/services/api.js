@@ -426,6 +426,11 @@ export const applicationStatusAPI = {
   getUserApplications: (userId) =>
     api.get(`/applications/user/${userId}`),
 
+  // "My Insights" - a candidate's own status breakdown, average match score, most commonly
+  // missing skills across their applications, and profile view count.
+  getUserInsights: (userId) =>
+    api.get(`/applications/user/${userId}/insights`),
+
   // Get job applications
   getJobApplications: (jobId) =>
     api.get(`/applications/job/${jobId}`),

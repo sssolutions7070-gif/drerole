@@ -196,6 +196,7 @@ public class AccessPolicy {
 
         // Application tracking
         rule("GET", "/api/applications/user/{userId}", self("userId"));
+        rule("GET", "/api/applications/user/{userId}/insights", self("userId"));
         rule("GET", "/api/applications/job/{jobId}", ownsJob("jobId"));
         rule("GET", "/api/applications/recruiter/{recruiterId}/**", ownRecruiterId("recruiterId"));
         rule("PUT", "/api/applications/{applicationId}/*", c -> recruiterManagesApplication(c, "applicationId"));

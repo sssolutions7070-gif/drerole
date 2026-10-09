@@ -259,6 +259,7 @@ public class ApplicationStatusService {
      */
     public Map<String, Object> getRecruiterAnalytics(List<JobPosting> jobs) {
         List<Map<String, Object>> perJob = new ArrayList<>();
+        List<Application> allApplications = new ArrayList<>();
 
         long totalApplications = 0;
         long totalViewed = 0;
@@ -272,6 +273,7 @@ public class ApplicationStatusService {
 
         for (JobPosting job : jobs) {
             List<Application> apps = getJobApplications(job.getId());
+            allApplications.addAll(apps);
 
             long shortlisted = apps.stream().filter(a -> STATUS_SHORTLISTED.equals(a.getStatus())).count();
             long rejected = apps.stream().filter(a -> STATUS_REJECTED.equals(a.getStatus())).count();
@@ -322,6 +324,9 @@ public class ApplicationStatusService {
         analytics.put("averageHoursToFirstView", viewedWithTimestamps > 0 ? round1(sumHoursToFirstView / viewedWithTimestamps) : null);
         analytics.put("averageDaysToOffer", offersWithTimestamps > 0 ? round1(sumDaysToOffer / offersWithTimestamps) : null);
         analytics.put("jobs", perJob);
+        // What candidates most often lack across every job this recruiter has posted - the
+        // missingSkills recorded on each application at apply time, rolled up for the first time.
+        analytics.put("topMissingSkills", SkillGapAnalyzer.topMissingSkills(allApplications, 5));
         return analytics;
     }
 

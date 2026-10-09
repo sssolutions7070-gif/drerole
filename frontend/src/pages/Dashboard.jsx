@@ -1,7 +1,7 @@
 ﻿// src/pages/Dashboard.jsx
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { 
+import { Link, useLocation } from 'react-router-dom';
+import {
   User, Briefcase, Upload, FileText, BarChart3,
   BookOpen, Clock, Award, Calendar, MapPin, CheckCircle, XCircle,
   TrendingUp, MessageSquare
@@ -9,9 +9,21 @@ import {
 import UserApplications from './UserApplications';
 import api from '../services/api';
 import DirectMessagesInbox from '../components/DirectMessagesInbox';
+import CandidateInsightsPanel from '../components/CandidateInsightsPanel';
 
 const Dashboard = () => {
-  const [activeTab, setActiveTab] = useState('overview');
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState(location.state?.initialTab || 'overview');
+
+  // Re-applies a deep-linked tab (e.g. from the voice assistant's "my insights") on every
+  // re-navigation to this same route, not just the first mount - useState's initializer above
+  // only runs once, so without this a second navigate() here while already on /dashboard would
+  // silently do nothing. See the identical fix in RecruiterDashboard.jsx/AdminDashboard.jsx.
+  useEffect(() => {
+    if (location.state?.initialTab) {
+      setActiveTab(location.state.initialTab);
+    }
+  }, [location.key]);
   const [assignedTests, setAssignedTests] = useState([]);
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -402,6 +414,17 @@ const Dashboard = () => {
             <MessageSquare className="h-5 w-5 mr-2" />
             Messages
           </button>
+          <button
+            onClick={() => setActiveTab('insights')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center ${
+              activeTab === 'insights'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <TrendingUp className="h-5 w-5 mr-2" />
+            My Insights
+          </button>
         </nav>
       </div>
 
@@ -790,6 +813,17 @@ const Dashboard = () => {
       {/* Messages Tab */}
       {activeTab === 'messages' && currentUser && (
         <DirectMessagesInbox role="candidate" id={currentUser.id} />
+      )}
+
+      {/* My Insights Tab */}
+      {activeTab === 'insights' && currentUser && (
+        <div className="bg-white rounded-lg shadow-lg p-6">
+          <h3 className="text-xl font-semibold text-gray-800 mb-1">My Insights</h3>
+          <p className="text-gray-500 text-sm mb-6">
+            How your own applications are trending, and which skills keep coming up missing.
+          </p>
+          <CandidateInsightsPanel userId={currentUser.id} />
+        </div>
       )}
 
       {/* Interviews Tab */}

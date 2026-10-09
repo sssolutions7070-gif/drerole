@@ -123,17 +123,31 @@ const PlatformAnalyticsPanel = () => {
           })}
         </div>
 
-        {/* Time-to-Hire and Integrity Benchmarks */}
+        {/* Real, computed benchmarks - not hardcoded placeholders. Time-to-hire comes from actual
+            application/offer timestamps and proctoring integrity from actual recorded violation
+            counts, so both show "—" rather than a fabricated number when there's no data yet. */}
         <div className="mt-5 pt-4 border-t border-gray-100 grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
           <div className="bg-slate-50 border border-slate-200 rounded p-2.5">
             <p className="text-xs text-slate-500 font-medium">Avg. Time-to-Hire</p>
-            <p className="text-lg font-bold text-slate-800">14.2 Days</p>
-            <p className="text-[11px] text-green-600 font-medium">⚡ 32% faster than industry avg</p>
+            <p className="text-lg font-bold text-slate-800">
+              {overview.timeToHire?.averageDays != null ? `${overview.timeToHire.averageDays} Days` : '—'}
+            </p>
+            <p className="text-[11px] text-slate-500">
+              {overview.timeToHire?.sampleSize > 0
+                ? `From ${overview.timeToHire.sampleSize} offer${overview.timeToHire.sampleSize === 1 ? '' : 's'} sent`
+                : 'No offers sent yet'}
+            </p>
           </div>
           <div className="bg-slate-50 border border-slate-200 rounded p-2.5">
             <p className="text-xs text-slate-500 font-medium">Proctoring Integrity</p>
-            <p className="text-lg font-bold text-emerald-700">99.1% Clean</p>
-            <p className="text-[11px] text-slate-500">Zero flagged test violations</p>
+            <p className="text-lg font-bold text-emerald-700">
+              {overview.proctoringIntegrity?.cleanPercentage != null ? `${overview.proctoringIntegrity.cleanPercentage}% Clean` : '—'}
+            </p>
+            <p className="text-[11px] text-slate-500">
+              {overview.proctoringIntegrity?.totalProctoredSessions > 0
+                ? `${overview.proctoringIntegrity.cleanSessions} of ${overview.proctoringIntegrity.totalProctoredSessions} sessions clean`
+                : 'No proctored sessions yet'}
+            </p>
           </div>
           <div className="bg-slate-50 border border-slate-200 rounded p-2.5">
             <p className="text-xs text-slate-500 font-medium">Offer Acceptance Rate</p>
@@ -143,6 +157,38 @@ const PlatformAnalyticsPanel = () => {
                 : '—'}
             </p>
             <p className="text-[11px] text-slate-500">Candidate offer conversion</p>
+          </div>
+        </div>
+      </div>
+
+      {(overview.topMissingSkills || []).length > 0 && (
+        <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
+          <p className="text-sm font-semibold text-gray-700 mb-3">Most commonly missing skills (platform-wide)</p>
+          <div className="flex flex-wrap gap-2">
+            {overview.topMissingSkills.map((row) => (
+              <span key={row.skill} className="bg-amber-50 text-amber-800 border border-amber-200 px-2.5 py-1 rounded-full text-xs font-medium">
+                {row.skill} <span className="text-amber-600">({row.count})</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
+          <p className="text-sm font-semibold text-gray-700 mb-3">Job postings by experience level</p>
+          <div className="flex flex-wrap gap-3 text-sm">
+            {Object.entries(overview.jobPostingsByExperienceLevel || {}).map(([level, count]) => (
+              <span key={level} className="text-gray-700">{level}: {count}</span>
+            ))}
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
+          <p className="text-sm font-semibold text-gray-700 mb-3">Job postings by type</p>
+          <div className="flex flex-wrap gap-3 text-sm">
+            {Object.entries(overview.jobPostingsByType || {}).map(([type, count]) => (
+              <span key={type} className="text-gray-700">{type}: {count}</span>
+            ))}
           </div>
         </div>
       </div>

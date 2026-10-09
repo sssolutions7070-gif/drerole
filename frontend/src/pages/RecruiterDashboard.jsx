@@ -1050,6 +1050,22 @@ const RecruiterDashboard = () => {
                   </tbody>
                 </table>
               </div>
+
+              {(analyticsData.topMissingSkills || []).length > 0 && (
+                <div className="mt-8">
+                  <h4 className="font-semibold text-gray-800 mb-1">Most commonly missing skills</h4>
+                  <p className="text-xs text-gray-500 mb-3">
+                    What applicants to your jobs most often lack, based on resume matching at apply time.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {analyticsData.topMissingSkills.map((row) => (
+                      <span key={row.skill} className="bg-amber-50 text-amber-800 border border-amber-200 px-2.5 py-1 rounded-full text-xs font-medium">
+                        {row.skill} <span className="text-amber-600">({row.count})</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>

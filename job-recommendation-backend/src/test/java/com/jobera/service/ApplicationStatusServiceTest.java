@@ -220,6 +220,29 @@ class ApplicationStatusServiceTest {
 
     @Test
     @SuppressWarnings("unchecked")
+    void analyticsRollsUpTheMostCommonlyMissingSkillsAcrossAllOfARecruitersJobs() {
+        JobPosting jobA = new JobPosting();
+        jobA.setId(1L);
+        JobPosting jobB = new JobPosting();
+        jobB.setId(2L);
+
+        Application missingDockerAndAws = analyticsApplication("APPLICATION_SUBMITTED", 50.0);
+        missingDockerAndAws.setMissingSkills("[\"Docker\", \"AWS\"]");
+        Application missingDockerOnly = analyticsApplication("APPLICATION_SUBMITTED", 60.0);
+        missingDockerOnly.setMissingSkills("[\"Docker\"]");
+
+        when(applicationRepository.findByJobPostingId(1L)).thenReturn(java.util.List.of(missingDockerAndAws));
+        when(applicationRepository.findByJobPostingId(2L)).thenReturn(java.util.List.of(missingDockerOnly));
+
+        Map<String, Object> analytics = service.getRecruiterAnalytics(java.util.List.of(jobA, jobB));
+        List<Map<String, Object>> topMissingSkills = (List<Map<String, Object>>) analytics.get("topMissingSkills");
+
+        assertEquals("Docker", topMissingSkills.get(0).get("skill"));
+        assertEquals(2, topMissingSkills.get(0).get("count"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
     void perJobBreakdownIsSortedByApplicationCountDescending() {
         JobPosting smallJob = new JobPosting();
         smallJob.setId(1L);

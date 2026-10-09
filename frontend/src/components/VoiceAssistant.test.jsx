@@ -443,4 +443,42 @@ describe('VoiceAssistant', () => {
       expect(await screen.findByText(/didn't understand/i)).toBeInTheDocument();
     });
   });
+
+  describe('"view analytics" is routed to each role\'s own analytics view', () => {
+    it('a candidate saying "show analytics" is sent to their own Insights tab, not the recruiter dashboard', async () => {
+      setUser({ role: 'ROLE_USER' });
+      const user = await openAssistant();
+
+      await typeCommand(user, 'show analytics');
+
+      expect(await screen.findByText('Opening your insights.')).toBeInTheDocument();
+    });
+
+    it('"my insights" is understood as the candidate analytics command', async () => {
+      setUser({ role: 'ROLE_USER' });
+      const user = await openAssistant();
+
+      await typeCommand(user, 'my insights');
+
+      expect(await screen.findByText('Opening your insights.')).toBeInTheDocument();
+    });
+
+    it('a recruiter saying "show analytics" still goes to their hiring analytics, unaffected by the candidate routing fix', async () => {
+      setUser({ role: 'ROLE_RECRUITER' });
+      const user = await openAssistant();
+
+      await typeCommand(user, 'show analytics');
+
+      expect(await screen.findByText('Opening analytics.')).toBeInTheDocument();
+    });
+
+    it('an admin saying "show analytics" still goes to platform-wide analytics', async () => {
+      setUser({ role: 'ROLE_ADMIN' });
+      const user = await openAssistant();
+
+      await typeCommand(user, 'show analytics');
+
+      expect(await screen.findByText('Opening analytics.')).toBeInTheDocument();
+    });
+  });
 });

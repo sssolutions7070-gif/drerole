@@ -95,11 +95,13 @@ const COMMAND_MAPPINGS = {
     'hi-IN': ['उम्मीदवार खोजें', 'कैंडिडेट खोजें'],
     'mr-IN': ['उमेदवार शोधा', 'कँडिडेट शोधा']
   },
-  // Shared phrasing; routed to the recruiter's or admin's own analytics view by role.
+  // Shared phrasing; routed to the recruiter's, admin's or candidate's own analytics view by role
+  // (see goToAnalytics) - "my insights"/"show my insights" are the candidate-facing phrasing.
   'view analytics': {
-    'en-US': ['show analytics', 'view analytics', 'my analytics', 'hiring analytics', 'open analytics'],
-    'hi-IN': ['एनालिटिक्स दिखाएं', 'विश्लेषण दिखाएं'],
-    'mr-IN': ['अॅनालिटिक्स दाखवा', 'विश्लेषण दाखवा']
+    'en-US': ['show analytics', 'view analytics', 'my analytics', 'hiring analytics', 'open analytics',
+      'my insights', 'show my insights', 'show insights'],
+    'hi-IN': ['एनालिटिक्स दिखाएं', 'विश्लेषण दिखाएं', 'मेरी इनसाइट्स'],
+    'mr-IN': ['अॅनालिटिक्स दाखवा', 'विश्लेषण दाखवा', 'माझे इनसाइट्स']
   },
   // Admin-only.
   'pending moderation': {
@@ -180,7 +182,8 @@ const ALL_COMMANDS = {
     { category: '📋 Applications', commands: [
       { text: '• "my applications" - Check your application status', action: 'my applications' },
       { text: '• "application status" - View applied jobs', action: 'my applications' },
-      { text: '• "my jobs" - See your job applications', action: 'my applications' }
+      { text: '• "my jobs" - See your job applications', action: 'my applications' },
+      { text: '• "my insights" - See your status breakdown and skill gaps', action: 'view analytics' }
     ]},
     { key: 'job_actions', category: '🎯 Job Actions (after a search)', commands: [
       { text: '• "apply to job 1" / "apply to the first job" - Apply to a listed job', action: 'apply_to_job' },
@@ -215,7 +218,8 @@ const ALL_COMMANDS = {
     { category: '📋 आवेदन', commands: [
       { text: '• "मेरे आवेदन" - आपके आवेदन की स्थिति जांचें', action: 'my applications' },
       { text: '• "आवेदन स्थिति" - अप्लाइड जॉब्स देखें', action: 'my applications' },
-      { text: '• "मेरी नौकरियां" - आपके नौकरी आवेदन देखें', action: 'my applications' }
+      { text: '• "मेरी नौकरियां" - आपके नौकरी आवेदन देखें', action: 'my applications' },
+      { text: '• "मेरी इनसाइट्स" - अपनी स्थिति और स्किल गैप देखें', action: 'view analytics' }
     ]},
     { key: 'job_actions', category: '🎯 नौकरी क्रियाएं (खोज के बाद)', commands: [
       { text: '• "apply to job 1" - सूची से किसी नौकरी के लिए आवेदन करें', action: 'apply_to_job' },
@@ -250,7 +254,8 @@ const ALL_COMMANDS = {
     { category: '📋 अर्ज', commands: [
       { text: '• "माझे अर्ज" - तुमच्या अर्जांची स्थिती तपासा', action: 'my applications' },
       { text: '• "अर्ज स्थिती" - अप्लाइड नोकऱ्या पहा', action: 'my applications' },
-      { text: '• "माझ्या नोकऱ्या" - तुमचे नोकरी अर्ज पहा', action: 'my applications' }
+      { text: '• "माझ्या नोकऱ्या" - तुमचे नोकरी अर्ज पहा', action: 'my applications' },
+      { text: '• "माझे इनसाइट्स" - तुमची स्थिती आणि स्किल गॅप पहा', action: 'view analytics' }
     ]},
     { key: 'job_actions', category: '🎯 नोकरी क्रिया (शोधल्यानंतर)', commands: [
       { text: '• "apply to job 1" - यादीतील नोकरीसाठी अर्ज करा', action: 'apply_to_job' },
@@ -445,6 +450,11 @@ const RESPONSES = {
     'en-US': 'Opening analytics.',
     'hi-IN': 'एनालिटिक्स खोल रहा हूँ।',
     'mr-IN': 'अॅनालिटिक्स उघडत आहे.'
+  },
+  'opening_insights': {
+    'en-US': 'Opening your insights.',
+    'hi-IN': 'आपकी इनसाइट्स खोल रहा हूँ।',
+    'mr-IN': 'तुमचे इनसाइट्स उघडत आहे.'
   },
   'opening_admin_dashboard': {
     'en-US': 'Opening the admin dashboard.',
@@ -1231,13 +1241,23 @@ const VoiceAssistant = ({ onAuthChange }) => {
     }
   };
 
+  // "Analytics" meant something different for each role from the start, but a candidate saying
+  // the shared phrase ("show analytics") used to fall into the else branch meant for recruiters
+  // and land on the recruiter dashboard instead - this never had a candidate-facing analytics
+  // view to route to until CandidateInsightsPanel/the "My Insights" tab was added.
   const goToAnalytics = () => {
+    let responseKey;
     if (isAdmin) {
       navigate('/admin/dashboard', { state: { initialTab: 'analytics' } });
-    } else {
+      responseKey = 'opening_analytics';
+    } else if (isRecruiter) {
       navigate('/recruiter/dashboard', { state: { initialTab: 'analytics' } });
+      responseKey = 'opening_analytics';
+    } else {
+      navigate('/dashboard', { state: { initialTab: 'insights' } });
+      responseKey = 'opening_insights';
     }
-    const msg = getResponse('opening_analytics', currentLanguage);
+    const msg = getResponse(responseKey, currentLanguage);
     addMessage('assistant', msg, currentLanguage);
     speakResponse(msg, currentLanguage);
   };

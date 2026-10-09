@@ -198,6 +198,9 @@ class AccessPolicyTest {
     void usersCanOnlyTouchTheirOwnUserScopedResources() {
         assertTrue(allowed(candidate, "GET", "/api/applications/user/10"));
         assertFalse(allowed(candidate, "GET", "/api/applications/user/11"));
+        assertTrue(allowed(candidate, "GET", "/api/applications/user/10/insights"));
+        assertFalse(allowed(candidate, "GET", "/api/applications/user/11/insights"));
+        assertTrue(allowed(admin, "GET", "/api/applications/user/11/insights"));
         assertTrue(allowed(candidate, "POST", "/api/jobs/5/apply/10"));
         assertFalse(allowed(candidate, "POST", "/api/jobs/5/apply/11"));
         assertTrue(allowed(candidate, "GET", "/api/resumes/user/10/latest"));

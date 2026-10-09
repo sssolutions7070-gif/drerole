@@ -25,6 +25,7 @@ import com.jobera.entity.Application;
 import com.jobera.entity.JobPosting;
 import com.jobera.entity.User;
 import com.jobera.service.ApplicationStatusService;
+import com.jobera.service.CandidateAnalyticsService;
 import com.jobera.service.JobPostingService;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -37,6 +38,7 @@ public class ApplicationStatusController {
     
     private final ApplicationStatusService applicationStatusService;
     private final JobPostingService jobPostingService;
+    private final CandidateAnalyticsService candidateAnalyticsService;
     
     private static final String STATUS_APPLICATION_SUBMITTED = "APPLICATION_SUBMITTED";
     private static final String STATUS_SHORTLISTED = "SHORTLISTED";
@@ -56,9 +58,11 @@ public class ApplicationStatusController {
     private static final String RESPONSE_KEY_STATUS = "status";
     
     public ApplicationStatusController(ApplicationStatusService applicationStatusService,
-                                     JobPostingService jobPostingService) {
+                                     JobPostingService jobPostingService,
+                                     CandidateAnalyticsService candidateAnalyticsService) {
         this.applicationStatusService = applicationStatusService;
         this.jobPostingService = jobPostingService;
+        this.candidateAnalyticsService = candidateAnalyticsService;
     }
     
     @GetMapping("/user/{userId}")
@@ -82,7 +86,21 @@ public class ApplicationStatusController {
             return ResponseEntity.badRequest().body(errorResponse);
         }
     }
-    
+
+    /** A candidate's own "My Insights" - status breakdown, average match score, most commonly
+     *  missing skills across their own applications, and how many recruiters viewed their profile.
+     *  Recruiters/admins get an equivalent view scoped to their own jobs or the whole platform;
+     *  candidates previously had no analytics of their own at all. */
+    @GetMapping("/user/{userId}/insights")
+    public ResponseEntity<Map<String, Object>> getUserInsights(@PathVariable Long userId) {
+        try {
+            return ResponseEntity.ok(candidateAnalyticsService.getInsights(userId));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                .body(Map.of(RESPONSE_KEY_ERROR, "Failed to load insights: " + e.getMessage()));
+        }
+    }
+
     @GetMapping("/job/{jobId}")
     public ResponseEntity<List<Application>> getJobApplications(@PathVariable Long jobId) {
         try {
