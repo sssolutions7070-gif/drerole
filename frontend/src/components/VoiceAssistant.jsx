@@ -141,6 +141,30 @@ const NEGATIVE_WORDS = {
   'mr-IN': ['नको', 'रद्द करा'],
 };
 
+// Pure filler/grammar words stripped before the fuzzy fallback in detectCommand compares a
+// phrase's *meaningful* words against the command - deliberately excludes domain verbs like
+// "open"/"show"/"add"/"post" even though they're grammatically fillable, since those are what
+// distinguish one command from another here.
+const STOPWORDS_EN = new Set([
+  'a', 'an', 'the', 'to', 'is', 'are', 'my', 'please', 'i', 'want', 'of', 'for', 'me', 'can',
+  'could', 'would', 'you', 'now', 'it', 'on', 'in', 'at', 'do', 'does', 'did', 'that', 'this',
+  'your', 'our', 'we', 'us', 'there', 'so', 'just', 'like', 'some', 'with', "i'd", "i'll", 'am',
+]);
+
+const tokenizeEnglish = (text) => text.toLowerCase().match(/[a-z0-9']+/g) || [];
+
+// True if a phrase word and an input token are "close enough" - plain equality, or a substring
+// check either direction to absorb plurals and minor suffix differences ("job" / "jobs",
+// "applicant" / "applicants"), without any real stemming library. The substring check is
+// restricted to words of 4+ letters each: short words are exactly where this goes wrong - e.g.
+// "recommend".includes("me") is true, which would make a filler word fuzzy-match an unrelated
+// command. Below that length only exact equality counts.
+const wordsRoughlyMatch = (phraseWord, inputToken) => {
+  if (phraseWord === inputToken) return true;
+  if (phraseWord.length < 4 || inputToken.length < 4) return false;
+  return inputToken.includes(phraseWord) || phraseWord.includes(inputToken);
+};
+
 // Complete command list for help popup with click handlers - UPDATED with all commands
 const ALL_COMMANDS = {
   'en-US': [
@@ -1366,7 +1390,10 @@ const VoiceAssistant = ({ onAuthChange }) => {
   // Detect command from user input
   const detectCommand = (userInput, language) => {
     const lowerInput = userInput.toLowerCase();
-    
+
+    // Fast path: an exact phrase appears verbatim. Works for all three languages and is what
+    // every phrase in COMMAND_MAPPINGS was written to satisfy - left completely unchanged so
+    // every phrasing that already worked keeps working exactly as before.
     for (const [command, translations] of Object.entries(COMMAND_MAPPINGS)) {
       const phrases = translations[language] || [];
       for (const phrase of phrases) {
@@ -1375,7 +1402,39 @@ const VoiceAssistant = ({ onAuthChange }) => {
         }
       }
     }
-    
+
+    // Fallback: English only, and only reached when nothing matched verbatim above. Real speech
+    // rarely comes out as one of our exact phrases - "can you add a new job listing for me"
+    // means the same thing as "add a job" but doesn't contain it word-for-word. This strips
+    // filler words from each phrase and checks whether every *meaningful* word shows up
+    // somewhere in what was said, in any order. Among every phrase that matches this way, the
+    // one with the most meaningful words wins, so a specific multi-word phrase for one command
+    // doesn't lose out to a shorter, more generic phrase belonging to a different command. A
+    // floor of 2 meaningful words keeps single generic words (like "jobs" alone) from
+    // fuzzy-matching almost anything.
+    if (language === 'en-US') {
+      // Filtered the same way phrase words are - otherwise a filler word surviving in the raw
+      // input (like "me") can spuriously satisfy a phrase word via the substring check above.
+      const inputTokens = tokenizeEnglish(lowerInput).filter(w => !STOPWORDS_EN.has(w));
+      let best = null; // { command, score }
+
+      for (const [command, translations] of Object.entries(COMMAND_MAPPINGS)) {
+        for (const phrase of translations['en-US'] || []) {
+          const meaningfulWords = tokenizeEnglish(phrase).filter(w => !STOPWORDS_EN.has(w));
+          if (meaningfulWords.length < 2) continue;
+
+          const allPresent = meaningfulWords.every(w =>
+            inputTokens.some(tok => wordsRoughlyMatch(w, tok))
+          );
+          if (allPresent && (!best || meaningfulWords.length > best.score)) {
+            best = { command, score: meaningfulWords.length };
+          }
+        }
+      }
+
+      if (best) return best.command;
+    }
+
     return null;
   };
 

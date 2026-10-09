@@ -394,4 +394,53 @@ describe('VoiceAssistant', () => {
       expect(screen.queryByPlaceholderText(/type a command/i)).not.toBeInTheDocument();
     });
   });
+
+  describe('fuzzy understanding of rephrased commands', () => {
+    // None of these contain any COMMAND_MAPPINGS phrase word-for-word - they only share the
+    // same *meaningful* words, in a different order and with filler words mixed in, which is
+    // exactly what the fuzzy fallback in detectCommand is for.
+    it('"can you add a new job listing for me" is understood as "post a job"', async () => {
+      setUser({ role: 'ROLE_RECRUITER' });
+      const user = await openAssistant();
+
+      await typeCommand(user, 'can you add a new job listing for me');
+
+      expect(await screen.findByText(/opening your jobs tab/i)).toBeInTheDocument();
+    });
+
+    it('"please open the queue for moderation" (reversed word order) is understood as "pending jobs"', async () => {
+      setUser({ role: 'ROLE_ADMIN' });
+      const user = await openAssistant();
+
+      await typeCommand(user, 'please open the queue for moderation');
+
+      expect(await screen.findByText(/opening the pending jobs moderation queue/i)).toBeInTheDocument();
+    });
+
+    it('"please get me signed out of here" (inflected verb) is understood as "log out"', async () => {
+      const user = await openAssistant();
+
+      await typeCommand(user, 'please get me signed out of here');
+
+      expect(await screen.findByText(/are you sure you want to log out/i)).toBeInTheDocument();
+    });
+
+    it('a single generic word is not enough to fuzzy-match anything on its own', async () => {
+      const user = await openAssistant();
+
+      await typeCommand(user, 'jobs');
+
+      // "jobs" alone only ever reaches the 1-meaningful-word floor, which the fallback requires
+      // at least 2 of - so this should NOT be silently reinterpreted as some arbitrary command.
+      expect(await screen.findByText(/didn't understand/i)).toBeInTheDocument();
+    });
+
+    it('an unrelated sentence still falls through to the unknown-command message', async () => {
+      const user = await openAssistant();
+
+      await typeCommand(user, "what's the weather like today");
+
+      expect(await screen.findByText(/didn't understand/i)).toBeInTheDocument();
+    });
+  });
 });
