@@ -106,6 +106,19 @@ const COMMAND_MAPPINGS = {
     'en-US': ['pending jobs', 'moderation queue', 'pending reviews', 'review queue', 'pending approvals'],
     'hi-IN': ['लंबित नौकरियां', 'मॉडरेशन क्यू'],
     'mr-IN': ['प्रलंबित नोकऱ्या', 'मॉडरेशन क्यू']
+  },
+  // Stops speech mid-sentence without closing the assistant - checked before the generic
+  // "unknown command" fallback so it's usable regardless of what's currently being said.
+  'stop': {
+    'en-US': ['stop talking', 'stop speaking', 'be quiet', 'stop listening to that', 'stop'],
+    'hi-IN': ['बोलना बंद करो', 'रुको', 'चुप रहो'],
+    'mr-IN': ['बोलणे थांबवा', 'थांबा', 'गप्प राहा']
+  },
+  // Re-speaks the last assistant message instead of making the user ask the whole question again.
+  'repeat': {
+    'en-US': ['say that again', 'repeat that', 'repeat', 'say it again', 'what did you say'],
+    'hi-IN': ['फिर से कहो', 'दोहराओ', 'फिर बोलो'],
+    'mr-IN': ['पुन्हा सांगा', 'पुन्हा बोला']
   }
 };
 
@@ -244,16 +257,22 @@ const ADMIN_COMMANDS = {
     { text: '• "pending jobs" - Open the moderation queue', action: 'pending moderation' },
     { text: '• "view applications" - See every application on the platform', action: 'my applications' },
     { text: '• "show analytics" - Open platform-wide analytics', action: 'view analytics' },
+    { text: '• "approve job 1" - Approve a pending job straight from the queue', action: 'approve_job' },
+    { text: '• "reject job 1 because spam" - Reject one with a reason', action: 'reject_job' },
   ]},
   'hi-IN': { key: 'admin', category: '🛡️ एडमिन टूल्स', commands: [
     { text: '• "pending jobs" - मॉडरेशन क्यू खोलें', action: 'pending moderation' },
     { text: '• "view applications" - प्लेटफ़ॉर्म पर सभी आवेदन देखें', action: 'my applications' },
     { text: '• "show analytics" - प्लेटफ़ॉर्म-व्यापी एनालिटिक्स खोलें', action: 'view analytics' },
+    { text: '• "approve job 1" - कतार से किसी नौकरी को स्वीकृत करें', action: 'approve_job' },
+    { text: '• "reject job 1 because spam" - कारण के साथ अस्वीकृत करें', action: 'reject_job' },
   ]},
   'mr-IN': { key: 'admin', category: '🛡️ अॅडमिन टूल्स', commands: [
     { text: '• "pending jobs" - मॉडरेशन क्यू उघडा', action: 'pending moderation' },
     { text: '• "view applications" - प्लॅटफॉर्मवरील सर्व अर्ज पहा', action: 'my applications' },
     { text: '• "show analytics" - प्लॅटफॉर्म-व्यापी अॅनालिटिक्स उघडा', action: 'view analytics' },
+    { text: '• "approve job 1" - रांगेतून एक नोकरी मंजूर करा', action: 'approve_job' },
+    { text: '• "reject job 1 because spam" - कारणासह नकार द्या', action: 'reject_job' },
   ]},
 };
 
@@ -389,6 +408,26 @@ const RESPONSES = {
     'hi-IN': 'सभी आवेदन खोल रहा हूँ।',
     'mr-IN': 'सर्व अर्ज उघडत आहे.'
   },
+  'no_pending_job_found': {
+    'en-US': "I couldn't tell which pending job you mean. Try \"pending jobs\" first to see the queue, then say \"approve job 1\".",
+    'hi-IN': 'मुझे समझ नहीं आया कौन सी लंबित नौकरी। पहले "pending jobs" कहें, फिर "approve job 1" कहें।',
+    'mr-IN': 'मला कोणती प्रलंबित नोकरी हे कळले नाही. आधी "pending jobs" म्हणा, मग "approve job 1" म्हणा.'
+  },
+  'error_moderation': {
+    'en-US': "Sorry, that moderation action didn't go through.",
+    'hi-IN': 'क्षमा करें, वह मॉडरेशन कार्रवाई नहीं हो सकी।',
+    'mr-IN': 'क्षमस्व, ती मॉडरेशन कृती होऊ शकली नाही.'
+  },
+  'nothing_to_repeat': {
+    'en-US': "I haven't said anything yet.",
+    'hi-IN': 'मैंने अभी तक कुछ नहीं कहा है।',
+    'mr-IN': 'मी अजून काही बोललो नाही.'
+  },
+  'stopped_speaking': {
+    'en-US': 'Stopped.',
+    'hi-IN': 'रुक गया।',
+    'mr-IN': 'थांबले.'
+  },
   'opening_dashboard': {
     'en-US': 'Opening dashboard.',
     'hi-IN': 'डैशबोर्ड खोल रहा हूँ।',
@@ -423,6 +462,26 @@ const RESPONSES = {
     'en-US': "I didn't understand. Try saying 'help' to see all commands.",
     'hi-IN': "मैं समझ नहीं पाया। सभी कमांड देखने के लिए 'मदद' कहें।",
     'mr-IN': "मला समजले नाही. सर्व कमांड पाहण्यासाठी 'मदत' म्हणा."
+  },
+  'approving_job': {
+    'en-US': 'Approving "{title}"...',
+    'hi-IN': '"{title}" को स्वीकृत कर रहा हूँ...',
+    'mr-IN': '"{title}" मंजूर करत आहे...'
+  },
+  'job_approved': {
+    'en-US': '"{title}" has been approved and is now live.',
+    'hi-IN': '"{title}" स्वीकृत हो गई है और अब लाइव है।',
+    'mr-IN': '"{title}" मंजूर झाली आहे आणि आता लाइव्ह आहे.'
+  },
+  'rejecting_job': {
+    'en-US': 'Rejecting "{title}"...',
+    'hi-IN': '"{title}" को अस्वीकृत कर रहा हूँ...',
+    'mr-IN': '"{title}" नकारत आहे...'
+  },
+  'job_rejected': {
+    'en-US': '"{title}" has been rejected.',
+    'hi-IN': '"{title}" अस्वीकृत कर दी गई है।',
+    'mr-IN': '"{title}" नकारली गेली आहे.'
   }
 };
 
@@ -440,6 +499,7 @@ const VoiceAssistant = ({ onAuthChange }) => {
   const [searchResults, setSearchResults] = useState([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [allJobs, setAllJobs] = useState([]);
+  const [pendingJobs, setPendingJobs] = useState([]);
   const [playStartSound, setPlayStartSound] = useState(false);
   const [playStopSound, setPlayStopSound] = useState(false);
   
@@ -453,6 +513,7 @@ const VoiceAssistant = ({ onAuthChange }) => {
   const audioContextRef = useRef(null);
   const navigate = useNavigate();
   const messagesEndRef = useRef(null);
+  const textInputRef = useRef(null);
 
   const currentUser = JSON.parse(localStorage.getItem('user'));
   const userRole = currentUser?.role; // 'ROLE_USER' | 'ROLE_RECRUITER' | 'ROLE_ADMIN'
@@ -480,9 +541,9 @@ const VoiceAssistant = ({ onAuthChange }) => {
       'hi-IN': "नमस्ते! मैं आपका DreamRole सहायक हूँ। 'post a job', 'discover candidates', या 'show analytics' कहें - या सभी कमांड देखने के लिए 'help' कहें।",
       'mr-IN': "नमस्कार! मी तुमचा DreamRole सहाय्यक आहे. 'post a job', 'discover candidates', किंवा 'show analytics' म्हणा - किंवा सर्व कमांड पाहण्यासाठी 'help' म्हणा."
     } : isAdmin ? {
-      'en-US': "Hello! I'm your DreamRole assistant. Say 'pending jobs' to open the moderation queue, or 'help' to see everything I can do.",
-      'hi-IN': "नमस्ते! मैं आपका DreamRole सहायक हूँ। मॉडरेशन क्यू खोलने के लिए 'pending jobs' कहें, या सभी कमांड देखने के लिए 'help' कहें।",
-      'mr-IN': "नमस्कार! मी तुमचा DreamRole सहाय्यक आहे. मॉडरेशन क्यू उघडण्यासाठी 'pending jobs' म्हणा, किंवा सर्व कमांड पाहण्यासाठी 'help' म्हणा."
+      'en-US': "Hello! I'm your DreamRole assistant. Say 'pending jobs' to open the moderation queue, or 'approve job 1' / 'reject job 1 because spam' to act on one directly. Say 'help' to see everything I can do.",
+      'hi-IN': "नमस्ते! मैं आपका DreamRole सहायक हूँ। मॉडरेशन क्यू खोलने के लिए 'pending jobs' कहें, या सीधे कार्रवाई के लिए 'approve job 1' कहें। सभी कमांड देखने के लिए 'help' कहें।",
+      'mr-IN': "नमस्कार! मी तुमचा DreamRole सहाय्यक आहे. मॉडरेशन क्यू उघडण्यासाठी 'pending jobs' म्हणा, किंवा थेट कृतीसाठी 'approve job 1' म्हणा. सर्व कमांड पाहण्यासाठी 'help' म्हणा."
     } : {
       'en-US': "Hello! I'm your DreamRole assistant. Say 'recommend jobs' or 'browse jobs' to go to jobs page, or search for specific jobs like 'find data scientist jobs'.",
       'hi-IN': "नमस्ते! मैं आपका DreamRole सहायक हूँ। जॉब पेज पर जाने के लिए 'recommend jobs' या 'browse jobs' कहें, या विशिष्ट नौकरियां खोजें जैसे 'डाटा साइंटिस्ट नौकरी'।",
@@ -498,8 +559,32 @@ const VoiceAssistant = ({ onAuthChange }) => {
     // Fetch all jobs on load (only once a user is logged in; the API requires auth)
     if (currentUser) {
       fetchAllJobs();
+      // An admin also gets the pending-moderation queue preloaded, so "approve job 1" works
+      // immediately without having to say "pending jobs" first.
+      if (isAdmin) fetchPendingJobs();
     }
   }, []);
+
+  // Alt+A opens the assistant and focuses the type-a-command box from anywhere on the page - a
+  // keyboard-only path in that needs neither the mouse nor microphone permission. Guarded against
+  // ctrlKey/metaKey so it doesn't fire for AltGr-based characters on non-US keyboard layouts
+  // (Windows reports AltGr as ctrlKey+altKey together).
+  useEffect(() => {
+    const handleGlobalShortcut = (e) => {
+      if (e.altKey && !e.ctrlKey && !e.metaKey && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        setIsOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalShortcut);
+    return () => window.removeEventListener('keydown', handleGlobalShortcut);
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      textInputRef.current?.focus();
+    }
+  }, [isOpen]);
 
   // Play sound effects
   useEffect(() => {
@@ -832,6 +917,65 @@ const VoiceAssistant = ({ onAuthChange }) => {
     }
   };
 
+  // Admin-only: the moderation queue "approve job N" / "reject job N" resolve against.
+  const fetchPendingJobs = async () => {
+    try {
+      const response = await api.get('/admin/jobs/pending');
+      const jobs = response.data || [];
+      setPendingJobs(jobs);
+      return jobs;
+    } catch (error) {
+      console.error('Error fetching pending jobs:', error);
+      return [];
+    }
+  };
+
+  // Approve/reject a pending job by voice - the same two actions AdminDashboard's bulk-moderation
+  // buttons call, just resolved from a spoken job reference instead of a checkbox selection.
+  const approveJobByVoice = async (job) => {
+    const startMsg = getResponse('approving_job', currentLanguage, { title: job.title });
+    addMessage('assistant', startMsg, currentLanguage);
+    speakResponse(startMsg, currentLanguage);
+
+    try {
+      await api.put(`/admin/jobs/${job.id}/approve`);
+      setPendingJobs(prev => prev.filter(j => j.id !== job.id));
+      const doneMsg = getResponse('job_approved', currentLanguage, { title: job.title });
+      addMessage('assistant', doneMsg, currentLanguage);
+      speakResponse(doneMsg, currentLanguage);
+    } catch (error) {
+      const errMsg = getResponse('error_moderation', currentLanguage);
+      addMessage('assistant', errMsg, currentLanguage);
+      speakResponse(errMsg, currentLanguage);
+    }
+  };
+
+  const rejectJobByVoice = async (job, reason) => {
+    const startMsg = getResponse('rejecting_job', currentLanguage, { title: job.title });
+    addMessage('assistant', startMsg, currentLanguage);
+    speakResponse(startMsg, currentLanguage);
+
+    try {
+      await api.put(`/admin/jobs/${job.id}/reject`, { reason });
+      setPendingJobs(prev => prev.filter(j => j.id !== job.id));
+      const doneMsg = getResponse('job_rejected', currentLanguage, { title: job.title });
+      addMessage('assistant', doneMsg, currentLanguage);
+      speakResponse(doneMsg, currentLanguage);
+    } catch (error) {
+      const errMsg = getResponse('error_moderation', currentLanguage);
+      addMessage('assistant', errMsg, currentLanguage);
+      speakResponse(errMsg, currentLanguage);
+    }
+  };
+
+  // The reason clause of a spoken rejection, e.g. "reject job 1 because it looks like spam" ->
+  // "it looks like spam". Falls back to a generic reason when none was given, since the backend
+  // reject endpoint expects one.
+  const extractRejectReason = (command) => {
+    const match = command.match(/(?:because|reason(?:\s+is)?)\s*[:\-]?\s*(.+)$/i);
+    return match ? match[1].trim() : null;
+  };
+
   // Search jobs by title
   const searchJobsByTitle = async (searchTerm) => {
     if (!currentUser) {
@@ -1043,6 +1187,14 @@ const VoiceAssistant = ({ onAuthChange }) => {
         addMessage('assistant', 'Search for jobs first, then say something like "rate job 1 five stars".', currentLanguage);
         speakResponse('Search for jobs first, then say rate job 1 five stars', currentLanguage);
         break;
+      case 'approve_job':
+        addMessage('assistant', 'Say "pending jobs" first to see the queue, then say something like "approve job 1".', currentLanguage);
+        speakResponse('Say pending jobs first, then say approve job 1', currentLanguage);
+        break;
+      case 'reject_job':
+        addMessage('assistant', 'Say "pending jobs" first to see the queue, then say something like "reject job 1 because it\'s spam".', currentLanguage);
+        speakResponse('Say pending jobs first, then say reject job 1 with a reason', currentLanguage);
+        break;
       case 'my applications':
         goToApplications();
         break;
@@ -1072,6 +1224,7 @@ const VoiceAssistant = ({ onAuthChange }) => {
         break;
       case 'pending moderation':
         navigate('/admin/dashboard', { state: { initialTab: 'pending-jobs' } });
+        fetchPendingJobs(); // refresh in case the queue changed since mount
         addMessage('assistant', getResponse('opening_pending_moderation', currentLanguage), currentLanguage);
         speakResponse(getResponse('opening_pending_moderation', currentLanguage), currentLanguage);
         break;
@@ -1211,6 +1364,31 @@ const VoiceAssistant = ({ onAuthChange }) => {
       }
     }
 
+    // APPROVE A PENDING JOB (admin only) - e.g. "approve job 1", "approve the backend engineer job"
+    else if (isAdmin && (lowerCommand.includes('approve') || lowerCommand.includes('स्वीकृत') || lowerCommand.includes('मंजूर'))) {
+      const job = resolveJobFromCommand(lowerCommand, pendingJobs, extractJobTitle);
+      if (job) {
+        approveJobByVoice(job);
+      } else {
+        const msg = getResponse('no_pending_job_found', currentLanguage);
+        addMessage('assistant', msg, currentLanguage);
+        speakResponse(msg, currentLanguage);
+      }
+    }
+
+    // REJECT A PENDING JOB (admin only) - e.g. "reject job 1 because it's spam"
+    else if (isAdmin && (lowerCommand.includes('reject') || lowerCommand.includes('अस्वीकृत') || lowerCommand.includes('नकार'))) {
+      const job = resolveJobFromCommand(lowerCommand, pendingJobs, extractJobTitle);
+      if (job) {
+        const reason = extractRejectReason(lowerCommand) || 'Rejected via voice assistant.';
+        rejectJobByVoice(job, reason);
+      } else {
+        const msg = getResponse('no_pending_job_found', currentLanguage);
+        addMessage('assistant', msg, currentLanguage);
+        speakResponse(msg, currentLanguage);
+      }
+    }
+
     // SEARCH JOBS BY TITLE - This handles specific job title searches
     else if (
       // Check for search patterns
@@ -1272,6 +1450,7 @@ const VoiceAssistant = ({ onAuthChange }) => {
     }
     else if (detectedCommand === 'pending moderation') {
       navigate('/admin/dashboard', { state: { initialTab: 'pending-jobs' } });
+      fetchPendingJobs(); // refresh in case the queue changed since mount
       addMessage('assistant', getResponse('opening_pending_moderation', currentLanguage), currentLanguage);
       speakResponse(getResponse('opening_pending_moderation', currentLanguage), currentLanguage);
     }
@@ -1296,7 +1475,27 @@ const VoiceAssistant = ({ onAuthChange }) => {
       addMessage('assistant', greetingTemplates[currentLanguage] || greetingTemplates['en-US'], currentLanguage);
       speakResponse(greetingTemplates[currentLanguage] || greetingTemplates['en-US'], currentLanguage);
     }
-    
+
+    // Stop speaking mid-sentence - deliberately doesn't speak the confirmation out loud, since
+    // that would immediately restart the exact thing the user just asked to stop.
+    else if (detectedCommand === 'stop') {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      addMessage('assistant', getResponse('stopped_speaking', currentLanguage), currentLanguage);
+    }
+
+    // Repeat the last thing the assistant said, instead of making the user ask again.
+    else if (detectedCommand === 'repeat') {
+      const lastAssistantMessage = [...messages].reverse().find(m => m.type === 'assistant');
+      if (lastAssistantMessage) {
+        speakResponse(lastAssistantMessage.text, currentLanguage);
+      } else {
+        const msg = getResponse('nothing_to_repeat', currentLanguage);
+        addMessage('assistant', msg, currentLanguage);
+        speakResponse(msg, currentLanguage);
+      }
+    }
+
     // Unknown command
     else {
       addMessage('assistant', getResponse('unknown_command', currentLanguage), currentLanguage);
@@ -1546,9 +1745,14 @@ const VoiceAssistant = ({ onAuthChange }) => {
             
             <div className="mt-4 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
               <p className="text-xs text-yellow-800">
-                {currentLanguage === 'en-US' && '💡 Try: "recommend jobs", "browse jobs", or search "find data scientist jobs"'}
-                {currentLanguage === 'hi-IN' && '💡 उदाहरण: "recommend jobs", "browse jobs", या "डाटा साइंटिस्ट नौकरी" खोजें'}
-                {currentLanguage === 'mr-IN' && '💡 उदाहरण: "recommend jobs", "browse jobs", किंवा "डेटा सायंटिस्ट नोकरी" शोधा'}
+                {currentLanguage === 'en-US' && '💡 Try: "recommend jobs", "browse jobs", or search "find data scientist jobs". Say "stop" to interrupt me, or "repeat that" to hear it again.'}
+                {currentLanguage === 'hi-IN' && '💡 उदाहरण: "recommend jobs", "browse jobs", या "डाटा साइंटिस्ट नौकरी" खोजें। रोकने के लिए "stop" कहें, दोहराने के लिए "repeat that" कहें।'}
+                {currentLanguage === 'mr-IN' && '💡 उदाहरण: "recommend jobs", "browse jobs", किंवा "डेटा सायंटिस्ट नोकरी" शोधा. थांबवण्यासाठी "stop" म्हणा, पुन्हा ऐकण्यासाठी "repeat that" म्हणा.'}
+              </p>
+              <p className="text-xs text-yellow-700 mt-1">
+                {currentLanguage === 'en-US' && '⌨️ Press Alt+A anywhere on the page to open the assistant.'}
+                {currentLanguage === 'hi-IN' && '⌨️ पेज पर कहीं भी Alt+A दबाकर असिस्टेंट खोलें।'}
+                {currentLanguage === 'mr-IN' && '⌨️ पेजवर कुठेही Alt+A दाबून सहाय्यक उघडा.'}
               </p>
             </div>
           </div>
@@ -1701,6 +1905,7 @@ const VoiceAssistant = ({ onAuthChange }) => {
               browsers (e.g. Firefox) with no Web Speech API support. */}
           <form onSubmit={handleTextSubmit} className="flex items-center gap-2 p-2 border-t">
             <input
+              ref={textInputRef}
               type="text"
               value={textInput}
               onChange={(e) => setTextInput(e.target.value)}

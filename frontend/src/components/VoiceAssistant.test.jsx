@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, act, waitFor } from '@testing-library/react';
+import { render, screen, act, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import VoiceAssistant from './VoiceAssistant';
@@ -197,6 +197,121 @@ describe('VoiceAssistant', () => {
       expect(await screen.findByText(/logging you out/i)).toBeInTheDocument();
       expect(authService.logout).toHaveBeenCalled();
       await waitFor(() => expect(onAuthChange).toHaveBeenCalledWith(null));
+    });
+  });
+
+  describe('admin moderation by voice', () => {
+    const pendingJobs = [
+      { id: 11, title: 'Backend Engineer', company: 'Acme' },
+      { id: 12, title: 'Frontend Engineer', company: 'Acme' },
+    ];
+
+    beforeEach(() => {
+      setUser({ role: 'ROLE_ADMIN' });
+      api.get.mockImplementation((url) => {
+        if (url === '/admin/jobs/pending') return Promise.resolve({ data: pendingJobs });
+        return Promise.resolve({ data: [] });
+      });
+      api.put.mockResolvedValue({ data: { message: 'ok' } });
+    });
+
+    it('"approve job 1" approves the first pending job and confirms by name', async () => {
+      const user = await openAssistant();
+
+      await typeCommand(user, 'approve job 1');
+
+      await waitFor(() => expect(api.put).toHaveBeenCalledWith('/admin/jobs/11/approve'));
+      expect(await screen.findByText(/"Backend Engineer" has been approved/i)).toBeInTheDocument();
+    });
+
+    it('"reject job 2 because it looks like spam" rejects with the spoken reason', async () => {
+      const user = await openAssistant();
+
+      await typeCommand(user, "reject job 2 because it looks like spam");
+
+      await waitFor(() => expect(api.put).toHaveBeenCalledWith('/admin/jobs/12/reject', { reason: 'it looks like spam' }));
+      expect(await screen.findByText(/"Frontend Engineer" has been rejected/i)).toBeInTheDocument();
+    });
+
+    it('"reject job 1" with no reason given falls back to a default reason', async () => {
+      const user = await openAssistant();
+
+      await typeCommand(user, 'reject job 1');
+
+      await waitFor(() => expect(api.put).toHaveBeenCalledWith('/admin/jobs/11/reject', { reason: 'Rejected via voice assistant.' }));
+    });
+
+    it('"approve job 9" (out of range) reports it could not find the job instead of calling the API', async () => {
+      const user = await openAssistant();
+
+      await typeCommand(user, 'approve job 9');
+
+      expect(await screen.findByText(/couldn't tell which pending job/i)).toBeInTheDocument();
+      expect(api.put).not.toHaveBeenCalled();
+    });
+
+    it('a candidate saying "approve job 1" is not treated as a moderation command', async () => {
+      setUser({ role: 'ROLE_USER' });
+      const user = await openAssistant();
+
+      await typeCommand(user, 'approve job 1');
+
+      expect(api.put).not.toHaveBeenCalled();
+      expect(await screen.findByText(/didn't understand/i)).toBeInTheDocument();
+    });
+  });
+
+  describe('"stop" and "repeat" commands', () => {
+    it('"stop" cancels speech synthesis without speaking the confirmation', async () => {
+      const user = await openAssistant();
+      window.speechSynthesis.speak.mockClear();
+      window.speechSynthesis.cancel.mockClear();
+
+      await typeCommand(user, 'stop talking');
+
+      expect(window.speechSynthesis.cancel).toHaveBeenCalled();
+      expect(await screen.findByText('Stopped.')).toBeInTheDocument();
+      expect(window.speechSynthesis.speak).not.toHaveBeenCalled();
+    });
+
+    it('"repeat that" re-speaks the last assistant message', async () => {
+      const user = await openAssistant();
+      await typeCommand(user, 'go to home');
+      await screen.findByText('Going to home page.');
+      window.speechSynthesis.speak.mockClear();
+
+      await typeCommand(user, 'repeat that');
+
+      await waitFor(() => expect(window.speechSynthesis.speak).toHaveBeenCalledTimes(1));
+      const spoken = window.speechSynthesis.speak.mock.calls[0][0];
+      expect(spoken.text).toBe('Going to home page.');
+    });
+  });
+
+  describe('Alt+A keyboard shortcut', () => {
+    it('opens the assistant and focuses the text input', async () => {
+      render(
+        <MemoryRouter>
+          <VoiceAssistant />
+        </MemoryRouter>
+      );
+
+      fireEvent.keyDown(window, { key: 'a', altKey: true });
+
+      const input = await screen.findByPlaceholderText(/type a command/i);
+      expect(input).toHaveFocus();
+    });
+
+    it('does not open on AltGr-style combinations (ctrlKey+altKey together)', async () => {
+      render(
+        <MemoryRouter>
+          <VoiceAssistant />
+        </MemoryRouter>
+      );
+
+      fireEvent.keyDown(window, { key: 'a', altKey: true, ctrlKey: true });
+
+      expect(screen.queryByPlaceholderText(/type a command/i)).not.toBeInTheDocument();
     });
   });
 });
