@@ -119,7 +119,26 @@ const COMMAND_MAPPINGS = {
     'en-US': ['say that again', 'repeat that', 'repeat', 'say it again', 'what did you say'],
     'hi-IN': ['फिर से कहो', 'दोहराओ', 'फिर बोलो'],
     'mr-IN': ['पुन्हा सांगा', 'पुन्हा बोला']
+  },
+  // Resets the message panel - doesn't touch any account/application state, just the transcript.
+  'clear chat': {
+    'en-US': ['clear chat', 'clear history', 'clear the conversation', 'start over'],
+    'hi-IN': ['चैट साफ़ करें', 'इतिहास साफ़ करें'],
+    'mr-IN': ['चॅट साफ करा', 'इतिहास साफ करा']
   }
+};
+
+// Yes/no words recognized while a confirmation (currently just "log out") is pending - checked
+// as a substring match like every other command, so "yes please" and "no thanks" both work.
+const AFFIRMATIVE_WORDS = {
+  'en-US': ['yes', 'yeah', 'yep', 'confirm', 'sure', 'go ahead'],
+  'hi-IN': ['हाँ', 'जी हाँ', 'ठीक है'],
+  'mr-IN': ['हो', 'होय', 'ठीक आहे'],
+};
+const NEGATIVE_WORDS = {
+  'en-US': ['no', 'nope', 'cancel', "don't", 'never mind'],
+  'hi-IN': ['नहीं', 'रद्द करें'],
+  'mr-IN': ['नको', 'रद्द करा'],
 };
 
 // Complete command list for help popup with click handlers - UPDATED with all commands
@@ -131,7 +150,8 @@ const ALL_COMMANDS = {
       { text: '• "search jobs" - Search for jobs', action: 'search jobs' },
       { text: '• "find software developer jobs" - Search by job title', action: 'search_by_title' },
       { text: '• "looking for data scientist" - Find specific roles', action: 'search_by_title' },
-      { text: '• "devops engineer positions" - Any job title works!', action: 'search_by_title' }
+      { text: '• "devops engineer positions" - Any job title works!', action: 'search_by_title' },
+      { text: '• "how many jobs are there" - Hear the total job count', action: 'job_count' }
     ]},
     { category: '📋 Applications', commands: [
       { text: '• "my applications" - Check your application status', action: 'my applications' },
@@ -165,7 +185,8 @@ const ALL_COMMANDS = {
       { text: '• "search jobs" - नौकरियां खोजें', action: 'search jobs' },
       { text: '• "सॉफ्टवेयर डेवलपर नौकरी" - शीर्षक से खोजें', action: 'search_by_title' },
       { text: '• "डाटा साइंटिस्ट के लिए" - विशिष्ट भूमिकाएं खोजें', action: 'search_by_title' },
-      { text: '• "डेवॉप्स इंजीनियर पद" - कोई भी शीर्षक काम करता है', action: 'search_by_title' }
+      { text: '• "डेवॉप्स इंजीनियर पद" - कोई भी शीर्षक काम करता है', action: 'search_by_title' },
+      { text: '• "how many jobs are there" - कुल नौकरियों की संख्या सुनें', action: 'job_count' }
     ]},
     { category: '📋 आवेदन', commands: [
       { text: '• "मेरे आवेदन" - आपके आवेदन की स्थिति जांचें', action: 'my applications' },
@@ -199,7 +220,8 @@ const ALL_COMMANDS = {
       { text: '• "search jobs" - नोकऱ्या शोधा', action: 'search jobs' },
       { text: '• "सॉफ्टवेअर डेव्हलपर नोकरी" - शीर्षकाने शोधा', action: 'search_by_title' },
       { text: '• "डेटा सायंटिस्ट साठी" - विशिष्ट भूमिका शोधा', action: 'search_by_title' },
-      { text: '• "डेव्हॉप्स इंजिनियर पद" - कोणतेही शीर्षक कार्य करते', action: 'search_by_title' }
+      { text: '• "डेव्हॉप्स इंजिनियर पद" - कोणतेही शीर्षक कार्य करते', action: 'search_by_title' },
+      { text: '• "how many jobs are there" - एकूण नोकऱ्यांची संख्या ऐका', action: 'job_count' }
     ]},
     { category: '📋 अर्ज', commands: [
       { text: '• "माझे अर्ज" - तुमच्या अर्जांची स्थिती तपासा', action: 'my applications' },
@@ -237,18 +259,21 @@ const RECRUITER_COMMANDS = {
     { text: '• "discover candidates" - Browse open-to-work candidates', action: 'discover candidates' },
     { text: '• "view applications" - See applicants on your jobs', action: 'my applications' },
     { text: '• "show analytics" - Open your hiring analytics', action: 'view analytics' },
+    { text: '• "how many jobs are there" - Hear the total job count', action: 'job_count' },
   ]},
   'hi-IN': { key: 'recruiter', category: '🧑‍💼 रिक्रूटर टूल्स', commands: [
     { text: '• "post a job" - नौकरी बनाने के लिए जॉब्स टैब खोलें', action: 'post job' },
     { text: '• "discover candidates" - उम्मीदवार खोजें', action: 'discover candidates' },
     { text: '• "view applications" - अपनी नौकरियों के आवेदक देखें', action: 'my applications' },
     { text: '• "show analytics" - अपनी हायरिंग एनालिटिक्स खोलें', action: 'view analytics' },
+    { text: '• "how many jobs are there" - कुल नौकरियों की संख्या सुनें', action: 'job_count' },
   ]},
   'mr-IN': { key: 'recruiter', category: '🧑‍💼 रिक्रूटर टूल्स', commands: [
     { text: '• "post a job" - नोकरी तयार करण्यासाठी जॉब्स टॅब उघडा', action: 'post job' },
     { text: '• "discover candidates" - उमेदवार शोधा', action: 'discover candidates' },
     { text: '• "view applications" - तुमच्या नोकऱ्यांचे अर्जदार पहा', action: 'my applications' },
     { text: '• "show analytics" - तुमची हायरिंग अॅनालिटिक्स उघडा', action: 'view analytics' },
+    { text: '• "how many jobs are there" - एकूण नोकऱ्यांची संख्या ऐका', action: 'job_count' },
   ]},
 };
 
@@ -259,6 +284,8 @@ const ADMIN_COMMANDS = {
     { text: '• "show analytics" - Open platform-wide analytics', action: 'view analytics' },
     { text: '• "approve job 1" - Approve a pending job straight from the queue', action: 'approve_job' },
     { text: '• "reject job 1 because spam" - Reject one with a reason', action: 'reject_job' },
+    { text: '• "how many pending jobs" - Hear the queue size without opening it', action: 'pending_job_count' },
+    { text: '• "how many jobs are there" - Hear the total job count', action: 'job_count' },
   ]},
   'hi-IN': { key: 'admin', category: '🛡️ एडमिन टूल्स', commands: [
     { text: '• "pending jobs" - मॉडरेशन क्यू खोलें', action: 'pending moderation' },
@@ -266,6 +293,8 @@ const ADMIN_COMMANDS = {
     { text: '• "show analytics" - प्लेटफ़ॉर्म-व्यापी एनालिटिक्स खोलें', action: 'view analytics' },
     { text: '• "approve job 1" - कतार से किसी नौकरी को स्वीकृत करें', action: 'approve_job' },
     { text: '• "reject job 1 because spam" - कारण के साथ अस्वीकृत करें', action: 'reject_job' },
+    { text: '• "how many pending jobs" - क्यू खोले बिना उसका आकार सुनें', action: 'pending_job_count' },
+    { text: '• "how many jobs are there" - कुल नौकरियों की संख्या सुनें', action: 'job_count' },
   ]},
   'mr-IN': { key: 'admin', category: '🛡️ अॅडमिन टूल्स', commands: [
     { text: '• "pending jobs" - मॉडरेशन क्यू उघडा', action: 'pending moderation' },
@@ -273,6 +302,8 @@ const ADMIN_COMMANDS = {
     { text: '• "show analytics" - प्लॅटफॉर्म-व्यापी अॅनालिटिक्स उघडा', action: 'view analytics' },
     { text: '• "approve job 1" - रांगेतून एक नोकरी मंजूर करा', action: 'approve_job' },
     { text: '• "reject job 1 because spam" - कारणासह नकार द्या', action: 'reject_job' },
+    { text: '• "how many pending jobs" - क्यू न उघडता आकार ऐका', action: 'pending_job_count' },
+    { text: '• "how many jobs are there" - एकूण नोकऱ्यांची संख्या ऐका', action: 'job_count' },
   ]},
 };
 
@@ -280,15 +311,18 @@ const ADMIN_COMMANDS = {
 const ACCOUNT_COMMANDS = {
   'en-US': { key: 'account', category: '👤 Account', commands: [
     { text: '• "my profile" - Open your profile page', action: 'my profile' },
-    { text: '• "log out" - Sign out of your account', action: 'logout' },
+    { text: '• "log out" - Sign out of your account (asks you to confirm)', action: 'logout' },
+    { text: '• "clear chat" - Clear this conversation', action: 'clear chat' },
   ]},
   'hi-IN': { key: 'account', category: '👤 खाता', commands: [
     { text: '• "my profile" - अपनी प्रोफाइल खोलें', action: 'my profile' },
-    { text: '• "log out" - अपने खाते से साइन आउट करें', action: 'logout' },
+    { text: '• "log out" - अपने खाते से साइन आउट करें (पुष्टि माँगेगा)', action: 'logout' },
+    { text: '• "clear chat" - यह बातचीत साफ़ करें', action: 'clear chat' },
   ]},
   'mr-IN': { key: 'account', category: '👤 खाते', commands: [
     { text: '• "my profile" - तुमची प्रोफाइल उघडा', action: 'my profile' },
-    { text: '• "log out" - तुमच्या खात्यातून साइन आउट करा', action: 'logout' },
+    { text: '• "log out" - तुमच्या खात्यातून साइन आउट करा (पुष्टी विचारेल)', action: 'logout' },
+    { text: '• "clear chat" - हे संभाषण साफ करा', action: 'clear chat' },
   ]},
 };
 
@@ -482,6 +516,36 @@ const RESPONSES = {
     'en-US': '"{title}" has been rejected.',
     'hi-IN': '"{title}" अस्वीकृत कर दी गई है।',
     'mr-IN': '"{title}" नकारली गेली आहे.'
+  },
+  'confirm_logout': {
+    'en-US': 'Are you sure you want to log out? Say "yes" to confirm, or "no" to stay signed in.',
+    'hi-IN': 'क्या आप वाकई लॉग आउट करना चाहते हैं? पुष्टि के लिए "हाँ" कहें, या साइन इन रहने के लिए "नहीं" कहें।',
+    'mr-IN': 'तुम्हाला खरोखर लॉग आउट करायचे आहे का? पुष्टीसाठी "हो" म्हणा, किंवा साइन इन राहण्यासाठी "नको" म्हणा.'
+  },
+  'logout_cancelled': {
+    'en-US': "Okay, staying signed in.",
+    'hi-IN': 'ठीक है, साइन इन रह रहे हैं।',
+    'mr-IN': 'ठीक आहे, साइन इन राहत आहे.'
+  },
+  'chat_cleared': {
+    'en-US': 'Cleared. What can I help you with?',
+    'hi-IN': 'साफ़ कर दिया। मैं आपकी कैसे मदद कर सकता हूँ?',
+    'mr-IN': 'साफ केले. मी तुम्हाला कशी मदत करू शकतो?'
+  },
+  'job_count': {
+    'en-US': 'There are {count} jobs posted right now.',
+    'hi-IN': 'अभी {count} नौकरियां पोस्ट की गई हैं।',
+    'mr-IN': 'सध्या {count} नोकऱ्या पोस्ट केलेल्या आहेत.'
+  },
+  'pending_job_count': {
+    'en-US': 'There are {count} jobs waiting in the moderation queue.',
+    'hi-IN': 'मॉडरेशन क्यू में {count} नौकरियां प्रतीक्षा में हैं।',
+    'mr-IN': 'मॉडरेशन क्यूमध्ये {count} नोकऱ्या प्रतीक्षेत आहेत.'
+  },
+  'no_pending_jobs': {
+    'en-US': "Nothing's waiting in the moderation queue right now.",
+    'hi-IN': 'अभी मॉडरेशन क्यू में कुछ भी प्रतीक्षा में नहीं है।',
+    'mr-IN': 'सध्या मॉडरेशन क्यूमध्ये काहीही प्रतीक्षेत नाही.'
   }
 };
 
@@ -520,6 +584,9 @@ const VoiceAssistant = ({ onAuthChange }) => {
   const isRecruiter = userRole === 'ROLE_RECRUITER';
   const isAdmin = userRole === 'ROLE_ADMIN';
   const [textInput, setTextInput] = useState('');
+  // Set while waiting on a yes/no reply to a sensitive action - currently only "log out", which
+  // can otherwise fire from a misheard phrase and silently end the session.
+  const [pendingConfirmation, setPendingConfirmation] = useState(null);
 
   // Load available voices
   useEffect(() => {
@@ -1160,6 +1227,37 @@ const VoiceAssistant = ({ onAuthChange }) => {
     setTimeout(() => navigate('/'), 300);
   };
 
+  // "Log out" doesn't fire immediately from speech - a misheard phrase would otherwise end the
+  // session with no way to undo it. This asks instead, and the next command handled is checked
+  // against AFFIRMATIVE_WORDS/NEGATIVE_WORDS before anything else (see handleVoiceCommand).
+  const requestLogoutConfirmation = () => {
+    setPendingConfirmation({ type: 'logout' });
+    const msg = getResponse('confirm_logout', currentLanguage);
+    addMessage('assistant', msg, currentLanguage);
+    speakResponse(msg, currentLanguage);
+  };
+
+  // Quick info queries that answer in place instead of navigating anywhere.
+  const announceJobCount = () => {
+    const speakCount = (jobs) => {
+      const msg = getResponse('job_count', currentLanguage, { count: jobs.length });
+      addMessage('assistant', msg, currentLanguage);
+      speakResponse(msg, currentLanguage);
+    };
+    if (allJobs.length > 0) {
+      speakCount(allJobs);
+    } else {
+      fetchAllJobs().then(speakCount);
+    }
+  };
+
+  const announcePendingJobCount = () => {
+    const count = pendingJobs.length;
+    const msg = getResponse(count === 0 ? 'no_pending_jobs' : 'pending_job_count', currentLanguage, { count });
+    addMessage('assistant', msg, currentLanguage);
+    speakResponse(msg, currentLanguage);
+  };
+
   // Execute command from click
   const executeCommand = (command) => {
     setShowHelpPopup(false);
@@ -1207,7 +1305,17 @@ const VoiceAssistant = ({ onAuthChange }) => {
         speakResponse(getResponse('opening_profile', currentLanguage), currentLanguage);
         break;
       case 'logout':
-        logOutByVoice();
+        requestLogoutConfirmation();
+        break;
+      case 'job_count':
+        announceJobCount();
+        break;
+      case 'pending_job_count':
+        announcePendingJobCount();
+        break;
+      case 'clear chat':
+        setMessages([{ type: 'assistant', text: getResponse('chat_cleared', currentLanguage), language: currentLanguage }]);
+        speakResponse(getResponse('chat_cleared', currentLanguage), currentLanguage);
         break;
       case 'post job':
         navigate('/recruiter/dashboard', { state: { initialTab: 'jobs' } });
@@ -1274,12 +1382,35 @@ const VoiceAssistant = ({ onAuthChange }) => {
   // Handle voice commands
   const handleVoiceCommand = (command, language) => {
     addMessage('user', command, language);
-    
+
     const detectedCommand = detectCommand(command, language);
     const lowerCommand = command.toLowerCase();
 
+    // A confirmation is pending (currently only "log out") - resolve it here before anything
+    // else runs. Anything that isn't a recognizable yes/no is NOT treated as a stuck state; it
+    // falls through and gets handled as a brand-new command below, so the assistant never just
+    // sits there ignoring you because you moved on to something else.
+    if (pendingConfirmation) {
+      const words = (list) => (list[language] || list['en-US']).some(w => lowerCommand.includes(w));
+      const isYes = words(AFFIRMATIVE_WORDS);
+      const isNo = !isYes && words(NEGATIVE_WORDS);
+      if (isYes || isNo) {
+        const confirmation = pendingConfirmation;
+        setPendingConfirmation(null);
+        if (isYes && confirmation.type === 'logout') {
+          logOutByVoice();
+        } else if (isNo && confirmation.type === 'logout') {
+          const msg = getResponse('logout_cancelled', currentLanguage);
+          addMessage('assistant', msg, currentLanguage);
+          speakResponse(msg, currentLanguage);
+        }
+        return;
+      }
+      setPendingConfirmation(null);
+    }
+
     // Help command
-    if (detectedCommand === 'help' || 
+    if (detectedCommand === 'help' ||
         lowerCommand.includes('help') ||
         lowerCommand.includes('मदद') ||
         lowerCommand.includes('मदत')) {
@@ -1389,6 +1520,30 @@ const VoiceAssistant = ({ onAuthChange }) => {
       }
     }
 
+    // HOW MANY PENDING JOBS (admin only) - checked before the generic job-count query below and
+    // before "pending moderation", since "how many pending jobs" would otherwise also match that
+    // command's "pending jobs" phrase and navigate away instead of just answering.
+    else if (
+      (lowerCommand.includes('how many') || lowerCommand.includes('कितनी') || lowerCommand.includes('किती')) &&
+      (lowerCommand.includes('pending') || lowerCommand.includes('लंबित') || lowerCommand.includes('प्रलंबित'))
+    ) {
+      if (isAdmin) {
+        announcePendingJobCount();
+      } else {
+        addMessage('assistant', getResponse('unknown_command', currentLanguage), currentLanguage);
+        speakResponse(getResponse('unknown_command', currentLanguage), currentLanguage);
+      }
+    }
+
+    // HOW MANY JOBS ARE THERE - a quick count, available to every role, answered in place
+    // instead of navigating anywhere.
+    else if (
+      (lowerCommand.includes('how many') || lowerCommand.includes('कितनी') || lowerCommand.includes('किती')) &&
+      (lowerCommand.includes('job') || lowerCommand.includes('नौकर') || lowerCommand.includes('नोकर'))
+    ) {
+      announceJobCount();
+    }
+
     // SEARCH JOBS BY TITLE - This handles specific job title searches
     else if (
       // Check for search patterns
@@ -1433,7 +1588,7 @@ const VoiceAssistant = ({ onAuthChange }) => {
       speakResponse(getResponse('opening_profile', currentLanguage), currentLanguage);
     }
     else if (detectedCommand === 'logout') {
-      logOutByVoice();
+      requestLogoutConfirmation();
     }
     else if (detectedCommand === 'post job') {
       navigate('/recruiter/dashboard', { state: { initialTab: 'jobs' } });
@@ -1494,6 +1649,14 @@ const VoiceAssistant = ({ onAuthChange }) => {
         addMessage('assistant', msg, currentLanguage);
         speakResponse(msg, currentLanguage);
       }
+    }
+
+    // Clear the transcript - leaves a single fresh message instead of an empty panel, so it's
+    // obvious the command actually did something.
+    else if (detectedCommand === 'clear chat') {
+      const msg = getResponse('chat_cleared', currentLanguage);
+      setMessages([{ type: 'assistant', text: msg, language: currentLanguage }]);
+      speakResponse(msg, currentLanguage);
     }
 
     // Unknown command

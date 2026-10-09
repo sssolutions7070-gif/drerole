@@ -180,7 +180,16 @@ describe('VoiceAssistant', () => {
       expect(await screen.findByText('Opening your profile.')).toBeInTheDocument();
     });
 
-    it('"log out" signs the user out', async () => {
+    it('"log out" asks for confirmation instead of signing out immediately', async () => {
+      const user = await openAssistant();
+
+      await typeCommand(user, 'log out');
+
+      expect(await screen.findByText(/are you sure you want to log out/i)).toBeInTheDocument();
+      expect(authService.logout).not.toHaveBeenCalled();
+    });
+
+    it('confirming with "yes" after "log out" actually signs the user out', async () => {
       const onAuthChange = vi.fn();
       const user = userEvent.setup();
       render(
@@ -193,10 +202,81 @@ describe('VoiceAssistant', () => {
       });
 
       await typeCommand(user, 'log out');
+      await screen.findByText(/are you sure you want to log out/i);
+      await typeCommand(user, 'yes');
 
       expect(await screen.findByText(/logging you out/i)).toBeInTheDocument();
       expect(authService.logout).toHaveBeenCalled();
       await waitFor(() => expect(onAuthChange).toHaveBeenCalledWith(null));
+    });
+
+    it('declining with "no" after "log out" stays signed in', async () => {
+      const user = await openAssistant();
+
+      await typeCommand(user, 'log out');
+      await screen.findByText(/are you sure you want to log out/i);
+      await typeCommand(user, 'no');
+
+      expect(await screen.findByText(/okay, staying signed in/i)).toBeInTheDocument();
+      expect(authService.logout).not.toHaveBeenCalled();
+    });
+
+    it('moving on to an unrelated command after "log out" is treated as a new command, not stuck waiting', async () => {
+      const user = await openAssistant();
+
+      await typeCommand(user, 'log out');
+      await screen.findByText(/are you sure you want to log out/i);
+      await typeCommand(user, 'go to home');
+
+      expect(await screen.findByText('Going to home page.')).toBeInTheDocument();
+      expect(authService.logout).not.toHaveBeenCalled();
+    });
+
+    it('"clear chat" resets the conversation to a single fresh message', async () => {
+      const user = await openAssistant();
+      await typeCommand(user, 'go to home');
+      await screen.findByText('Going to home page.');
+
+      await typeCommand(user, 'clear chat');
+
+      expect(await screen.findByText(/cleared\. what can i help you with/i)).toBeInTheDocument();
+      expect(screen.queryByText('Going to home page.')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('job-count queries', () => {
+    it('"how many jobs are there" announces the total from the already-loaded job list', async () => {
+      api.get.mockImplementation((url) => {
+        if (url === '/jobs') return Promise.resolve({ data: [{ id: 1 }, { id: 2 }, { id: 3 }] });
+        return Promise.resolve({ data: [] });
+      });
+      const user = await openAssistant();
+
+      await typeCommand(user, 'how many jobs are there');
+
+      expect(await screen.findByText(/there are 3 jobs posted right now/i)).toBeInTheDocument();
+    });
+
+    it('"how many pending jobs" is admin-only and reports the queue size without navigating', async () => {
+      setUser({ role: 'ROLE_ADMIN' });
+      api.get.mockImplementation((url) => {
+        if (url === '/admin/jobs/pending') return Promise.resolve({ data: [{ id: 1 }, { id: 2 }] });
+        return Promise.resolve({ data: [] });
+      });
+      const user = await openAssistant();
+
+      await typeCommand(user, 'how many pending jobs are there');
+
+      expect(await screen.findByText(/there are 2 jobs waiting in the moderation queue/i)).toBeInTheDocument();
+    });
+
+    it('a candidate asking "how many pending jobs" gets the unknown-command fallback, not the admin queue size', async () => {
+      setUser({ role: 'ROLE_USER' });
+      const user = await openAssistant();
+
+      await typeCommand(user, 'how many pending jobs are there');
+
+      expect(await screen.findByText(/didn't understand/i)).toBeInTheDocument();
     });
   });
 
