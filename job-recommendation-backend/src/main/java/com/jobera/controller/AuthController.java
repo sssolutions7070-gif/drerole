@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.jobera.entity.User;
 import com.jobera.security.LoginAttemptService;
 import com.jobera.security.PasswordResetRateLimiter;
+import com.jobera.security.RegistrationRateLimiter;
 import com.jobera.security.TwoFactorAttemptService;
 import com.jobera.service.AuthenticationService;
 import com.jobera.service.NotificationService;
@@ -41,6 +42,7 @@ public class AuthController {
     private final LoginAttemptService loginAttemptService;
     private final PasswordResetService passwordResetService;
     private final PasswordResetRateLimiter passwordResetRateLimiter;
+    private final RegistrationRateLimiter registrationRateLimiter;
     private final NotificationService notificationService;
     private final TwoFactorService twoFactorService;
     private final TwoFactorAttemptService twoFactorAttemptService;
@@ -50,6 +52,7 @@ public class AuthController {
                           LoginAttemptService loginAttemptService,
                           PasswordResetService passwordResetService,
                           PasswordResetRateLimiter passwordResetRateLimiter,
+                          RegistrationRateLimiter registrationRateLimiter,
                           NotificationService notificationService,
                           TwoFactorService twoFactorService,
                           TwoFactorAttemptService twoFactorAttemptService,
@@ -58,15 +61,25 @@ public class AuthController {
         this.loginAttemptService = loginAttemptService;
         this.passwordResetService = passwordResetService;
         this.passwordResetRateLimiter = passwordResetRateLimiter;
+        this.registrationRateLimiter = registrationRateLimiter;
         this.notificationService = notificationService;
         this.twoFactorService = twoFactorService;
         this.twoFactorAttemptService = twoFactorAttemptService;
         this.frontendUrl = frontendUrl;
     }
-    
+
     @PostMapping("/register")
     public ResponseEntity<Map<String, Object>> register(@RequestBody Map<String, String> request,
                                                         HttpServletRequest httpRequest) {
+        String address = httpRequest.getRemoteAddr();
+        if (registrationRateLimiter.isBlocked(address)) {
+            long minutes = registrationRateLimiter.retryAfterMinutes(address);
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(minutes * 60))
+                .body(Map.of(ERROR, "Too many registration attempts. Try again in " + minutes + " minute(s)."));
+        }
+        registrationRateLimiter.recordAttempt(address);
+
         try {
             String email = request.get(EMAIL);
             String password = request.get("password");

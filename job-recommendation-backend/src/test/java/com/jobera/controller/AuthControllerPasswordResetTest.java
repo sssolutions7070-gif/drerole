@@ -19,6 +19,7 @@ import org.springframework.http.ResponseEntity;
 
 import com.jobera.security.LoginAttemptService;
 import com.jobera.security.PasswordResetRateLimiter;
+import com.jobera.security.RegistrationRateLimiter;
 import com.jobera.security.TwoFactorAttemptService;
 import com.jobera.service.AuthenticationService;
 import com.jobera.service.NotificationService;
@@ -32,6 +33,7 @@ class AuthControllerPasswordResetTest {
     @Mock LoginAttemptService loginAttemptService;
     @Mock PasswordResetService passwordResetService;
     @Mock PasswordResetRateLimiter passwordResetRateLimiter;
+    @Mock RegistrationRateLimiter registrationRateLimiter;
     @Mock NotificationService notificationService;
     @Mock TwoFactorService twoFactorService;
     @Mock TwoFactorAttemptService twoFactorAttemptService;
@@ -41,8 +43,8 @@ class AuthControllerPasswordResetTest {
     @BeforeEach
     void setUp() {
         controller = new AuthController(authenticationService, loginAttemptService, passwordResetService,
-            passwordResetRateLimiter, notificationService, twoFactorService, twoFactorAttemptService,
-            "http://localhost:3000");
+            passwordResetRateLimiter, registrationRateLimiter, notificationService, twoFactorService,
+            twoFactorAttemptService, "http://localhost:3000");
     }
 
     @Test

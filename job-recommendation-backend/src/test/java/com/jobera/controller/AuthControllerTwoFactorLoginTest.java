@@ -25,6 +25,7 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import com.jobera.entity.User;
 import com.jobera.security.LoginAttemptService;
 import com.jobera.security.PasswordResetRateLimiter;
+import com.jobera.security.RegistrationRateLimiter;
 import com.jobera.security.TwoFactorAttemptService;
 import com.jobera.service.AuthenticationService;
 import com.jobera.service.NotificationService;
@@ -38,6 +39,7 @@ class AuthControllerTwoFactorLoginTest {
     @Mock LoginAttemptService loginAttemptService;
     @Mock PasswordResetService passwordResetService;
     @Mock PasswordResetRateLimiter passwordResetRateLimiter;
+    @Mock RegistrationRateLimiter registrationRateLimiter;
     @Mock NotificationService notificationService;
     @Mock TwoFactorService twoFactorService;
     @Mock TwoFactorAttemptService twoFactorAttemptService;
@@ -47,8 +49,8 @@ class AuthControllerTwoFactorLoginTest {
     @BeforeEach
     void setUp() {
         controller = new AuthController(authenticationService, loginAttemptService, passwordResetService,
-            passwordResetRateLimiter, notificationService, twoFactorService, twoFactorAttemptService,
-            "http://localhost:3000");
+            passwordResetRateLimiter, registrationRateLimiter, notificationService, twoFactorService,
+            twoFactorAttemptService, "http://localhost:3000");
     }
 
     private User userWithTwoFactor(boolean enabled) {
