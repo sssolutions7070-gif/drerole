@@ -114,3 +114,47 @@ describe('AdminDashboard - deep-linking to a tab without a remount', () => {
     expect(await screen.findByText(/Pending Company Reviews \(/i)).toBeInTheDocument();
   });
 });
+
+describe('AdminDashboard - CSV exports', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    api.get.mockImplementation((url) => {
+      if (url === '/admin/dashboard/stats') return Promise.resolve({ data: {} });
+      if (url === '/admin/users') return Promise.resolve({ data: [{ id: 1, fullName: 'Asha Rao', email: 'asha@example.com', roleId: 1, role: 'ROLE_USER', isActive: true }] });
+      if (url === '/admin/jobs') return Promise.resolve({ data: [{ id: 1, title: 'Backend Engineer', company: 'Acme' }] });
+      if (url === '/admin/applications') return Promise.resolve({ data: [] });
+      if (url === '/admin/export/users.csv') return Promise.resolve({ data: 'ID,Full Name\n1,Asha Rao\n' });
+      return Promise.resolve({ data: [] });
+    });
+  });
+
+  const renderOnTab = (tab) => render(
+    <MemoryRouter initialEntries={[{ pathname: '/admin/dashboard', state: { initialTab: tab } }]}>
+      <AdminDashboard />
+    </MemoryRouter>
+  );
+
+  it('downloads a users CSV when "Export CSV" is clicked on the Users tab', async () => {
+    const user = userEvent.setup();
+    renderOnTab('users');
+
+    await screen.findByText(/All Users/i);
+    await user.click(screen.getByRole('button', { name: /export csv/i }));
+
+    await waitFor(() => expect(api.get).toHaveBeenCalledWith('/admin/export/users.csv', { responseType: 'blob' }));
+  });
+
+  it('shows an "Export CSV" button on the Jobs tab', async () => {
+    renderOnTab('jobs');
+
+    await screen.findByText(/All Jobs/i);
+    expect(screen.getByRole('button', { name: /export csv/i })).toBeInTheDocument();
+  });
+
+  it('shows an "Export CSV" button on the Applications tab', async () => {
+    renderOnTab('applications');
+
+    await screen.findByText(/All Applications/i);
+    expect(screen.getByRole('button', { name: /export csv/i })).toBeInTheDocument();
+  });
+});

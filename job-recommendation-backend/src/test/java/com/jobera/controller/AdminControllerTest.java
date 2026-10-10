@@ -1,6 +1,7 @@
 package com.jobera.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
@@ -194,5 +195,69 @@ class AdminControllerTest {
         assertEquals(1, response.getBody().size());
         assertEquals("JOB_DELETED", response.getBody().get(0).get("action"));
         assertEquals("Backend Developer", response.getBody().get(0).get("targetDescription"));
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // CSV exports - a recruiter could already export their own applicants for one job; admins
+    // had no equivalent way to pull users/jobs/applications platform-wide at all.
+    // ---------------------------------------------------------------------------------------
+
+    @Test
+    void exportUsersCsvIncludesEveryUserAsARow() {
+        User u = user(10L, "asha@example.com", 1L);
+        u.setFullName("Asha, Rao"); // deliberately contains a comma to exercise CSV escaping
+        when(userRepository.findAll()).thenReturn(List.of(u));
+
+        ResponseEntity<byte[]> response = controller.exportUsersCsv();
+
+        assertEquals(200, response.getStatusCode().value());
+        String body = new String(response.getBody());
+        assertTrue(body.startsWith("ID,Full Name,Email,Role,Created At,Last Login\n"));
+        assertTrue(body.contains("\"Asha, Rao\""));
+        assertTrue(body.contains("asha@example.com"));
+        assertEquals("text/csv", response.getHeaders().getContentType().toString());
+        assertTrue(response.getHeaders().getFirst("Content-Disposition").contains("users.csv"));
+    }
+
+    @Test
+    void exportJobsCsvIncludesEveryJobAsARow() {
+        JobPosting job = new JobPosting("Backend Engineer", "Acme Corp", "Build APIs");
+        job.setId(3L);
+        job.setLocation("Remote");
+        job.setJobType("Full-time");
+        job.setModerationStatus(JobPosting.MODERATION_APPROVED);
+        job.setIsActive(true);
+        when(jobPostingRepository.findAll()).thenReturn(List.of(job));
+
+        ResponseEntity<byte[]> response = controller.exportJobsCsv();
+
+        assertEquals(200, response.getStatusCode().value());
+        String body = new String(response.getBody());
+        assertTrue(body.contains("Backend Engineer"));
+        assertTrue(body.contains("Acme Corp"));
+        assertTrue(body.contains("Remote"));
+        assertTrue(response.getHeaders().getFirst("Content-Disposition").contains("jobs.csv"));
+    }
+
+    @Test
+    void exportApplicationsCsvIncludesEveryApplicationAsARow() {
+        com.jobera.entity.Application application = new com.jobera.entity.Application();
+        application.setId(42L);
+        application.setApplicantName("Bob Smith");
+        application.setApplicantEmail("bob@example.com");
+        application.setStatus("SHORTLISTED");
+        application.setMatchPercentage(88.0);
+        JobPosting job = new JobPosting("Frontend Engineer", "Beta Inc", "Build UI");
+        application.setJobPosting(job);
+        when(applicationRepository.findAll()).thenReturn(List.of(application));
+
+        ResponseEntity<byte[]> response = controller.exportApplicationsCsv();
+
+        assertEquals(200, response.getStatusCode().value());
+        String body = new String(response.getBody());
+        assertTrue(body.contains("Bob Smith"));
+        assertTrue(body.contains("Frontend Engineer"));
+        assertTrue(body.contains("SHORTLISTED"));
+        assertTrue(response.getHeaders().getFirst("Content-Disposition").contains("applications.csv"));
     }
 }

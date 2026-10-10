@@ -1,12 +1,15 @@
 // File: src/main/java/com/jobera/controller/AdminController.java
 package com.jobera.controller;
 
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -32,6 +35,7 @@ import com.jobera.service.CompanyReviewService;
 import com.jobera.service.InterviewExperienceService;
 import com.jobera.service.JobPostingService;
 import com.jobera.service.NotificationService;
+import com.jobera.util.CsvField;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -491,5 +495,68 @@ public class AdminController {
         } catch (Exception e) {
             return ResponseEntity.status(500).body(List.of());
         }
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // CSV exports - a recruiter could already export their own applicants to CSV for one job;
+    // admins had no equivalent way to pull users/jobs/applications platform-wide for offline
+    // reporting at all.
+    // ---------------------------------------------------------------------------------------
+
+    @GetMapping("/export/users.csv")
+    public ResponseEntity<byte[]> exportUsersCsv() {
+        StringBuilder csv = new StringBuilder("ID,Full Name,Email,Role,Created At,Last Login\n");
+        for (User user : userRepository.findAll()) {
+            csv.append(user.getId()).append(',')
+                .append(CsvField.escape(user.getFullName())).append(',')
+                .append(CsvField.escape(user.getEmail())).append(',')
+                .append(CsvField.escape(user.getRole())).append(',')
+                .append(user.getCreatedAt() != null ? user.getCreatedAt() : "").append(',')
+                .append(user.getLastLogin() != null ? user.getLastLogin() : "").append('\n');
+        }
+        return csvResponse(csv.toString(), "users.csv");
+    }
+
+    @GetMapping("/export/jobs.csv")
+    public ResponseEntity<byte[]> exportJobsCsv() {
+        StringBuilder csv = new StringBuilder("ID,Title,Company,Location,Job Type,Experience Level,Moderation Status,Active,Posted Date\n");
+        for (JobPosting job : jobPostingRepository.findAll()) {
+            csv.append(job.getId()).append(',')
+                .append(CsvField.escape(job.getTitle())).append(',')
+                .append(CsvField.escape(job.getCompany())).append(',')
+                .append(CsvField.escape(job.getLocation())).append(',')
+                .append(CsvField.escape(job.getJobType())).append(',')
+                .append(CsvField.escape(job.getExperienceLevel())).append(',')
+                .append(CsvField.escape(job.getModerationStatus())).append(',')
+                .append(Boolean.TRUE.equals(job.getIsActive())).append(',')
+                .append(job.getPostedDate() != null ? job.getPostedDate() : "").append('\n');
+        }
+        return csvResponse(csv.toString(), "jobs.csv");
+    }
+
+    @GetMapping("/export/applications.csv")
+    public ResponseEntity<byte[]> exportApplicationsCsv() {
+        StringBuilder csv = new StringBuilder("ID,Applicant Name,Applicant Email,Job Title,Company,Status,Match %,Application Date\n");
+        for (Application application : applicationRepository.findAll()) {
+            String name = application.getUser() != null ? application.getUser().getFullName() : application.getApplicantName();
+            String email = application.getUser() != null ? application.getUser().getEmail() : application.getApplicantEmail();
+            JobPosting job = application.getJobPosting();
+            csv.append(application.getId()).append(',')
+                .append(CsvField.escape(name)).append(',')
+                .append(CsvField.escape(email)).append(',')
+                .append(CsvField.escape(job != null ? job.getTitle() : "")).append(',')
+                .append(CsvField.escape(job != null ? job.getCompany() : "")).append(',')
+                .append(CsvField.escape(application.getStatus())).append(',')
+                .append(application.getMatchPercentage() != null ? application.getMatchPercentage() : 0).append(',')
+                .append(application.getApplicationDate() != null ? application.getApplicationDate() : "").append('\n');
+        }
+        return csvResponse(csv.toString(), "applications.csv");
+    }
+
+    private ResponseEntity<byte[]> csvResponse(String csv, String filename) {
+        return ResponseEntity.ok()
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+            .contentType(MediaType.parseMediaType("text/csv"))
+            .body(csv.getBytes(StandardCharsets.UTF_8));
     }
 }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Users, Building, Briefcase, FileText, Trash2, ToggleLeft, ToggleRight, BarChart3, ScrollText, Clock, CheckCircle, XCircle, Star, MessageSquare, TrendingUp, BadgeCheck } from 'lucide-react';
+import { Users, Building, Briefcase, FileText, Trash2, ToggleLeft, ToggleRight, BarChart3, ScrollText, Clock, CheckCircle, XCircle, Star, MessageSquare, TrendingUp, BadgeCheck, Download } from 'lucide-react';
 import api from '../services/api';
 import PlatformAnalyticsPanel from '../components/PlatformAnalyticsPanel';
 import PendingVerificationsPanel from '../components/PendingVerificationsPanel';
@@ -11,6 +11,7 @@ const AdminDashboard = () => {
   const location = useLocation();
   const [stats, setStats] = useState({});
   const [activeTab, setActiveTab] = useState(location.state?.initialTab || 'dashboard');
+  const [exportingCsv, setExportingCsv] = useState(null);
   const [users, setUsers] = useState([]);
   const [recruiters, setRecruiters] = useState([]);
   const [jobs, setJobs] = useState([]);
@@ -206,6 +207,27 @@ const AdminDashboard = () => {
       alert('User deleted successfully!');
     } catch (error) {
       alert('Failed to delete user: ' + (error.response?.data?.error || error.message));
+    }
+  };
+
+  // Platform-wide CSV exports - a recruiter could already export their own applicants for one
+  // job; admins had no equivalent way to pull users/jobs/applications for offline reporting.
+  const handleExportCsv = async (resource) => {
+    setExportingCsv(resource);
+    try {
+      const response = await api.get(`/admin/export/${resource}.csv`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'text/csv' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${resource}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      alert(`Failed to export ${resource}: ` + (error.response?.data?.error || error.message));
+    } finally {
+      setExportingCsv(null);
     }
   };
 
@@ -443,8 +465,16 @@ const AdminDashboard = () => {
       {/* Users Tab */}
       {activeTab === 'users' && (
         <div className="bg-white rounded-lg shadow-lg border border-gray-200">
-          <div className="px-6 py-4 border-b border-gray-200">
+          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
             <h3 className="text-lg font-semibold text-gray-800">All Users ({users.length})</h3>
+            <button
+              onClick={() => handleExportCsv('users')}
+              disabled={exportingCsv === 'users'}
+              className="flex items-center text-sm text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50"
+            >
+              <Download className="h-4 w-4 mr-1" />
+              {exportingCsv === 'users' ? 'Exporting...' : 'Export CSV'}
+            </button>
           </div>
           <div className="overflow-x-auto">
             {users.length === 0 ? (
@@ -619,8 +649,16 @@ const AdminDashboard = () => {
       {/* Jobs Tab */}
       {activeTab === 'jobs' && (
         <div className="bg-white rounded-lg shadow-lg border border-gray-200">
-          <div className="px-6 py-4 border-b border-gray-200">
+          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
             <h3 className="text-lg font-semibold text-gray-800">All Jobs ({jobs.length})</h3>
+            <button
+              onClick={() => handleExportCsv('jobs')}
+              disabled={exportingCsv === 'jobs'}
+              className="flex items-center text-sm text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50"
+            >
+              <Download className="h-4 w-4 mr-1" />
+              {exportingCsv === 'jobs' ? 'Exporting...' : 'Export CSV'}
+            </button>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
@@ -958,8 +996,16 @@ const AdminDashboard = () => {
       {/* Applications Tab */}
       {activeTab === 'applications' && (
         <div className="bg-white rounded-lg shadow-lg border border-gray-200">
-          <div className="px-6 py-4 border-b border-gray-200">
+          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
             <h3 className="text-lg font-semibold text-gray-800">All Applications ({applications.length})</h3>
+            <button
+              onClick={() => handleExportCsv('applications')}
+              disabled={exportingCsv === 'applications'}
+              className="flex items-center text-sm text-blue-600 hover:text-blue-800 font-medium disabled:opacity-50"
+            >
+              <Download className="h-4 w-4 mr-1" />
+              {exportingCsv === 'applications' ? 'Exporting...' : 'Export CSV'}
+            </button>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
