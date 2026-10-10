@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Upload, FileText, CheckCircle, Loader, Plus, X as XIcon } from 'lucide-react';
+import { X, Upload, FileText, CheckCircle, Loader, Plus, X as XIcon, Sparkles } from 'lucide-react';
 import api from '../services/api';
 
 const JobApplicationModal = ({ job, onClose, onSuccess, source = 'DIRECT' }) => {
@@ -19,6 +19,7 @@ const JobApplicationModal = ({ job, onClose, onSuccess, source = 'DIRECT' }) => 
   const [fetchAttempted, setFetchAttempted] = useState(false);
   const [uploadedResumeId, setUploadedResumeId] = useState(null);
   const [uploadedResumePath, setUploadedResumePath] = useState('');
+  const [generatingCoverLetter, setGeneratingCoverLetter] = useState(false);
 
   const currentUser = JSON.parse(localStorage.getItem('user'));
 
@@ -112,6 +113,28 @@ const JobApplicationModal = ({ job, onClose, onSuccess, source = 'DIRECT' }) => 
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  // AI-drafted cover letter tailored to this specific job, using the skills already pulled from
+  // the candidate's resume above - works even without a real AI key configured (falls back to a
+  // templated letter server-side rather than failing).
+  const handleGenerateCoverLetter = async () => {
+    setGeneratingCoverLetter(true);
+    setError('');
+    try {
+      const response = await api.post('/resume-matching/generate-cover-letter', {
+        candidateName: currentUser?.fullName || '',
+        jobTitle: job?.title || '',
+        company: job?.company || '',
+        jobDescription: job?.description || '',
+        userSkills: formData.skills || [],
+      });
+      setFormData((prev) => ({ ...prev, coverLetter: response.data.coverLetter }));
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to generate a cover letter. Please try again.');
+    } finally {
+      setGeneratingCoverLetter(false);
+    }
   };
 
   const handleAddSkill = () => {
@@ -367,9 +390,20 @@ const JobApplicationModal = ({ job, onClose, onSuccess, source = 'DIRECT' }) => 
 
           {/* Cover Letter */}
           <div>
-            <label htmlFor="coverLetter" className="block text-sm font-medium text-gray-700">
-              Cover Letter *
-            </label>
+            <div className="flex items-center justify-between">
+              <label htmlFor="coverLetter" className="block text-sm font-medium text-gray-700">
+                Cover Letter *
+              </label>
+              <button
+                type="button"
+                onClick={handleGenerateCoverLetter}
+                disabled={generatingCoverLetter}
+                className="text-xs text-purple-600 hover:text-purple-800 font-medium flex items-center gap-1 disabled:opacity-50"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                {generatingCoverLetter ? 'Generating...' : 'Generate with AI'}
+              </button>
+            </div>
             <textarea
               id="coverLetter"
               name="coverLetter"

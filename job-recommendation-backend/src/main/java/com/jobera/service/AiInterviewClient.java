@@ -789,6 +789,63 @@ public class AiInterviewClient {
         return result;
     }
 
+    /** A complete, ready-to-send cover letter tailored to one job, leaning on the candidate's own
+     *  matched skills as strengths - unlike the other generate* methods here, the model is asked
+     *  for plain prose, not JSON, since a cover letter's actual content is the whole point, not
+     *  structured fields describing it. */
+    public Map<String, Object> generateCoverLetter(String candidateName, String jobTitle, String company,
+                                                     String jobDescription, List<String> userSkills) {
+        if (!isConfigured()) {
+            return generateFallbackCoverLetter(candidateName, jobTitle, company, userSkills);
+        }
+
+        String skillsList = (userSkills != null && !userSkills.isEmpty()) ? String.join(", ", userSkills) : "relevant experience";
+        String prompt = "Write a complete, professional cover letter for a job application.\n\n"
+            + "Candidate name: " + (nullToEmpty(candidateName).isEmpty() ? "the candidate" : candidateName) + "\n"
+            + "Job title: " + nullToEmpty(jobTitle) + "\n"
+            + "Company: " + nullToEmpty(company) + "\n"
+            + "Job description: " + nullToEmpty(jobDescription) + "\n"
+            + "Candidate's key skills: " + skillsList + "\n\n"
+            + "Write 3-4 concise paragraphs: an opening expressing genuine interest in this specific role, a "
+            + "middle section connecting the candidate's listed skills to the role's actual requirements with "
+            + "specific, confident language (not generic filler), and a closing paragraph inviting next steps. "
+            + "Address it generically (e.g. \"Dear Hiring Manager,\") since there's no named recruiter contact. "
+            + "Respond with ONLY the letter text itself - no JSON, no markdown, no commentary before or after it.";
+
+        try {
+            String letter = callClaude(prompt).trim();
+            if (letter.isEmpty()) {
+                return generateFallbackCoverLetter(candidateName, jobTitle, company, userSkills);
+            }
+            return Map.of("coverLetter", letter);
+        } catch (Exception e) {
+            return generateFallbackCoverLetter(candidateName, jobTitle, company, userSkills);
+        }
+    }
+
+    public Map<String, Object> generateFallbackCoverLetter(String candidateName, String jobTitle, String company,
+                                                             List<String> userSkills) {
+        String name = (candidateName != null && !candidateName.isBlank()) ? candidateName : "I";
+        String title = (jobTitle != null && !jobTitle.isBlank()) ? jobTitle : "this role";
+        String companyPhrase = (company != null && !company.isBlank()) ? " at " + company : "";
+        String skillsPhrase = (userSkills != null && !userSkills.isEmpty())
+            ? String.join(", ", userSkills.subList(0, Math.min(4, userSkills.size())))
+            : "my relevant background";
+
+        String letter = "Dear Hiring Manager,\n\n"
+            + "I am writing to express my interest in the " + title + " position" + companyPhrase + ". "
+            + "Having reviewed the role, I believe my background in " + skillsPhrase + " aligns well with what "
+            + "you're looking for, and I'm excited about the opportunity to contribute to your team.\n\n"
+            + "Throughout my experience, I have developed practical, hands-on expertise that I believe translates "
+            + "directly to the responsibilities of this role. I am a quick learner, collaborate well with others, "
+            + "and take ownership of the work I'm given.\n\n"
+            + "I would welcome the opportunity to discuss how my skills and experience could benefit your team. "
+            + "Thank you for considering my application - I look forward to the possibility of speaking further.\n\n"
+            + "Sincerely,\n" + name;
+
+        return Map.of("coverLetter", letter);
+    }
+
     public Map<String, Object> generateInterviewScorecard(String roundTitle, String roundType,
                                                           String candidateNotes, String codeSnippet) {
         if (!isConfigured()) {

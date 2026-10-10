@@ -294,6 +294,7 @@ public class AccessPolicy {
             c -> participatesInApplication(c, "applicationId"));
         rule("POST", "/api/resume-matching/tailor-resume", authenticated);
         rule("POST", "/api/resume-matching/career-roadmap", authenticated);
+        rule("POST", "/api/resume-matching/generate-cover-letter", authenticated);
 
         // Own profile
         rule(null, "/api/users/{userId}/**", self("userId"));

@@ -254,4 +254,48 @@ class AiInterviewClientTest {
         assertTrue(result.containsKey("technicalKeywords"));
         assertTrue(result.containsKey("keyTakeaways"));
     }
+
+    @Test
+    void generateCoverLetterReturnsTheModelsPlainTextResponseDirectly() {
+        lenient().when(restTemplate.postForObject(any(String.class), any(), eq(Map.class)))
+            .thenReturn(claudeResponse("Dear Hiring Manager,\n\nI am excited to apply...\n\nSincerely,\nAsha"));
+
+        Map<String, Object> result = configured.generateCoverLetter(
+            "Asha Rao", "Backend Engineer", "Acme Corp", "Build APIs", List.of("Java", "Spring"));
+
+        assertEquals("Dear Hiring Manager,\n\nI am excited to apply...\n\nSincerely,\nAsha", result.get("coverLetter"));
+    }
+
+    @Test
+    void generateCoverLetterFallsBackWhenUnconfigured() {
+        Map<String, Object> result = unconfigured.generateCoverLetter(
+            "Asha Rao", "Backend Engineer", "Acme Corp", "Build APIs", List.of("Java", "Spring"));
+
+        String letter = (String) result.get("coverLetter");
+        assertTrue(letter.contains("Backend Engineer"));
+        assertTrue(letter.contains("Acme Corp"));
+        assertTrue(letter.contains("Java"));
+        assertTrue(letter.contains("Asha Rao"));
+    }
+
+    @Test
+    void generateCoverLetterFallsBackOnANetworkFailure() {
+        lenient().when(restTemplate.postForObject(any(String.class), any(), eq(Map.class)))
+            .thenThrow(new RestClientException("boom"));
+
+        Map<String, Object> result = configured.generateCoverLetter(
+            "Asha Rao", "Backend Engineer", "Acme Corp", "Build APIs", List.of("Java"));
+
+        assertNotNull(result.get("coverLetter"));
+        assertTrue(((String) result.get("coverLetter")).contains("Backend Engineer"));
+    }
+
+    @Test
+    void generateFallbackCoverLetterHandlesMissingDetailsGracefully() {
+        Map<String, Object> result = unconfigured.generateCoverLetter(null, null, null, null, null);
+
+        String letter = (String) result.get("coverLetter");
+        assertNotNull(letter);
+        assertTrue(letter.contains("this role"));
+    }
 }

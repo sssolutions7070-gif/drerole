@@ -212,4 +212,40 @@ class ResumeMatchingControllerTest {
 
         assertEquals(404, response.getStatusCode().value());
     }
+
+    @Test
+    void generateCoverLetterCallsTheAiClientWithTheRequestFields() {
+        when(aiInterviewClient.generateCoverLetter("Asha Rao", "Backend Engineer", "Acme Corp", "Build APIs", List.of("Java")))
+            .thenReturn(Map.of("coverLetter", "Dear Hiring Manager,..."));
+
+        Map<String, Object> request = Map.of(
+            "candidateName", "Asha Rao",
+            "jobTitle", "Backend Engineer",
+            "company", "Acme Corp",
+            "jobDescription", "Build APIs",
+            "userSkills", List.of("Java")
+        );
+
+        ResponseEntity<Map<String, Object>> response = controller.generateCoverLetter(request);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals("Dear Hiring Manager,...", response.getBody().get("coverLetter"));
+    }
+
+    @Test
+    void generateCoverLetterHandlesFallbackWhenClientNull() {
+        ResumeMatchingController controllerNoAi = new ResumeMatchingController(jobPostingService, applicationRepository);
+
+        Map<String, Object> request = Map.of(
+            "candidateName", "Asha Rao",
+            "jobTitle", "Backend Engineer",
+            "company", "Acme Corp",
+            "userSkills", List.of("Java")
+        );
+
+        ResponseEntity<Map<String, Object>> response = controllerNoAi.generateCoverLetter(request);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertTrue(((String) response.getBody().get("coverLetter")).contains("Backend Engineer"));
+    }
 }

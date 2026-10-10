@@ -179,6 +179,28 @@ public class ResumeMatchingController {
         }
     }
 
+    @PostMapping("/generate-cover-letter")
+    public ResponseEntity<Map<String, Object>> generateCoverLetter(@RequestBody Map<String, Object> request) {
+        try {
+            String candidateName = (String) request.get("candidateName");
+            String jobTitle = (String) request.get("jobTitle");
+            String company = (String) request.get("company");
+            String jobDescription = (String) request.get("jobDescription");
+
+            @SuppressWarnings("unchecked")
+            List<String> userSkills = (List<String>) request.get("userSkills");
+
+            Map<String, Object> result = (aiInterviewClient != null)
+                ? aiInterviewClient.generateCoverLetter(candidateName, jobTitle, company, jobDescription, userSkills)
+                : new AiInterviewClient(new RestTemplate(), "", "").generateFallbackCoverLetter(candidateName, jobTitle, company, userSkills);
+
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            log.error("Error generating cover letter: {}", e.getMessage(), e);
+            return ResponseEntity.badRequest().body(Map.of("error", "Failed to generate a cover letter: " + e.getMessage()));
+        }
+    }
+
     @PostMapping("/career-roadmap")
     public ResponseEntity<Map<String, Object>> getCareerRoadmap(@RequestBody Map<String, Object> request) {
         try {
