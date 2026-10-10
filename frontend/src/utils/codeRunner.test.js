@@ -1,5 +1,32 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { executeCode, CODE_STARTERS } from './codeRunner';
+
+// Python/Java/C++/SQL execute for real against wandbox.org's free compile API rather than being
+// simulated - mocking fetch here keeps these tests fast, offline and deterministic while still
+// proving the request is built correctly and the response is parsed correctly, exactly the way
+// an integration test for a third-party API call should (never depend on a live network call
+// from a unit test). The exact response shape mocked below was verified against the live API.
+const wandboxResponse = (overrides = {}) => ({
+  status: '0',
+  signal: '',
+  compiler_output: '',
+  compiler_error: '',
+  compiler_message: '',
+  program_output: '',
+  program_error: '',
+  program_message: '',
+  permlink: '',
+  url: '',
+  ...overrides,
+});
+
+const mockFetchOnce = (body, ok = true, status = 200) => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+    ok,
+    status,
+    json: () => Promise.resolve(body),
+  }));
+};
 
 describe('codeRunner', () => {
   it('has starter templates for all supported languages', () => {
@@ -60,55 +87,109 @@ describe('codeRunner', () => {
     expect(res.output[0].text).toBe('Async step');
   });
 
-  it('executes simulated Python prints', async () => {
-    const code = `
-print("Hello Python")
-print("Line 2")
-`;
-    const res = await executeCode(code, 'Python');
-    expect(res.success).toBe(true);
-    expect(res.output[0].text).toBe('Hello Python');
-    expect(res.output[1].text).toBe('Line 2');
-  });
+  describe('Python/Java/C++/SQL execute for real via the Wandbox API (fetch mocked)', () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
 
-  it('validates Java main method and prints', async () => {
-    const validJava = `
-public class Main {
-    public static void main(String[] args) {
-        System.out.println("Hello Java");
-    }
-}
-`;
-    const res = await executeCode(validJava, 'Java');
-    expect(res.success).toBe(true);
-    expect(res.output[0].text).toBe('Hello Java');
+    it('runs real Python output back from the response, not a regex guess', async () => {
+      mockFetchOnce(wandboxResponse({ program_output: 'Hello Python\nLine 2\n' }));
 
-    const invalidJava = `public class Main {}`;
-    const resInvalid = await executeCode(invalidJava, 'Java');
-    expect(resInvalid.success).toBe(false);
-    expect(resInvalid.status).toBe('ERROR');
-  });
+      const res = await executeCode('print("Hello Python")\nprint("Line 2")', 'Python');
 
-  it('validates C++ main and cout', async () => {
-    const validCpp = `
-#include <iostream>
-int main() {
-    std::cout << "Hello C++" << std::endl;
-    return 0;
-}
-`;
-    const res = await executeCode(validCpp, 'C++');
-    expect(res.success).toBe(true);
-    expect(res.output[0].text).toBe('Hello C++');
-  });
+      expect(res.success).toBe(true);
+      expect(res.status).toBe('SUCCESS');
+      expect(res.output.some(o => o.type === 'stdout' && o.text === 'Hello Python\nLine 2')).toBe(true);
+      expect(fetch).toHaveBeenCalledWith('https://wandbox.org/api/compile.json', expect.objectContaining({
+        method: 'POST',
+      }));
+      const sentBody = JSON.parse(fetch.mock.calls[0][1].body);
+      expect(sentBody.compiler).toBe('cpython-3.12.7');
+    });
 
-  it('executes SQL queries in the sandbox', async () => {
-    const sql = `
-CREATE TABLE users (id INT, name VARCHAR(50));
-SELECT * FROM users;
-`;
-    const res = await executeCode(sql, 'SQL');
-    expect(res.success).toBe(true);
-    expect(res.output.some(o => o.text.includes('users'))).toBe(true);
+    it('strips "public" from the top-level Java class before sending, so Wandbox\'s fixed filename doesn\'t reject it', async () => {
+      mockFetchOnce(wandboxResponse({ program_output: 'Hello Java\n' }));
+
+      const res = await executeCode(
+        'public class Main { public static void main(String[] args) { System.out.println("Hello Java"); } }',
+        'Java'
+      );
+
+      expect(res.success).toBe(true);
+      expect(res.output.some(o => o.text === 'Hello Java')).toBe(true);
+      const sentBody = JSON.parse(fetch.mock.calls[0][1].body);
+      expect(sentBody.code).not.toMatch(/\bpublic\s+class\s+Main\b/);
+      expect(sentBody.code).toMatch(/\bclass\s+Main\b/);
+    });
+
+    it('reports a real Java compile error instead of always succeeding', async () => {
+      mockFetchOnce(wandboxResponse({
+        status: '1',
+        compiler_error: 'prog.java:1: error: reached end of file while parsing\n1 error\n',
+      }));
+
+      const res = await executeCode('public class Main {', 'Java');
+
+      expect(res.success).toBe(false);
+      expect(res.status).toBe('COMPILE_ERROR');
+      expect(res.output.some(o => o.type === 'stderr' && o.text.includes('reached end of file'))).toBe(true);
+    });
+
+    it('runs real C++ output back from the response', async () => {
+      mockFetchOnce(wandboxResponse({ program_output: 'Hello C++\n' }));
+
+      const res = await executeCode('#include <iostream>\nint main() { std::cout << "Hello C++"; return 0; }', 'C++');
+
+      expect(res.success).toBe(true);
+      expect(res.output.some(o => o.text === 'Hello C++')).toBe(true);
+      const sentBody = JSON.parse(fetch.mock.calls[0][1].body);
+      expect(sentBody.compiler).toBe('gcc-13.2.0');
+    });
+
+    it('runs real SQL against an actual SQLite engine and returns real rows, not a fixed fixture row', async () => {
+      mockFetchOnce(wandboxResponse({ program_output: '1|Alice\n2|Bob\n' }));
+
+      const res = await executeCode(
+        "CREATE TABLE users (id INT, name TEXT); INSERT INTO users VALUES (1,'Alice'); INSERT INTO users VALUES (2,'Bob'); SELECT * FROM users;",
+        'SQL'
+      );
+
+      expect(res.success).toBe(true);
+      expect(res.output.some(o => o.text === '1|Alice\n2|Bob')).toBe(true);
+      // Never the old hardcoded fixture row that showed up regardless of what was queried.
+      expect(res.output.some(o => o.text.includes('Alice Chen'))).toBe(false);
+    });
+
+    it('reports a runtime error (e.g. a Python traceback) distinctly from a compile error', async () => {
+      mockFetchOnce(wandboxResponse({
+        status: '1',
+        program_error: 'Traceback (most recent call last):\n  File "prog.py", line 1\nZeroDivisionError: division by zero\n',
+      }));
+
+      const res = await executeCode('print(1/0)', 'Python');
+
+      expect(res.success).toBe(false);
+      expect(res.status).toBe('ERROR');
+      expect(res.output.some(o => o.type === 'stderr' && o.text.includes('ZeroDivisionError'))).toBe(true);
+    });
+
+    it('surfaces a clear message when the execution service cannot be reached, instead of silently faking success', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
+
+      const res = await executeCode('print("hi")', 'Python');
+
+      expect(res.success).toBe(false);
+      expect(res.status).toBe('ERROR');
+      expect(res.output[0].text).toContain('Could not reach the code execution service');
+    });
+
+    it('passes custom stdin through to the execution request', async () => {
+      mockFetchOnce(wandboxResponse({ program_output: 'Hello, World\n' }));
+
+      await executeCode('name = input()\nprint("Hello, " + name)', 'Python', 'World');
+
+      const sentBody = JSON.parse(fetch.mock.calls[0][1].body);
+      expect(sentBody.stdin).toBe('World');
+    });
   });
 });

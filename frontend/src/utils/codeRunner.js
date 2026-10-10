@@ -1,7 +1,12 @@
 /**
  * DreamRole In-Interview Live Code Execution Engine.
- * Executes JavaScript client-side with captured stdout/stderr, execution timing,
- * and handles Python, Java, C++, and SQL sandboxed execution.
+ * Executes JavaScript client-side with captured stdout/stderr and execution timing. Python,
+ * Java, C++ and SQL are compiled and run for real too, via Wandbox (wandbox.org) - a free,
+ * keyless, CORS-enabled public compile-and-run API. The code (and any custom stdin) is sent to
+ * that third-party service to actually execute, which is the trade-off for genuine multi-language
+ * execution without running our own sandboxed infrastructure (no Docker/VM sandbox exists in
+ * this project). This previously just pattern-matched the source with regex and faked plausible
+ * output for every language but JavaScript - none of it was real execution.
  */
 
 export const CODE_STARTERS = {
@@ -92,14 +97,12 @@ export async function executeCode(code, language = 'JavaScript', customInput = '
 
   if (language === 'JavaScript') {
     return executeJavaScript(code, customInput, timeoutMs, startTime);
-  } else if (language === 'Python') {
-    return executePythonSimulation(code, customInput, startTime);
-  } else if (language === 'Java') {
-    return executeJavaSimulation(code, customInput, startTime);
-  } else if (language === 'C++') {
-    return executeCppSimulation(code, customInput, startTime);
-  } else if (language === 'SQL') {
-    return executeSqlSimulation(code, customInput, startTime);
+  }
+
+  if (WANDBOX_COMPILERS[language]) {
+    // Compiling and actually running Java/C++/Python/SQL takes real network + compiler time,
+    // well beyond the 3s default meant for catching JavaScript infinite loops - give it room.
+    return executeViaWandbox(language, code, customInput, startTime, options.timeoutMs || 20000);
   }
 
   return {
@@ -238,180 +241,82 @@ function formatLogArgument(arg) {
   return String(arg);
 }
 
-/**
- * Sandboxed interpreter/simulator for Python code in technical interviews.
- */
-function executePythonSimulation(code, customInput, startTime) {
-  const logs = [];
-  const lines = code.split('\n');
+// Wandbox's compile API (https://wandbox.org/api/compile.json) - free, no API key, CORS-enabled
+// (Access-Control-Allow-Origin: *, verified live). Each of these actually compiles and runs the
+// submitted source on Wandbox's own infrastructure; none of this is simulated.
+const WANDBOX_API = 'https://wandbox.org/api/compile.json';
+const WANDBOX_COMPILERS = {
+  Python: 'cpython-3.12.7',
+  Java: 'openjdk-jdk-21+35',
+  'C++': 'gcc-13.2.0',
+  SQL: 'sqlite-3.46.1',
+};
+
+// Wandbox always compiles the primary submission under a fixed filename (javac sees "prog.java"
+// regardless of what's inside it - confirmed against the live API). javac only enforces
+// "public class Foo must live in Foo.java" for a *public* top-level class, so stripping that one
+// modifier avoids the mismatch without needing a real Java parser - a non-public top-level class
+// behaves identically otherwise, including still being runnable via `public static void main`.
+function stripPublicFromTopLevelClass(code) {
+  return code.replace(/\bpublic\s+(class\s+[A-Za-z_$][A-Za-z0-9_$]*)/, '$1');
+}
+
+async function executeViaWandbox(language, code, customInput, startTime, timeoutMs) {
+  const compiler = WANDBOX_COMPILERS[language];
+  const source = language === 'Java' ? stripPublicFromTopLevelClass(code) : code;
+  const elapsed = () => Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - startTime);
+
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
 
   try {
-    for (let rawLine of lines) {
-      const line = rawLine.trim();
-      if (!line || line.startsWith('#')) continue;
+    const response = await fetch(WANDBOX_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: source, compiler, stdin: customInput || '', save: false }),
+      signal: controller?.signal,
+    });
+    if (timer) clearTimeout(timer);
 
-      // Extract print statements
-      const printMatch = line.match(/^print\s*\((.*)\)\s*$/);
-      if (printMatch) {
-        let content = printMatch[1].trim();
-        // Handle basic strings and variables
-        if ((content.startsWith('"') && content.endsWith('"')) || (content.startsWith("'") && content.endsWith("'"))) {
-          logs.push({ type: 'stdout', text: content.slice(1, -1) });
-        } else if (content.startsWith('f"') || content.startsWith("f'")) {
-          let inner = content.slice(2, -1);
-          inner = inner.replace(/\{([^}]+)\}/g, (match, expr) => {
-            if (expr.includes('data') || expr.includes('input')) {
-              return customInput || 'Test Case';
-            }
-            return '[Computed Value]';
-          });
-          logs.push({ type: 'stdout', text: inner });
-        } else if (content.includes('solution(')) {
-          logs.push({ type: 'stdout', text: `Result computed successfully` });
-        } else {
-          logs.push({ type: 'stdout', text: content });
-        }
-      }
+    if (!response.ok) {
+      throw new Error(`execution service responded with HTTP ${response.status}`);
     }
 
-    if (logs.length === 0) {
-      logs.push({ type: 'stdout', text: 'Program executed successfully (0 return code).' });
-      if (customInput) {
-        logs.push({ type: 'system', text: `Standard input consumed: "${customInput}"` });
-      }
+    const result = await response.json();
+    const output = [
+      { type: 'system', text: `Compiled & executed via a sandboxed third-party runtime (wandbox.org, ${compiler}).` }
+    ];
+    if (result.compiler_error) {
+      output.push({ type: 'stderr', text: result.compiler_error.replace(/\n$/, '') });
+    }
+    if (result.program_output) {
+      output.push({ type: 'stdout', text: result.program_output.replace(/\n$/, '') });
+    }
+    if (result.program_error) {
+      output.push({ type: 'stderr', text: result.program_error.replace(/\n$/, '') });
+    }
+    if (result.signal) {
+      output.push({ type: 'stderr', text: `Terminated by signal: ${result.signal}` });
     }
 
-    const durationMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - startTime) + 12;
+    const success = result.status === '0';
     return {
-      success: true,
-      output: logs,
-      durationMs,
-      status: 'SUCCESS'
+      success,
+      output,
+      durationMs: elapsed(),
+      status: success ? 'SUCCESS' : (result.compiler_error ? 'COMPILE_ERROR' : 'ERROR'),
     };
   } catch (err) {
+    if (timer) clearTimeout(timer);
+    const timedOut = err?.name === 'AbortError';
+    const message = timedOut
+      ? `Execution timed out after ${timeoutMs}ms.`
+      : `Could not reach the code execution service: ${err?.message || err}`;
     return {
       success: false,
-      output: [{ type: 'stderr', text: `IndentationError/SyntaxError: ${err.message}` }],
-      durationMs: 5,
-      status: 'ERROR'
+      output: [{ type: 'stderr', text: message }],
+      durationMs: elapsed(),
+      status: timedOut ? 'TIMEOUT' : 'ERROR',
     };
   }
-}
-
-/**
- * Sandboxed simulator for Java code in interviews.
- */
-function executeJavaSimulation(code, customInput, startTime) {
-  const logs = [];
-  if (!code.includes('class') || !code.includes('main')) {
-    return {
-      success: false,
-      output: [{ type: 'stderr', text: 'Error: Main method not found in class. Please define public static void main(String[] args).' }],
-      durationMs: 8,
-      status: 'ERROR'
-    };
-  }
-
-  const lines = code.split('\n');
-  for (let line of lines) {
-    const trimmed = line.trim();
-    const printMatch = trimmed.match(/System\.out\.println\s*\((.*)\);/);
-    if (printMatch) {
-      let content = printMatch[1].trim();
-      if ((content.startsWith('"') && content.endsWith('"')) || (content.startsWith("'") && content.endsWith("'"))) {
-        logs.push({ type: 'stdout', text: content.slice(1, -1) });
-      } else {
-        logs.push({ type: 'stdout', text: content.replace(/"/g, '').replace(/\s*\+\s*/g, ' ') });
-      }
-    }
-  }
-
-  if (logs.length === 0) {
-    logs.push({ type: 'stdout', text: 'Compiled and executed successfully with exit code 0.' });
-  }
-
-  const durationMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - startTime) + 18;
-  return {
-    success: true,
-    output: logs,
-    durationMs,
-    status: 'SUCCESS'
-  };
-}
-
-/**
- * Sandboxed simulator for C++ code in interviews.
- */
-function executeCppSimulation(code, customInput, startTime) {
-  const logs = [];
-  if (!code.includes('main()') && !code.includes('main ()')) {
-    return {
-      success: false,
-      output: [{ type: 'stderr', text: 'g++: error: undefined reference to `main\'' }],
-      durationMs: 10,
-      status: 'ERROR'
-    };
-  }
-
-  const lines = code.split('\n');
-  for (let line of lines) {
-    const trimmed = line.trim();
-    if (trimmed.includes('cout <<')) {
-      const parts = trimmed.split('<<').map(s => s.trim());
-      const texts = [];
-      for (let i = 1; i < parts.length; i++) {
-        const part = parts[i].replace(/;$/, '');
-        if (part === 'endl' || part === 'std::endl') continue;
-        texts.push(part.replace(/^["']|["']$/g, ''));
-      }
-      if (texts.length > 0) {
-        logs.push({ type: 'stdout', text: texts.filter(t => t !== 'endl' && t !== 'std::endl').join(' ') });
-      }
-    }
-  }
-
-  if (logs.length === 0) {
-    logs.push({ type: 'stdout', text: 'C++ binary built and executed cleanly with return code 0.' });
-  }
-
-  const durationMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - startTime) + 15;
-  return {
-    success: true,
-    output: logs,
-    durationMs,
-    status: 'SUCCESS'
-  };
-}
-
-/**
- * Sandboxed simulator for SQL statements in interviews.
- */
-function executeSqlSimulation(code, customInput, startTime) {
-  const logs = [];
-  const statements = code.split(';').map(s => s.trim()).filter(Boolean);
-
-  for (let stmt of statements) {
-    const upper = stmt.toUpperCase();
-    if (upper.startsWith('CREATE TABLE')) {
-      const tableName = stmt.match(/CREATE\s+TABLE\s+([a-zA-Z0-9_]+)/i)?.[1] || 'table';
-      logs.push({ type: 'system', text: `✓ Table "${tableName}" created.` });
-    } else if (upper.startsWith('INSERT INTO')) {
-      logs.push({ type: 'system', text: `✓ 1 row affected.` });
-    } else if (upper.startsWith('SELECT')) {
-      logs.push({ type: 'stdout', text: `| id | name         | role                 | score |` });
-      logs.push({ type: 'stdout', text: `|----|--------------|----------------------|-------|` });
-      logs.push({ type: 'stdout', text: `| 1  | Alice Chen   | Senior Full Stack    | 95    |` });
-      logs.push({ type: 'system', text: `(1 row returned)` });
-    } else {
-      logs.push({ type: 'stdout', text: `Query OK: ${stmt.slice(0, 30)}...` });
-    }
-  }
-
-  const durationMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - startTime) + 8;
-  return {
-    success: true,
-    output: logs,
-    durationMs,
-    status: 'SUCCESS'
-  };
 }

@@ -51,8 +51,11 @@ public final class SkillGapAnalyzer {
             .collect(Collectors.toList());
     }
 
+    /** Parses a {@code matchedSkills}/{@code missingSkills}-shaped JSON array column into a
+     *  plain list, tolerating null/blank/malformed input - exposed publicly so callers that need
+     *  a single application's own skill list (not an aggregate) don't have to duplicate this. */
     @SuppressWarnings("unchecked")
-    private static List<String> parseSkillList(String skillsJson) {
+    public static List<String> parseSkillList(String skillsJson) {
         if (skillsJson == null || skillsJson.isBlank()) {
             return List.of();
         }

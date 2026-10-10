@@ -19,26 +19,39 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
 
 import com.jobera.entity.Application;
+import com.jobera.entity.JobPosting;
+import com.jobera.repository.ApplicationRepository;
 import com.jobera.service.AiInterviewClient;
 import com.jobera.service.JobPostingService;
+import com.jobera.service.SkillGapAnalyzer;
 
 @RestController
 @RequestMapping("/api/resume-matching")
 public class ResumeMatchingController {
     private static final Logger log = LoggerFactory.getLogger(ResumeMatchingController.class);
 
-    
+    // Rough minimum years of experience implied by each canonical experience level (see
+    // JobPosting.canonicalizeExperienceLevel) - there's no numeric "years required" field on a
+    // job posting, so this is the best available real comparison against the applicant's own
+    // recorded years, rather than a fabricated verdict.
+    private static final Map<String, Integer> MIN_YEARS_BY_LEVEL = Map.of(
+        "Entry", 0, "Junior", 1, "Mid-level", 2, "Senior", 5, "Lead", 8, "Principal", 12
+    );
+
     private final JobPostingService jobPostingService;
     private final AiInterviewClient aiInterviewClient;
+    private final ApplicationRepository applicationRepository;
 
     @Autowired
-    public ResumeMatchingController(JobPostingService jobPostingService, AiInterviewClient aiInterviewClient) {
+    public ResumeMatchingController(JobPostingService jobPostingService, AiInterviewClient aiInterviewClient,
+                                     ApplicationRepository applicationRepository) {
         this.jobPostingService = jobPostingService;
         this.aiInterviewClient = aiInterviewClient;
+        this.applicationRepository = applicationRepository;
     }
 
-    public ResumeMatchingController(JobPostingService jobPostingService) {
-        this(jobPostingService, null);
+    public ResumeMatchingController(JobPostingService jobPostingService, ApplicationRepository applicationRepository) {
+        this(jobPostingService, null, applicationRepository);
     }
     
     @GetMapping("/job/{jobId}/applications/sorted")
@@ -81,24 +94,61 @@ public class ResumeMatchingController {
         }
     }
     
+    /** Real resume-match analysis for one application, read from the fields the resume matcher
+     *  already recorded at apply time - this used to return the exact same hardcoded 85.5% /
+     *  Java-Spring-MySQL analysis for every application regardless of what it actually contained. */
     @GetMapping("/application/{applicationId}/resume-analysis")
     public ResponseEntity<Map<String, Object>> getResumeAnalysis(@PathVariable Long applicationId) {
         try {
-            // This would typically fetch from the application entity
-            // For now, return a mock analysis
+            Application application = applicationRepository.findById(applicationId).orElse(null);
+            if (application == null) {
+                return ResponseEntity.notFound().build();
+            }
+
             Map<String, Object> analysis = new HashMap<>();
-            analysis.put("matchPercentage", 85.5);
-            analysis.put("strengths", List.of("Java", "Spring Boot", "MySQL", "REST API"));
-            analysis.put("improvements", List.of("Docker", "Kubernetes", "AWS"));
-            analysis.put("experienceMatch", "Good");
-            analysis.put("educationMatch", "Excellent");
-            
+            analysis.put("matchPercentage", application.getMatchPercentage() != null ? application.getMatchPercentage() : 0.0);
+            analysis.put("strengths", SkillGapAnalyzer.parseSkillList(application.getMatchedSkills()));
+            analysis.put("improvements", SkillGapAnalyzer.parseSkillList(application.getMissingSkills()));
+            analysis.put("experienceMatch", experienceMatch(application));
+            analysis.put("educationMatch", educationMatch(application));
+
             return ResponseEntity.ok(analysis);
-            
+
         } catch (Exception e) {
             return ResponseEntity.badRequest()
                 .body(Map.of("error", "Failed to analyze resume: " + e.getMessage()));
         }
+    }
+
+    /** Compares the applicant's own recorded years of experience against the job's experience
+     *  level - the only real target available, since a job posting has no numeric "years
+     *  required" field. */
+    private String experienceMatch(Application application) {
+        Integer years = application.getApplicantExperience();
+        if (years == null) {
+            return "Not specified";
+        }
+        JobPosting job = application.getJobPosting();
+        String level = job != null ? job.getExperienceLevel() : null;
+        Integer requiredYears = (level != null) ? MIN_YEARS_BY_LEVEL.get(level) : null;
+        if (requiredYears == null) {
+            return years + (years == 1 ? " year of experience" : " years of experience");
+        }
+        if (years >= requiredYears + 2) {
+            return "Exceeds requirement (" + years + "y vs " + requiredYears + "y+ for " + level + ")";
+        }
+        if (years >= requiredYears) {
+            return "Meets requirement (" + years + "y vs " + requiredYears + "y+ for " + level + ")";
+        }
+        return "Below requirement (" + years + "y vs " + requiredYears + "y+ for " + level + ")";
+    }
+
+    /** There's no structured "required education" field on a job posting to compare against, so
+     *  rather than inventing a qualitative verdict against nothing, this reports what the
+     *  applicant actually recorded. */
+    private String educationMatch(Application application) {
+        String education = application.getApplicantEducation();
+        return (education == null || education.isBlank()) ? "Not provided" : education;
     }
 
     @PostMapping("/tailor-resume")
