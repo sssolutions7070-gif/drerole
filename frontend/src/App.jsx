@@ -33,6 +33,7 @@ const RecruiterDashboard = lazy(() => import('./pages/RecruiterDashboard'));
 const OAuthCallback = lazy(() => import('./pages/OAuthCallback'));
 const InterviewRoundRoom = lazy(() => import('./pages/InterviewRoundRoom'));
 const MockInterviewPractice = lazy(() => import('./pages/MockInterviewPractice'));
+const MockInterviewHistory = lazy(() => import('./pages/MockInterviewHistory'));
 const SalaryInsights = lazy(() => import('./pages/SalaryInsights'));
 
 function App() {
@@ -162,6 +163,12 @@ function App() {
             <Route path="/interview-rounds/:roundId" element={
               <ProtectedRoute user={user}>
                 <InterviewRoundRoom />
+              </ProtectedRoute>
+            } />
+
+            <Route path="/mock-interviews/history" element={
+              <ProtectedRoute user={user}>
+                <MockInterviewHistory />
               </ProtectedRoute>
             } />
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import { Sparkles, CheckCircle } from 'lucide-react';
 import { mockInterviewAPI } from '../services/api';
 
@@ -78,9 +78,14 @@ const MockInterviewPractice = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
       <div className="max-w-3xl mx-auto">
-        <div className="flex items-center gap-2 mb-2">
-          <Sparkles className="h-6 w-6 text-purple-600" />
-          <h1 className="text-2xl font-bold text-gray-900">Mock Interview: {jobTitle}</h1>
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-6 w-6 text-purple-600" />
+            <h1 className="text-2xl font-bold text-gray-900">Mock Interview: {jobTitle}</h1>
+          </div>
+          <Link to="/mock-interviews/history" className="text-sm text-purple-600 hover:text-purple-800 font-medium whitespace-nowrap">
+            View practice history →
+          </Link>
         </div>
         <p className="text-gray-500 mb-6">{answeredCount} of {questions.length} questions answered</p>
 

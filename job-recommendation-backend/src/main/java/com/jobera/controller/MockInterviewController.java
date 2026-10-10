@@ -57,6 +57,14 @@ public class MockInterviewController {
         return ResponseEntity.ok(mockInterviewService.listSessions(userId));
     }
 
+    /** Score trend across every past session plus the lowest-scoring answered questions overall -
+     *  previously each session's score/feedback was only ever shown once, right after finishing
+     *  it, with no way to look back across sessions. */
+    @GetMapping("/history")
+    public ResponseEntity<Map<String, Object>> history(@PathVariable Long userId) {
+        return ResponseEntity.ok(mockInterviewService.getPracticeHistory(userId));
+    }
+
     @GetMapping("/{sessionId}")
     public ResponseEntity<?> get(@PathVariable Long userId, @PathVariable Long sessionId) {
         try {

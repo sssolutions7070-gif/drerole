@@ -231,6 +231,10 @@ export const mockInterviewAPI = {
 
   answer: (userId, sessionId, questionId, answer) =>
     api.put(`/users/${userId}/mock-interviews/${sessionId}/questions/${questionId}/answer`, { answer }),
+
+  // Score trend across every past session plus the lowest-scoring answered questions overall.
+  getHistory: (userId) =>
+    api.get(`/users/${userId}/mock-interviews/history`),
 };
 
 // Interview experience reports - what interviewing at a company was actually like

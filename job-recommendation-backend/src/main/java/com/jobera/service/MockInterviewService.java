@@ -1,7 +1,12 @@
 package com.jobera.service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -126,5 +131,90 @@ public class MockInterviewService {
         }
 
         return saved;
+    }
+
+    private static final int QUESTIONS_TO_REVISIT = 5;
+
+    /** Every past session's questions/answers already sit in the database (score, feedback,
+     *  timestamp) but, until now, nothing ever rolled them up - each session was only ever shown
+     *  once, right after finishing it, then effectively lost. This aggregates them into a score
+     *  trend over time and the lowest-scoring answered questions across every session, so a
+     *  candidate can actually see whether they're improving and what to revisit. */
+    public Map<String, Object> getPracticeHistory(Long candidateUserId) {
+        List<MockInterviewSession> sessions = sessionRepository.findByCandidateUserIdOrderByCreatedAtDesc(candidateUserId);
+
+        List<Map<String, Object>> sessionSummaries = new ArrayList<>();
+        List<Map<String, Object>> scoreTrend = new ArrayList<>();
+        List<Map<String, Object>> allAnsweredRows = new ArrayList<>();
+
+        long totalQuestionsAnswered = 0;
+        double sumOfAllScores = 0;
+
+        for (MockInterviewSession session : sessions) {
+            List<MockInterviewQuestion> questions = questionRepository.findBySessionIdOrderByQuestionNumberAsc(session.getId());
+            List<MockInterviewQuestion> answered = questions.stream()
+                .filter(q -> q.getScore() != null)
+                .collect(Collectors.toList());
+
+            Double averageScore = answered.isEmpty() ? null
+                : answered.stream().mapToInt(MockInterviewQuestion::getScore).average().getAsDouble();
+
+            Map<String, Object> summary = new LinkedHashMap<>();
+            summary.put("sessionId", session.getId());
+            summary.put("jobTitle", session.getJobTitle());
+            summary.put("status", session.getStatus());
+            summary.put("createdAt", session.getCreatedAt());
+            summary.put("questionCount", questions.size());
+            summary.put("answeredCount", answered.size());
+            summary.put("averageScore", averageScore == null ? null : round1(averageScore));
+            sessionSummaries.add(summary);
+
+            if (averageScore != null) {
+                Map<String, Object> trendPoint = new LinkedHashMap<>();
+                trendPoint.put("sessionId", session.getId());
+                trendPoint.put("jobTitle", session.getJobTitle());
+                trendPoint.put("createdAt", session.getCreatedAt());
+                trendPoint.put("averageScore", round1(averageScore));
+                scoreTrend.add(trendPoint);
+
+                totalQuestionsAnswered += answered.size();
+                sumOfAllScores += answered.stream().mapToInt(MockInterviewQuestion::getScore).sum();
+            }
+
+            for (MockInterviewQuestion q : answered) {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("sessionId", session.getId());
+                row.put("jobTitle", session.getJobTitle());
+                row.put("questionText", q.getQuestionText());
+                row.put("answerText", q.getAnswerText());
+                row.put("score", q.getScore());
+                row.put("feedback", q.getFeedback());
+                row.put("answeredAt", q.getAnsweredAt());
+                allAnsweredRows.add(row);
+            }
+        }
+
+        // sessionSummaries/sessions are newest-first (matches listSessions); the trend reads
+        // more naturally oldest-to-newest for charting, so reverse just that one.
+        List<Map<String, Object>> chronologicalTrend = new ArrayList<>(scoreTrend);
+        java.util.Collections.reverse(chronologicalTrend);
+
+        List<Map<String, Object>> questionsToRevisit = allAnsweredRows.stream()
+            .sorted(Comparator.comparingInt(row -> (Integer) row.get("score")))
+            .limit(QUESTIONS_TO_REVISIT)
+            .collect(Collectors.toList());
+
+        Map<String, Object> history = new LinkedHashMap<>();
+        history.put("totalSessions", sessions.size());
+        history.put("totalQuestionsAnswered", totalQuestionsAnswered);
+        history.put("overallAverageScore", totalQuestionsAnswered > 0 ? round1(sumOfAllScores / totalQuestionsAnswered) : null);
+        history.put("sessions", sessionSummaries);
+        history.put("scoreTrend", chronologicalTrend);
+        history.put("questionsToRevisit", questionsToRevisit);
+        return history;
+    }
+
+    private static Double round1(double value) {
+        return Math.round(value * 10.0) / 10.0;
     }
 }
