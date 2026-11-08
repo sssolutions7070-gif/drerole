@@ -3,12 +3,25 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Briefcase, Upload, Home, User, LogOut, Building, BarChart3,
-  Calendar, UserCircle, LayoutDashboard, ChevronDown, GraduationCap, DollarSign
+  Calendar, UserCircle, LayoutDashboard, ChevronDown, GraduationCap, DollarSign,
+  Sun, Moon
 } from 'lucide-react';
 import authService from '../services/auth';
 import NotificationBell from './NotificationBell';
+import { useTheme } from '../contexts/ThemeContext';
 
 const isAdmin = (user) => user && user.role === 'ROLE_ADMIN';
+
+const ThemeToggleButton = ({ theme, toggleTheme }) => (
+  <button
+    onClick={toggleTheme}
+    aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+    title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+    className="p-2 rounded-md text-gray-600 hover:text-blue-600 hover:bg-gray-50 transition-colors"
+  >
+    {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+  </button>
+);
 
 const Navbar = ({ onAuthChange }) => {
   const location = useLocation();
@@ -16,6 +29,7 @@ const Navbar = ({ onAuthChange }) => {
   const currentUser = authService.getCurrentUser();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const menuRef = useRef(null);
+  const { theme, toggleTheme } = useTheme();
 
   const handleLogout = () => {
     authService.logout();
@@ -75,9 +89,11 @@ const Navbar = ({ onAuthChange }) => {
             <Briefcase className="h-8 w-8 text-blue-600" />
             <span className="ml-2 text-xl font-bold text-gray-800">DreamRole</span>
           </div>
-          
+
           {currentUser ? (
             <div className="flex items-center space-x-8">
+              <ThemeToggleButton theme={theme} toggleTheme={toggleTheme} />
+
               {/* Navigation Links - Desktop */}
               <div className="hidden md:flex space-x-6">
                 {navItems.map((item) => {
@@ -196,6 +212,8 @@ const Navbar = ({ onAuthChange }) => {
             </div>
           ) : (
             <div className="flex items-center space-x-4">
+              <ThemeToggleButton theme={theme} toggleTheme={toggleTheme} />
+
               <Link
                 to="/jobs"
                 className="px-3 py-2 text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors"

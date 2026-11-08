@@ -1,3 +1,126 @@
 ﻿@tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * Dark mode.
+ *
+ * This app's ~70 pages/components write Tailwind color utilities (bg-white, text-gray-700,
+ * border-gray-300, bg-blue-100, ...) directly in JSX, with no central design-token file and no
+ * existing `dark:` variants anywhere. Retrofitting every one of those call sites with a `dark:`
+ * class would mean touching nearly every file in src/.
+ *
+ * Instead, ThemeProvider (src/contexts/ThemeContext.jsx) toggles a `.dark` class on <html>, and
+ * this block overrides the *existing* light-theme utility classes wherever they're nested under
+ * `.dark`, using plain descendant selectors (two classes = higher specificity than Tailwind's
+ * single-class utilities, so these win regardless of source order, no `!important` needed). The
+ * whole app gets a working dark theme without editing those ~70 files. New code going forward can
+ * still use ordinary `dark:` Tailwind variants (darkMode: 'class' is set in tailwind.config.js) -
+ * both approaches are driven by the same `.dark` class and compose fine.
+ *
+ * Deliberately-dark surfaces that were already using gray-700/800/900 or slate-900 in light mode
+ * (e.g. a footer, a code block) are left alone - they already read as "dark" and inverting them
+ * would break their contrast with the white text they're normally paired with.
+ */
+
+.dark body {
+  background-color: #0f172a;
+  color: #e2e8f0;
+}
+
+.dark input,
+.dark textarea,
+.dark select {
+  background-color: #1e293b;
+  color: #e2e8f0;
+}
+
+/* Neutral surfaces and text */
+.dark .bg-white { background-color: #1e293b; }
+.dark .bg-gray-50 { background-color: #0f172a; }
+.dark .bg-gray-100 { background-color: #1e293b; }
+.dark .bg-gray-200 { background-color: #334155; }
+.dark .bg-gray-300 { background-color: #475569; }
+.dark .bg-slate-50 { background-color: #0f172a; }
+.dark .bg-slate-100 { background-color: #1e293b; }
+
+.dark .hover\:bg-white:hover { background-color: #334155; }
+.dark .hover\:bg-gray-50:hover { background-color: #334155; }
+.dark .hover\:bg-gray-100:hover { background-color: #334155; }
+.dark .hover\:bg-gray-200:hover { background-color: #475569; }
+.dark .hover\:bg-gray-300:hover { background-color: #64748b; }
+.dark .hover\:bg-slate-100:hover { background-color: #334155; }
+
+.dark .text-gray-900 { color: #f1f5f9; }
+.dark .text-gray-800 { color: #e2e8f0; }
+.dark .text-gray-700 { color: #cbd5e1; }
+.dark .text-gray-600 { color: #94a3b8; }
+.dark .text-gray-500 { color: #94a3b8; }
+.dark .text-gray-400 { color: #64748b; }
+.dark .text-slate-900 { color: #f1f5f9; }
+.dark .text-slate-800 { color: #e2e8f0; }
+.dark .text-slate-700 { color: #cbd5e1; }
+.dark .text-slate-600 { color: #94a3b8; }
+.dark .text-slate-500 { color: #94a3b8; }
+
+.dark .hover\:text-gray-600:hover { color: #cbd5e1; }
+.dark .hover\:text-gray-700:hover { color: #cbd5e1; }
+.dark .hover\:text-gray-800:hover { color: #f1f5f9; }
+.dark .hover\:text-gray-900:hover { color: #f1f5f9; }
+
+.dark .border-gray-100 { border-color: #1e293b; }
+.dark .border-gray-200 { border-color: #334155; }
+.dark .border-gray-300 { border-color: #475569; }
+.dark .border-gray-400 { border-color: #64748b; }
+.dark .border-slate-100 { border-color: #1e293b; }
+.dark .border-slate-200 { border-color: #334155; }
+.dark .hover\:border-gray-300:hover { border-color: #64748b; }
+.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]) { border-color: #1e293b; }
+.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) { border-color: #334155; }
+
+.dark .placeholder-gray-400::placeholder { color: #64748b; }
+
+/* Light colored badge/alert backgrounds (bg-{color}-50 / -100), each paired with that color's
+ * darker text shade (-700/-800/-900) - flipped to a dark badge (color-900 bg, color-200 text)
+ * rather than left as a near-white box on a dark page. */
+.dark .bg-blue-50, .dark .bg-blue-100 { background-color: #1e3a8a; }
+.dark .text-blue-700, .dark .text-blue-800, .dark .text-blue-900 { color: #bfdbfe; }
+
+.dark .bg-green-50, .dark .bg-green-100 { background-color: #14532d; }
+.dark .text-green-700, .dark .text-green-800, .dark .text-green-900 { color: #bbf7d0; }
+
+.dark .bg-red-50, .dark .bg-red-100 { background-color: #7f1d1d; }
+.dark .text-red-700, .dark .text-red-800, .dark .text-red-900 { color: #fecaca; }
+
+.dark .bg-yellow-50, .dark .bg-yellow-100 { background-color: #713f12; }
+.dark .text-yellow-700, .dark .text-yellow-800, .dark .text-yellow-900 { color: #fef08a; }
+
+.dark .bg-amber-50, .dark .bg-amber-100 { background-color: #78350f; }
+.dark .text-amber-700, .dark .text-amber-800, .dark .text-amber-900 { color: #fde68a; }
+
+.dark .bg-purple-50, .dark .bg-purple-100 { background-color: #581c87; }
+.dark .text-purple-700, .dark .text-purple-800, .dark .text-purple-900 { color: #e9d5ff; }
+
+.dark .bg-indigo-50, .dark .bg-indigo-100 { background-color: #312e81; }
+.dark .text-indigo-700, .dark .text-indigo-800, .dark .text-indigo-900 { color: #c7d2fe; }
+
+.dark .bg-pink-50, .dark .bg-pink-100 { background-color: #831843; }
+.dark .text-pink-700, .dark .text-pink-800, .dark .text-pink-900 { color: #fbcfe8; }
+
+.dark .bg-orange-50, .dark .bg-orange-100 { background-color: #7c2d12; }
+.dark .text-orange-700, .dark .text-orange-800, .dark .text-orange-900 { color: #fed7aa; }
+
+.dark .bg-teal-50, .dark .bg-teal-100 { background-color: #134e4a; }
+.dark .text-teal-700, .dark .text-teal-800, .dark .text-teal-900 { color: #99f6e4; }
+
+.dark .bg-cyan-50, .dark .bg-cyan-100 { background-color: #164e63; }
+.dark .text-cyan-700, .dark .text-cyan-800, .dark .text-cyan-900 { color: #a5f3fc; }
+
+.dark .bg-emerald-50, .dark .bg-emerald-100 { background-color: #064e3b; }
+.dark .text-emerald-700, .dark .text-emerald-800, .dark .text-emerald-900 { color: #a7f3d0; }
+
+.dark .bg-rose-50, .dark .bg-rose-100 { background-color: #881337; }
+.dark .text-rose-700, .dark .text-rose-800, .dark .text-rose-900 { color: #fecdd3; }
+
+.dark .bg-lime-50, .dark .bg-lime-100 { background-color: #365314; }
+.dark .text-lime-700, .dark .text-lime-800, .dark .text-lime-900 { color: #d9f99d; }
