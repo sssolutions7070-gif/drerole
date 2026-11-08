@@ -523,4 +523,11 @@ class JobPostingServiceTest {
         org.mockito.Mockito.verify(jobPostingRepository)
             .findByModerationStatusOrderByPostedDateDesc(JobPosting.MODERATION_PENDING);
     }
+
+    @Test
+    void searchJobsUsesTheRelevanceRankedQueryRatherThanUnorderedMatching() {
+        service.searchJobs("java developer");
+
+        org.mockito.Mockito.verify(jobPostingRepository).searchActiveJobsRanked("java developer");
+    }
 }

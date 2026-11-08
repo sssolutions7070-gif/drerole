@@ -77,7 +77,7 @@ public class JobPostingService {
     }
     
     public List<JobPosting> searchJobs(String keyword) {
-        return jobPostingRepository.searchActiveJobs(keyword);
+        return jobPostingRepository.searchActiveJobsRanked(keyword);
     }
     
     public Optional<JobPosting> getJobPostingById(Long id) {

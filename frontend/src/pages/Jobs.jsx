@@ -15,6 +15,8 @@ const Jobs = () => {
   const [filteredJobs, setFilteredJobs] = useState([]);
   const [recommendedJobs, setRecommendedJobs] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
   const [selectedJob, setSelectedJob] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -134,20 +136,19 @@ const Jobs = () => {
   };
 
   useEffect(() => {
-    let filtered = showRecommended && recommendedJobs.length > 0 ? recommendedJobs : jobs;
+    const isSearchActive = searchTerm.trim().length > 0;
+    // While searching, the base list is the backend's relevance-ranked match on title/company/
+    // description (see JobPostingRepository.searchActiveJobsRanked) rather than a client-side
+    // substring filter over the full job list - it understands things like an exact or
+    // leading-word title match outranking a hit buried in the description.
+    let filtered = isSearchActive
+      ? searchResults
+      : (showRecommended && recommendedJobs.length > 0 ? recommendedJobs : jobs);
 
     if (showSavedOnly) {
       filtered = filtered.filter(job => savedJobIds.has(job.id));
     }
 
-    if (searchTerm) {
-      filtered = filtered.filter(job =>
-        job.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        job.company?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        job.description?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-    
     if (selectedLocation) {
       filtered = filtered.filter(job =>
         job.location?.toLowerCase().includes(selectedLocation.toLowerCase())
@@ -180,10 +181,17 @@ const Jobs = () => {
       }
     }
 
-    filtered = sortJobs(filtered, sortBy);
+    // "Relevance" already means skill-match % elsewhere in this page (see the sort dropdown's
+    // "Sort by Relevance (Match %)" label) - while searching, keep the backend's text-relevance
+    // order instead of overriding it with that unrelated ranking. An explicit Date/Rating choice
+    // still re-sorts search results.
+    if (!(isSearchActive && sortBy === 'relevance')) {
+      filtered = sortJobs(filtered, sortBy);
+    }
     setFilteredJobs(filtered);
-  }, [searchTerm, jobs, recommendedJobs, showRecommended, sortBy, selectedLocation, selectedJobType,
-      selectedExperienceLevel, selectedSalaryCurrency, minSalary, showSavedOnly, savedJobIds]);
+  }, [searchTerm, searchResults, jobs, recommendedJobs, showRecommended, sortBy, selectedLocation,
+      selectedJobType, selectedExperienceLevel, selectedSalaryCurrency, minSalary, showSavedOnly,
+      savedJobIds]);
 
   const parseSkillsFromJson = (skillsJson) => {
     try {
@@ -254,6 +262,44 @@ const Jobs = () => {
     }
   };
 
+  const annotateJobs = (jobsList, skillsList) => jobsList.map(job => {
+    const analysis = analyzeJobMatch(job, skillsList);
+    return {
+      ...job,
+      matchScore: analysis.matchScore,
+      matchedSkills: analysis.matchedSkills,
+      missingSkills: analysis.missingSkills,
+      requiredSkillsParsed: parseSkillsFromJson(job.requiredSkills),
+      preferredSkillsParsed: parseSkillsFromJson(job.preferredSkills)
+    };
+  });
+
+  // Debounced server-side search: keeps the relevance ranking from the backend (title/company
+  // matches ranked above a description-only hit) instead of re-deriving it client-side.
+  useEffect(() => {
+    const keyword = searchTerm.trim();
+    if (!keyword) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    const timeoutId = setTimeout(async () => {
+      try {
+        const response = await api.get('/jobs/search', { params: { keyword } });
+        setSearchResults(annotateJobs(response.data || [], userSkills));
+      } catch (error) {
+        console.error('Error searching jobs:', error);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm, userSkills]);
+
   // FIXED: Only include jobs with matchScore > 0 in recommendations
   const fetchJobs = async () => {
     try {
@@ -277,17 +323,7 @@ const Jobs = () => {
           job.jobType?.toLowerCase() !== 'internship'
         );
         
-        const jobsWithScores = onlyJobs.map(job => {
-          const analysis = analyzeJobMatch(job, latestUserSkills);
-          return {
-            ...job,
-            matchScore: analysis.matchScore,
-            matchedSkills: analysis.matchedSkills,
-            missingSkills: analysis.missingSkills,
-            requiredSkillsParsed: parseSkillsFromJson(job.requiredSkills),
-            preferredSkillsParsed: parseSkillsFromJson(job.preferredSkills)
-          };
-        });
+        const jobsWithScores = annotateJobs(onlyJobs, latestUserSkills);
         
         setJobs(jobsWithScores);
         
@@ -601,6 +637,11 @@ const Jobs = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
+            {isSearching && (
+              <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-gray-400">
+                Searching...
+              </span>
+            )}
           </div>
           
           <div className="flex space-x-3">

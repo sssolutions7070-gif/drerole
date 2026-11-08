@@ -39,12 +39,23 @@ public interface JobPostingRepository extends JpaRepository<JobPosting, Long> {
     List<JobPosting> findByIsActiveTrueAndModerationStatusOrderByFeaturedDescPostedDateDesc(
         @Param("moderationStatus") String moderationStatus);
 
+    // Ranks matches instead of just filtering: an exact title match outranks a title that merely
+    // starts with the keyword, which outranks any other title match, then a company match, then a
+    // description-only match - a title/company hit means much more than the keyword only showing up
+    // somewhere in a long description. Ties fall back to featured, then newest first.
     @Query("SELECT jp FROM JobPosting jp WHERE jp.isActive = true AND jp.moderationStatus = 'APPROVED' AND " +
            "(jp.scheduledFor IS NULL OR jp.scheduledFor <= CURRENT_TIMESTAMP) AND " +
            "(LOWER(jp.title) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
            "LOWER(jp.company) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-           "LOWER(jp.description) LIKE LOWER(CONCAT('%', :keyword, '%')))")
-    List<JobPosting> searchActiveJobs(@Param("keyword") String keyword);
+           "LOWER(jp.description) LIKE LOWER(CONCAT('%', :keyword, '%'))) " +
+           "ORDER BY " +
+           "(CASE WHEN LOWER(jp.title) = LOWER(:keyword) THEN 100 ELSE 0 END) + " +
+           "(CASE WHEN LOWER(jp.title) LIKE LOWER(CONCAT(:keyword, '%')) THEN 50 ELSE 0 END) + " +
+           "(CASE WHEN LOWER(jp.title) LIKE LOWER(CONCAT('%', :keyword, '%')) THEN 20 ELSE 0 END) + " +
+           "(CASE WHEN LOWER(jp.company) LIKE LOWER(CONCAT('%', :keyword, '%')) THEN 10 ELSE 0 END) + " +
+           "(CASE WHEN LOWER(jp.description) LIKE LOWER(CONCAT('%', :keyword, '%')) THEN 1 ELSE 0 END) " +
+           "DESC, jp.featured DESC, jp.postedDate DESC")
+    List<JobPosting> searchActiveJobsRanked(@Param("keyword") String keyword);
 
     List<JobPosting> findByLocationContainingAndIsActiveTrue(String location);
 

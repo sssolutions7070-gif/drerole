@@ -73,15 +73,19 @@ public class JobController {
     }
     
     @GetMapping("/search")
-    public ResponseEntity<List<JobPosting>> searchJobs(@RequestParam String keyword) {
+    public ResponseEntity<List<JobPostingDTO>> searchJobs(@RequestParam String keyword) {
         try {
+            if (keyword == null || keyword.isBlank()) {
+                return ResponseEntity.ok(List.of());
+            }
             List<JobPosting> jobs = jobPostingService.searchJobs(keyword);
-            // Filter out internships
-            List<JobPosting> onlyJobs = jobs.stream()
-                .filter(job -> job.getJobType() != null && 
+            // Filter out internships, same as the main listing endpoint
+            List<JobPostingDTO> jobDTOs = jobs.stream()
+                .filter(job -> job.getJobType() != null &&
                        !"Internship".equalsIgnoreCase(job.getJobType()))
-                .collect(Collectors.toList());
-            return ResponseEntity.ok(onlyJobs);
+                .map(JobPostingDTO::new)
+                .toList();
+            return ResponseEntity.ok(jobDTOs);
         } catch (Exception e) {
             return ResponseEntity.ok(List.of());
         }
