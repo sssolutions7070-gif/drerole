@@ -66,3 +66,93 @@ describe('JobApplicationModal - AI cover letter generation', () => {
     resolveRequest({ data: { coverLetter: 'Letter text' } });
   });
 });
+
+describe('JobApplicationModal - screening questions', () => {
+  const jobWithScreening = {
+    id: 7,
+    title: 'Backend Engineer',
+    company: 'Acme Corp',
+    description: 'Build APIs',
+    screeningQuestions: JSON.stringify([
+      { questionText: 'Authorized to work in India?', expectedAnswer: true, knockout: true },
+    ]),
+  };
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    localStorage.setItem('user', JSON.stringify({ id: 1, fullName: 'Asha Rao' }));
+    api.get.mockImplementation((url) => {
+      if (url.includes('/resumes/user/')) {
+        // educationLevel must exactly match one of the <select>'s listed options - a value that
+        // doesn't (e.g. "Bachelor's" instead of "Bachelor's Degree") makes the DOM silently
+        // reset to the blank option, which then fails the field's `required` HTML5 validation
+        // and blocks submission before React's onSubmit ever runs.
+        return Promise.resolve({ data: { id: 50, filePath: '/r.pdf', skills: '["Java"]', experienceYears: 3, educationLevel: "Bachelor's Degree" } });
+      }
+      return Promise.resolve({ data: {} });
+    });
+  });
+
+  it('renders the job\'s screening questions with Yes/No options', async () => {
+    render(<JobApplicationModal job={jobWithScreening} onClose={() => {}} onSuccess={() => {}} />);
+
+    await waitFor(() => expect(screen.queryByText(/No resume found/i)).not.toBeInTheDocument());
+
+    expect(screen.getByText('Authorized to work in India?')).toBeInTheDocument();
+  });
+
+  it('blocks submission with a clear error until every screening question is answered', async () => {
+    const user = userEvent.setup();
+    render(<JobApplicationModal job={jobWithScreening} onClose={() => {}} onSuccess={() => {}} />);
+    await waitFor(() => expect(screen.queryByText(/No resume found/i)).not.toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: /submit application/i }));
+
+    expect(await screen.findByText(/Please answer: "Authorized to work in India\?"/i)).toBeInTheDocument();
+    expect(api.post).not.toHaveBeenCalledWith(expect.stringContaining('/apply-with-resume/'), expect.anything());
+  });
+
+  it('includes the answered questions in the submitted application', async () => {
+    api.post.mockResolvedValue({ data: { applicationId: 1, autoRejected: false } });
+    const onSuccess = vi.fn();
+    const user = userEvent.setup();
+    render(<JobApplicationModal job={jobWithScreening} onClose={() => {}} onSuccess={onSuccess} />);
+    await waitFor(() => expect(screen.queryByText(/No resume found/i)).not.toBeInTheDocument());
+
+    const yesRadios = screen.getAllByLabelText('Yes');
+    await user.click(yesRadios[yesRadios.length - 1]);
+    await user.click(screen.getByRole('button', { name: /submit application/i }));
+
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith(
+      expect.stringContaining('/apply-with-resume/'),
+      expect.objectContaining({
+        screeningAnswers: [{ questionText: 'Authorized to work in India?', answer: true }],
+      })
+    ));
+    expect(onSuccess).toHaveBeenCalled();
+  });
+
+  it('alerts with the server\'s explanation when the answer auto-rejects the application', async () => {
+    api.post.mockResolvedValue({
+      data: { applicationId: 1, autoRejected: true, message: "Didn't meet a required screening question." },
+    });
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const user = userEvent.setup();
+    render(<JobApplicationModal job={jobWithScreening} onClose={() => {}} onSuccess={() => {}} />);
+    await waitFor(() => expect(screen.queryByText(/No resume found/i)).not.toBeInTheDocument());
+
+    const noRadios = screen.getAllByLabelText('No');
+    await user.click(noRadios[noRadios.length - 1]);
+    await user.click(screen.getByRole('button', { name: /submit application/i }));
+
+    await waitFor(() => expect(alertSpy).toHaveBeenCalledWith("Didn't meet a required screening question."));
+  });
+
+  it('does not show a screening-questions section when the job has none', async () => {
+    render(<JobApplicationModal job={{ id: 7, title: 'Backend Engineer' }} onClose={() => {}} onSuccess={() => {}} />);
+
+    await waitFor(() => expect(screen.queryByText(/No resume found/i)).not.toBeInTheDocument());
+
+    expect(screen.queryByText(/Screening Questions/i)).not.toBeInTheDocument();
+  });
+});

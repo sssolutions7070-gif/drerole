@@ -91,7 +91,14 @@ public class Application {
     
     @Column(name = "missing_skills", columnDefinition = "JSON")
     private String missingSkills;
-    
+
+    // A JSON array of {questionText, answer (boolean)} - what the candidate actually answered to
+    // the job's screeningQuestions at apply time, recorded redundantly (not just an answer keyed
+    // against the job's current questions) so it stays an accurate historical record even if the
+    // recruiter edits or removes those questions later.
+    @Column(name = "screening_answers", columnDefinition = "JSON")
+    private String screeningAnswers;
+
     @Column(name = "resume_file_path")
     private String resumeFilePath;
     
@@ -236,6 +243,8 @@ public class Application {
     
     public String getMissingSkills() { return missingSkills; }
     public void setMissingSkills(String missingSkills) { this.missingSkills = missingSkills; }
+    public String getScreeningAnswers() { return screeningAnswers; }
+    public void setScreeningAnswers(String screeningAnswers) { this.screeningAnswers = screeningAnswers; }
     
     public String getResumeFilePath() { return resumeFilePath; }
     public void setResumeFilePath(String resumeFilePath) { this.resumeFilePath = resumeFilePath; }

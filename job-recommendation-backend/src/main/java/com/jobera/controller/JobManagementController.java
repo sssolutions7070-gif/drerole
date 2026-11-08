@@ -2,6 +2,7 @@ package com.jobera.controller;
 
 import org.slf4j.LoggerFactory;
 import org.slf4j.Logger;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jobera.entity.Application;
 import com.jobera.entity.JobPosting;
 import com.jobera.service.JobPostingService;
@@ -21,13 +22,29 @@ import java.util.Map;
 public class JobManagementController {
     private static final Logger log = LoggerFactory.getLogger(JobManagementController.class);
 
-    
+
     private final JobPostingService jobPostingService;
     private final RecruiterService recruiterService;
-    
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
     public JobManagementController(JobPostingService jobPostingService, RecruiterService recruiterService) {
         this.jobPostingService = jobPostingService;
         this.recruiterService = recruiterService;
+    }
+
+    /** The request body sends screeningQuestions as a real nested JSON array (not a
+     *  pre-stringified string like requiredSkills/preferredSkills) - cleaner for the frontend to
+     *  produce - so this re-serializes it to the JSON-string form JobPosting's column stores. */
+    private String serializeScreeningQuestions(Object raw) {
+        if (raw == null) {
+            return null;
+        }
+        try {
+            return objectMapper.writeValueAsString(raw);
+        } catch (Exception e) {
+            log.error("Failed to serialize screeningQuestions: " + e.getMessage());
+            return null;
+        }
     }
     
     @PostMapping
@@ -49,6 +66,7 @@ public class JobManagementController {
             java.time.LocalDateTime scheduledFor = request.get("scheduledFor") != null && !request.get("scheduledFor").toString().isBlank()
                 ? java.time.LocalDateTime.parse(request.get("scheduledFor").toString())
                 : null;
+            String screeningQuestions = serializeScreeningQuestions(request.get("screeningQuestions"));
 
             log.debug("Recruiter ID: " + recruiterId);
             log.debug("Title: " + title);
@@ -56,7 +74,7 @@ public class JobManagementController {
 
             JobPosting job = jobPostingService.createJobPosting(
                 recruiterId, title, company, description, requiredSkills,
-                preferredSkills, location, salaryRange, jobType, experienceLevel, scheduledFor
+                preferredSkills, location, salaryRange, jobType, experienceLevel, scheduledFor, screeningQuestions
             );
             
             Map<String, Object> response = new HashMap<>();
@@ -89,10 +107,11 @@ public class JobManagementController {
             String jobType = (String) request.get("jobType");
             String experienceLevel = (String) request.get("experienceLevel");
             Boolean isActive = (Boolean) request.get("isActive");
-            
+            String screeningQuestions = serializeScreeningQuestions(request.get("screeningQuestions"));
+
             JobPosting job = jobPostingService.updateJobPosting(
-                jobId, recruiterId, title, description, requiredSkills, 
-                preferredSkills, location, salaryRange, jobType, experienceLevel, isActive
+                jobId, recruiterId, title, description, requiredSkills,
+                preferredSkills, location, salaryRange, jobType, experienceLevel, isActive, screeningQuestions
             );
             
             Map<String, Object> response = new HashMap<>();
@@ -262,6 +281,7 @@ public class JobManagementController {
         response.put("isActive", job.getIsActive());
         response.put("featured", job.getFeatured());
         response.put("scheduledFor", job.getScheduledFor());
+        response.put("screeningQuestions", job.getScreeningQuestions());
         response.put("moderationStatus", job.getModerationStatus());
         response.put("rejectionReason", job.getRejectionReason());
 

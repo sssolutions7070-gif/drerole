@@ -2,6 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { X, Upload, FileText, CheckCircle, Loader, Plus, X as XIcon, Sparkles } from 'lucide-react';
 import api from '../services/api';
 
+/** Parses a job's screeningQuestions (a JSON string from the backend), tolerating null/blank/
+ *  malformed input the same way the backend's own parser does. */
+const parseScreeningQuestions = (raw) => {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
 const JobApplicationModal = ({ job, onClose, onSuccess, source = 'DIRECT' }) => {
   const [formData, setFormData] = useState({
     coverLetter: 'I am very interested in this position and believe my skills are a great match.',
@@ -10,6 +22,8 @@ const JobApplicationModal = ({ job, onClose, onSuccess, source = 'DIRECT' }) => 
     education: ''
   });
   const [newSkill, setNewSkill] = useState('');
+  const screeningQuestions = parseScreeningQuestions(job?.screeningQuestions);
+  const [screeningAnswers, setScreeningAnswers] = useState({});
   const [resumeFile, setResumeFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingResume, setIsLoadingResume] = useState(true);
@@ -247,6 +261,12 @@ const JobApplicationModal = ({ job, onClose, onSuccess, source = 'DIRECT' }) => 
       return;
     }
 
+    const unanswered = screeningQuestions.find((q) => screeningAnswers[q.questionText] === undefined);
+    if (unanswered) {
+      setError(`Please answer: "${unanswered.questionText}"`);
+      return;
+    }
+
     setIsSubmitting(true);
     setError('');
 
@@ -260,13 +280,21 @@ const JobApplicationModal = ({ job, onClose, onSuccess, source = 'DIRECT' }) => 
         resumeId:            uploadedResumeId,
         resumeFilePath:      uploadedResumePath,
         resumeParsedText:    'Resume content',
-        source
+        source,
+        screeningAnswers: screeningQuestions.map((q) => ({
+          questionText: q.questionText,
+          answer: screeningAnswers[q.questionText]
+        }))
       };
 
       const response = await api.post(
         `/jobs/${jobId}/apply-with-resume/${currentUser.id}`,
         applicationData
       );
+
+      if (response.data?.autoRejected) {
+        alert(response.data.message || "Your application didn't meet a required screening question and was not advanced.");
+      }
 
       if (onSuccess) onSuccess();
       onClose();
@@ -468,6 +496,42 @@ const JobApplicationModal = ({ job, onClose, onSuccess, source = 'DIRECT' }) => 
               Add your skills one by one. Click + to add, or press Enter.
             </p>
           </div>
+
+          {/* Screening Questions */}
+          {screeningQuestions.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Screening Questions *
+              </label>
+              <div className="space-y-3">
+                {screeningQuestions.map((q, index) => (
+                  <div key={index} className="border border-gray-200 rounded-md p-3">
+                    <p className="text-sm text-gray-800 mb-2">{q.questionText}</p>
+                    <div className="flex items-center gap-4">
+                      <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                        <input
+                          type="radio"
+                          name={`screening-${index}`}
+                          checked={screeningAnswers[q.questionText] === true}
+                          onChange={() => setScreeningAnswers((prev) => ({ ...prev, [q.questionText]: true }))}
+                        />
+                        Yes
+                      </label>
+                      <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                        <input
+                          type="radio"
+                          name={`screening-${index}`}
+                          checked={screeningAnswers[q.questionText] === false}
+                          onChange={() => setScreeningAnswers((prev) => ({ ...prev, [q.questionText]: false }))}
+                        />
+                        No
+                      </label>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Experience and Education */}
           <div className="grid grid-cols-2 gap-4">

@@ -388,6 +388,134 @@ class JobPostingServiceTest {
             org.mockito.ArgumentMatchers.argThat(a -> Application.SOURCE_DIRECT.equals(a.getSource())));
     }
 
+    // ---------------------------------------------------------------------------------------
+    // Screening knockout questions - a job can carry optional yes/no questions; one marked
+    // "knockout" auto-rejects the application right at submit time if answered the wrong way.
+    // ---------------------------------------------------------------------------------------
+
+    private static final String ONE_KNOCKOUT_QUESTION = """
+        [{"questionText":"Are you authorized to work in India?","expectedAnswer":true,"knockout":true}]
+        """;
+
+    @Test
+    void applyingAutoRejectsWhenAKnockoutQuestionIsAnsweredTheWrongWay() {
+        User user = new User();
+        user.setId(5L);
+        JobPosting job = new JobPosting();
+        job.setId(1L);
+        job.setScreeningQuestions(ONE_KNOCKOUT_QUESTION);
+        when(userRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(jobPostingRepository.findById(1L)).thenReturn(Optional.of(job));
+        when(applicationRepository.save(any(Application.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        String answers = """
+            [{"questionText":"Are you authorized to work in India?","answer":false}]
+            """;
+
+        service.applyForJob(5L, 1L, "cover", "[]", 2, "BS", null, answers);
+
+        org.mockito.Mockito.verify(applicationRepository).save(org.mockito.ArgumentMatchers.argThat(a ->
+            "REJECTED".equals(a.getStatus()) && a.getRecruiterNotes() != null
+                && a.getRecruiterNotes().contains("Are you authorized to work in India?")));
+    }
+
+    @Test
+    void applyingSucceedsWhenTheKnockoutQuestionIsAnsweredTheRightWay() {
+        User user = new User();
+        user.setId(5L);
+        JobPosting job = new JobPosting();
+        job.setId(1L);
+        job.setScreeningQuestions(ONE_KNOCKOUT_QUESTION);
+        when(userRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(jobPostingRepository.findById(1L)).thenReturn(Optional.of(job));
+        when(applicationRepository.save(any(Application.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        String answers = """
+            [{"questionText":"Are you authorized to work in India?","answer":true}]
+            """;
+
+        service.applyForJob(5L, 1L, "cover", "[]", 2, "BS", null, answers);
+
+        org.mockito.Mockito.verify(applicationRepository).save(org.mockito.ArgumentMatchers.argThat(a ->
+            "APPLICATION_SUBMITTED".equals(a.getStatus())));
+    }
+
+    @Test
+    void applyingWithNoAnswerToAKnockoutQuestionIsTreatedAsFailingIt() {
+        User user = new User();
+        user.setId(5L);
+        JobPosting job = new JobPosting();
+        job.setId(1L);
+        job.setScreeningQuestions(ONE_KNOCKOUT_QUESTION);
+        when(userRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(jobPostingRepository.findById(1L)).thenReturn(Optional.of(job));
+        when(applicationRepository.save(any(Application.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.applyForJob(5L, 1L, "cover", "[]", 2, "BS", null, null);
+
+        org.mockito.Mockito.verify(applicationRepository).save(org.mockito.ArgumentMatchers.argThat(a ->
+            "REJECTED".equals(a.getStatus())));
+    }
+
+    @Test
+    void applyingToAJobWithNoScreeningQuestionsNeverAutoRejects() {
+        User user = new User();
+        user.setId(5L);
+        JobPosting job = new JobPosting();
+        job.setId(1L);
+        when(userRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(jobPostingRepository.findById(1L)).thenReturn(Optional.of(job));
+        when(applicationRepository.save(any(Application.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.applyForJob(5L, 1L, "cover", "[]", 2, "BS", null, "garbage, not json");
+
+        org.mockito.Mockito.verify(applicationRepository).save(org.mockito.ArgumentMatchers.argThat(a ->
+            "APPLICATION_SUBMITTED".equals(a.getStatus())));
+    }
+
+    @Test
+    void malformedScreeningQuestionsJsonOnTheJobFailsOpenRatherThanBreakingTheApplication() {
+        User user = new User();
+        user.setId(5L);
+        JobPosting job = new JobPosting();
+        job.setId(1L);
+        job.setScreeningQuestions("not valid json");
+        when(userRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(jobPostingRepository.findById(1L)).thenReturn(Optional.of(job));
+        when(applicationRepository.save(any(Application.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.applyForJob(5L, 1L, "cover", "[]", 2, "BS", null, null);
+
+        org.mockito.Mockito.verify(applicationRepository).save(org.mockito.ArgumentMatchers.argThat(a ->
+            "APPLICATION_SUBMITTED".equals(a.getStatus())));
+    }
+
+    @Test
+    void applyForJobWithResumeAlsoEnforcesKnockoutQuestionsAndStillReturnsTheSavedApplication() {
+        User user = new User();
+        user.setId(5L);
+        JobPosting job = new JobPosting();
+        job.setId(1L);
+        job.setScreeningQuestions(ONE_KNOCKOUT_QUESTION);
+        when(userRepository.findById(5L)).thenReturn(Optional.of(user));
+        when(jobPostingRepository.findById(1L)).thenReturn(Optional.of(job));
+        when(applicationRepository.save(any(Application.class))).thenAnswer(inv -> {
+            Application a = inv.getArgument(0);
+            a.setId(900L);
+            return a;
+        });
+
+        String answers = """
+            [{"questionText":"Are you authorized to work in India?","answer":false}]
+            """;
+
+        Application result = service.applyForJobWithResume(
+            5L, 1L, "cover", "[]", 2, "BS", "resume.pdf", "resume text", null, answers);
+
+        assertEquals("REJECTED", result.getStatus());
+        assertEquals(900L, result.getId());
+    }
+
     @Test
     void pendingQueueAsksTheRepositoryForPendingJobs() {
         service.getPendingJobPostings();

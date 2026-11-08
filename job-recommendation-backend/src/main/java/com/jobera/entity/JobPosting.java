@@ -45,7 +45,14 @@ public class JobPosting {
     
     @Column(columnDefinition = "JSON")
     private String preferredSkills;
-    
+
+    // A JSON array of {questionText, expectedAnswer (boolean), knockout (boolean)} - optional
+    // yes/no questions a candidate must answer when applying. A knockout question whose answer
+    // doesn't match expectedAnswer auto-rejects the application at apply time (see
+    // JobPostingService.checkScreeningKnockout).
+    @Column(columnDefinition = "JSON")
+    private String screeningQuestions;
+
     private String location;
     private String salaryRange;
     private String jobType;
@@ -158,6 +165,8 @@ public class JobPosting {
     public void setRequiredSkills(String requiredSkills) { this.requiredSkills = requiredSkills; }
     public String getPreferredSkills() { return preferredSkills; }
     public void setPreferredSkills(String preferredSkills) { this.preferredSkills = preferredSkills; }
+    public String getScreeningQuestions() { return screeningQuestions; }
+    public void setScreeningQuestions(String screeningQuestions) { this.screeningQuestions = screeningQuestions; }
     public String getLocation() { return location; }
     public void setLocation(String location) { this.location = location; }
     public String getSalaryRange() { return salaryRange; }

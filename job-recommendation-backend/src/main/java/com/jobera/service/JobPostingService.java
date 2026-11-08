@@ -88,12 +88,22 @@ public class JobPostingService {
     public void applyForJob(Long userId, Long jobId, String coverLetter,
                            String applicantSkills, Integer applicantExperience,
                            String applicantEducation) {
-        applyForJob(userId, jobId, coverLetter, applicantSkills, applicantExperience, applicantEducation, null);
+        applyForJob(userId, jobId, coverLetter, applicantSkills, applicantExperience, applicantEducation, null, null);
     }
 
     public void applyForJob(Long userId, Long jobId, String coverLetter,
                            String applicantSkills, Integer applicantExperience,
                            String applicantEducation, String requestedSource) {
+        applyForJob(userId, jobId, coverLetter, applicantSkills, applicantExperience, applicantEducation,
+            requestedSource, null);
+    }
+
+    /** @param screeningAnswers JSON array of {questionText, answer} the candidate gave to the
+     *   job's screeningQuestions, if any - a knockout question answered the "wrong" way
+     *   auto-rejects the application right here instead of landing in the recruiter's queue. */
+    public void applyForJob(Long userId, Long jobId, String coverLetter,
+                           String applicantSkills, Integer applicantExperience,
+                           String applicantEducation, String requestedSource, String screeningAnswers) {
         log.debug("=== JOB POSTING SERVICE - APPLY FOR JOB ===");
         log.debug("User ID: " + userId);
         log.debug("Job ID: " + jobId);
@@ -112,14 +122,20 @@ public class JobPostingService {
             try {
                 log.debug("Creating Application entity...");
                 Application application = new Application(
-                    user.get(), 
-                    job.get(), 
+                    user.get(),
+                    job.get(),
                     coverLetter,
                     applicantSkills,
                     applicantExperience,
                     applicantEducation
                 );
                 application.setSource(resolveApplicationSource(requestedSource, userId));
+                application.setScreeningAnswers(screeningAnswers);
+                String knockoutReason = checkScreeningKnockout(job.get(), screeningAnswers);
+                if (knockoutReason != null) {
+                    application.reject();
+                    application.setRecruiterNotes(knockoutReason);
+                }
 
                 log.debug("Application entity created, saving to database...");
                 Application savedApplication = applicationRepository.save(application);
@@ -128,7 +144,9 @@ public class JobPostingService {
                 log.debug("✅ Applicant Email: " + savedApplication.getApplicantEmail());
                 log.debug("✅ Application Date: " + savedApplication.getApplicationDate());
                 log.debug("✅ Status: " + savedApplication.getStatus());
-                dispatchApplicationSubmitted(savedApplication, job.get());
+                if (knockoutReason == null) {
+                    dispatchApplicationSubmitted(savedApplication, job.get());
+                }
 
             } catch (Exception e) {
                 log.error("❌ Error saving application: " + e.getMessage());
@@ -154,13 +172,25 @@ public class JobPostingService {
                                             String applicantEducation, String resumeFilePath,
                                             String resumeParsedText) {
         return applyForJobWithResume(userId, jobId, coverLetter, applicantSkills, applicantExperience,
-            applicantEducation, resumeFilePath, resumeParsedText, null);
+            applicantEducation, resumeFilePath, resumeParsedText, null, null);
     }
 
     public Application applyForJobWithResume(Long userId, Long jobId, String coverLetter,
                                             String applicantSkills, Integer applicantExperience,
                                             String applicantEducation, String resumeFilePath,
                                             String resumeParsedText, String requestedSource) {
+        return applyForJobWithResume(userId, jobId, coverLetter, applicantSkills, applicantExperience,
+            applicantEducation, resumeFilePath, resumeParsedText, requestedSource, null);
+    }
+
+    /** @param screeningAnswers JSON array of {questionText, answer} the candidate gave to the
+     *   job's screeningQuestions, if any - a knockout question answered the "wrong" way
+     *   auto-rejects the application right here instead of landing in the recruiter's queue. */
+    public Application applyForJobWithResume(Long userId, Long jobId, String coverLetter,
+                                            String applicantSkills, Integer applicantExperience,
+                                            String applicantEducation, String resumeFilePath,
+                                            String resumeParsedText, String requestedSource,
+                                            String screeningAnswers) {
         log.debug("=== JOB POSTING SERVICE - APPLY FOR JOB WITH RESUME ===");
         log.debug("User ID: " + userId);
         log.debug("Job ID: " + jobId);
@@ -188,22 +218,31 @@ public class JobPostingService {
                 // Set resume data
                 application.setResumeFilePath(resumeFilePath);
                 application.setResumeParsedText(resumeParsedText);
-                
+
                 // Calculate match percentage
                 double matchPercentage = calculateResumeMatchPercentage(job.get(), resumeParsedText, applicantSkills);
                 application.setMatchPercentage(matchPercentage);
-                
+
                 // Calculate matched and missing skills
                 Map<String, Object> skillsAnalysis = analyzeSkillsMatch(job.get(), applicantSkills, resumeParsedText);
                 application.setMatchedSkills(objectMapper.writeValueAsString(skillsAnalysis.get("matchedSkills")));
                 application.setMissingSkills(objectMapper.writeValueAsString(skillsAnalysis.get("missingSkills")));
-                
+
+                application.setScreeningAnswers(screeningAnswers);
+                String knockoutReason = checkScreeningKnockout(job.get(), screeningAnswers);
+                if (knockoutReason != null) {
+                    application.reject();
+                    application.setRecruiterNotes(knockoutReason);
+                }
+
                 log.debug("Application entity created, saving to database...");
                 Application savedApplication = applicationRepository.save(application);
                 log.debug("✅ Application saved successfully with ID: " + savedApplication.getId());
                 log.debug("✅ Match Percentage: " + savedApplication.getMatchPercentage() + "%");
                 log.debug("✅ Applicant Name: " + savedApplication.getApplicantName());
-                dispatchApplicationSubmitted(savedApplication, job.get());
+                if (knockoutReason == null) {
+                    dispatchApplicationSubmitted(savedApplication, job.get());
+                }
 
                 return savedApplication;
                 
@@ -217,6 +256,47 @@ public class JobPostingService {
             log.error("❌ " + errorMsg);
             throw new JobApplicationException(errorMsg);
         }
+    }
+
+    /** Checks the candidate's answers against the job's knockout screening questions and returns
+     *  a human-readable rejection reason for the first one they failed, or null if they passed
+     *  every knockout question (non-knockout questions are informational only and never block
+     *  the application). Matches an answer to its question by questionText rather than position,
+     *  so it's resilient to the recruiter having reordered questions between page load and
+     *  submit. Malformed/missing JSON on either side is treated as "nothing to check" rather
+     *  than failing the whole application. */
+    private String checkScreeningKnockout(JobPosting job, String screeningAnswersJson) {
+        if (job.getScreeningQuestions() == null || job.getScreeningQuestions().isBlank()) {
+            return null;
+        }
+        try {
+            List<Map<String, Object>> questions = objectMapper.readValue(job.getScreeningQuestions(),
+                new TypeReference<List<Map<String, Object>>>() {});
+
+            Map<String, Object> answerByQuestionText = new HashMap<>();
+            if (screeningAnswersJson != null && !screeningAnswersJson.isBlank()) {
+                List<Map<String, Object>> answers = objectMapper.readValue(screeningAnswersJson,
+                    new TypeReference<List<Map<String, Object>>>() {});
+                for (Map<String, Object> answer : answers) {
+                    answerByQuestionText.put(String.valueOf(answer.get("questionText")), answer.get("answer"));
+                }
+            }
+
+            for (Map<String, Object> question : questions) {
+                if (!Boolean.TRUE.equals(question.get("knockout"))) {
+                    continue;
+                }
+                String questionText = String.valueOf(question.get("questionText"));
+                Object expectedAnswer = question.get("expectedAnswer");
+                Object givenAnswer = answerByQuestionText.get(questionText);
+                if (!Objects.equals(expectedAnswer, givenAnswer)) {
+                    return "Did not meet a required screening question: \"" + questionText + "\"";
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to evaluate screening questions for job {}: {}", job.getId(), e.getMessage());
+        }
+        return null;
     }
 
     private static final Set<String> VALID_APPLICATION_SOURCES = Set.of(
@@ -467,7 +547,7 @@ public class JobPostingService {
                                       String requiredSkills, String preferredSkills, String location,
                                       String salaryRange, String jobType, String experienceLevel) {
         return createJobPosting(recruiterId, title, company, description, requiredSkills, preferredSkills,
-            location, salaryRange, jobType, experienceLevel, null);
+            location, salaryRange, jobType, experienceLevel, null, null);
     }
 
     /** @param scheduledFor if set, the posting still goes through moderation immediately like any
@@ -477,6 +557,17 @@ public class JobPostingService {
                                       String requiredSkills, String preferredSkills, String location,
                                       String salaryRange, String jobType, String experienceLevel,
                                       LocalDateTime scheduledFor) {
+        return createJobPosting(recruiterId, title, company, description, requiredSkills, preferredSkills,
+            location, salaryRange, jobType, experienceLevel, scheduledFor, null);
+    }
+
+    /** @param screeningQuestions optional JSON array of {questionText, expectedAnswer, knockout} -
+     *   yes/no questions a candidate must answer when applying; a knockout question answered
+     *   the "wrong" way auto-rejects the application (see checkScreeningKnockout). */
+    public JobPosting createJobPosting(Long recruiterId, String title, String company, String description,
+                                      String requiredSkills, String preferredSkills, String location,
+                                      String salaryRange, String jobType, String experienceLevel,
+                                      LocalDateTime scheduledFor, String screeningQuestions) {
         Optional<Recruiter> recruiter = recruiterRepository.findById(recruiterId);
         if (recruiter.isEmpty()) {
             throw new JobPostingException("Recruiter not found with ID: " + recruiterId);
@@ -500,6 +591,7 @@ public class JobPostingService {
         jobPosting.setIsActive(true);
         jobPosting.setModerationStatus(JobPosting.MODERATION_PENDING);
         jobPosting.setScheduledFor(scheduledFor);
+        jobPosting.setScreeningQuestions(screeningQuestions);
 
         return jobPostingRepository.save(jobPosting);
     }
@@ -564,18 +656,26 @@ public class JobPostingService {
     public JobPosting updateJobPosting(Long jobId, Long recruiterId, String title, String description,
                                       String requiredSkills, String preferredSkills, String location,
                                       String salaryRange, String jobType, String experienceLevel, Boolean isActive) {
+        return updateJobPosting(jobId, recruiterId, title, description, requiredSkills, preferredSkills,
+            location, salaryRange, jobType, experienceLevel, isActive, null);
+    }
+
+    public JobPosting updateJobPosting(Long jobId, Long recruiterId, String title, String description,
+                                      String requiredSkills, String preferredSkills, String location,
+                                      String salaryRange, String jobType, String experienceLevel, Boolean isActive,
+                                      String screeningQuestions) {
         Optional<JobPosting> jobOpt = jobPostingRepository.findById(jobId);
         if (jobOpt.isEmpty()) {
             throw new JobPostingException("Job posting not found with ID: " + jobId);
         }
-        
+
         JobPosting jobPosting = jobOpt.get();
-        
+
         // Verify the recruiter owns this job posting
         if (jobPosting.getRecruiter() == null || !jobPosting.getRecruiter().getId().equals(recruiterId)) {
             throw new JobPostingException("You are not authorized to update this job posting");
         }
-        
+
         jobPosting.setTitle(title);
         jobPosting.setDescription(description);
         jobPosting.setRequiredSkills(requiredSkills);
@@ -584,6 +684,9 @@ public class JobPostingService {
         jobPosting.setSalaryRange(salaryRange);
         jobPosting.setJobType(jobType);
         jobPosting.setExperienceLevel(experienceLevel);
+        if (screeningQuestions != null) {
+            jobPosting.setScreeningQuestions(screeningQuestions);
+        }
 
         // A rejected posting goes back into the review queue once edited, so a recruiter can fix
         // what was wrong and resubmit. An already-approved posting is left alone on edit - it

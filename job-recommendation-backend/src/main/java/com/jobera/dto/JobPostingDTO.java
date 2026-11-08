@@ -21,6 +21,7 @@ public class JobPostingDTO {
     private String rejectionReason;
     private Long recruiterId;
     private Boolean featured;
+    private String screeningQuestions;
 
     // Constructor from Entity
     public JobPostingDTO(com.jobera.entity.JobPosting job) {
@@ -42,6 +43,7 @@ public class JobPostingDTO {
         this.rejectionReason = job.getRejectionReason();
         this.recruiterId = job.getRecruiter() != null ? job.getRecruiter().getId() : null;
         this.featured = job.getFeatured();
+        this.screeningQuestions = job.getScreeningQuestions();
     }
 
     // Getters and setters
@@ -81,4 +83,6 @@ public class JobPostingDTO {
     public void setRecruiterId(Long recruiterId) { this.recruiterId = recruiterId; }
     public Boolean getFeatured() { return featured; }
     public void setFeatured(Boolean featured) { this.featured = featured; }
+    public String getScreeningQuestions() { return screeningQuestions; }
+    public void setScreeningQuestions(String screeningQuestions) { this.screeningQuestions = screeningQuestions; }
 }

@@ -10,6 +10,7 @@ import java.util.stream.Collectors;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jobera.dto.JobPostingDTO;
 import com.jobera.entity.Application;
 import com.jobera.entity.JobPosting;
@@ -24,18 +25,33 @@ public class JobController {
     private final JobPostingService jobPostingService;
     private final JobRecommendationService recommendationService;
     private final ApplicationRepository applicationRepository;
-    
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
     private static final String ERROR_KEY = "error";
     private static final String MESSAGE_KEY = "message";
     private static final String JOB_ID_KEY = "jobId";
     private static final String USER_ID_KEY = "userId";
-    
-    public JobController(JobPostingService jobPostingService, 
+
+    public JobController(JobPostingService jobPostingService,
                         JobRecommendationService recommendationService,
                         ApplicationRepository applicationRepository) {
         this.jobPostingService = jobPostingService;
         this.recommendationService = recommendationService;
         this.applicationRepository = applicationRepository;
+    }
+
+    /** The request body sends screeningAnswers as a real nested JSON array - this re-serializes
+     *  it to the JSON-string form the service layer compares against the job's own
+     *  screeningQuestions column. */
+    private String serializeScreeningAnswers(Object raw) {
+        if (raw == null) {
+            return null;
+        }
+        try {
+            return objectMapper.writeValueAsString(raw);
+        } catch (Exception e) {
+            return null;
+        }
     }
     
     @GetMapping
@@ -148,18 +164,23 @@ public class JobController {
             String resumeParsedText = getStringValue(applicationData, "resumeParsedText", "");
             Integer applicantExperience = parseExperienceSafely(applicationData.get("applicantExperience"));
             String source = getStringValue(applicationData, "source", null);
+            String screeningAnswers = serializeScreeningAnswers(applicationData.get("screeningAnswers"));
 
             Application application = jobPostingService.applyForJobWithResume(
                 userId, jobId, coverLetter, applicantSkills, applicantExperience,
-                applicantEducation, resumeFilePath, resumeParsedText, source);
-            
-            return ResponseEntity.ok(Map.of(
-                "message", "Application submitted successfully with resume analysis",
-                "applicationId", application.getId(),
-                "matchPercentage", application.getMatchPercentage(),
-                "jobId", jobId,
-                "userId", userId
-            ));
+                applicantEducation, resumeFilePath, resumeParsedText, source, screeningAnswers);
+
+            boolean autoRejected = "REJECTED".equals(application.getStatus());
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", autoRejected
+                ? "Application submitted, but didn't meet a required screening question - see details on your application."
+                : "Application submitted successfully with resume analysis");
+            response.put("applicationId", application.getId());
+            response.put("matchPercentage", application.getMatchPercentage());
+            response.put("jobId", jobId);
+            response.put("userId", userId);
+            response.put("autoRejected", autoRejected);
+            return ResponseEntity.ok(response);
             
         } catch (Exception e) {
             return ResponseEntity.badRequest()
@@ -178,10 +199,11 @@ public class JobController {
             String applicantEducation = getStringValue(applicationData, "applicantEducation", "Not specified");
             Integer applicantExperience = parseExperienceSafely(applicationData.get("applicantExperience"));
             String source = getStringValue(applicationData, "source", null);
+            String screeningAnswers = serializeScreeningAnswers(applicationData.get("screeningAnswers"));
 
             jobPostingService.applyForJob(userId, jobId, coverLetter,
                                         applicantSkills, applicantExperience,
-                                        applicantEducation, source);
+                                        applicantEducation, source, screeningAnswers);
             
             return ResponseEntity.ok(Map.of(
                 MESSAGE_KEY, "Application submitted successfully",

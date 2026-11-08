@@ -1,5 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { X, Star } from 'lucide-react';
+import { X, Star, Plus, Trash2 } from 'lucide-react';
+
+/** Parses the job's screeningQuestions (a JSON string from the backend, or already an array if
+ *  a fresh form submission round-tripped through state) into a plain array, tolerating
+ *  null/blank/malformed input the same way the backend's own parser does. */
+const parseScreeningQuestions = (raw) => {
+  if (Array.isArray(raw)) return raw;
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
 
 const JobPostForm = ({ job, onSubmit, onCancel }) => {
   const [formData, setFormData] = useState({
@@ -12,7 +26,8 @@ const JobPostForm = ({ job, onSubmit, onCancel }) => {
     salaryRange: '',
     jobType: '',
     experienceLevel: '',
-    scheduledFor: ''
+    scheduledFor: '',
+    screeningQuestions: []
   });
 
   // FIXED: Proper useEffect to set form data when job prop changes
@@ -28,7 +43,8 @@ const JobPostForm = ({ job, onSubmit, onCancel }) => {
         salaryRange: job.salaryRange || '',
         jobType: job.jobType || '',
         experienceLevel: job.experienceLevel || '',
-        scheduledFor: ''
+        scheduledFor: '',
+        screeningQuestions: parseScreeningQuestions(job.screeningQuestions)
       });
     } else {
       // Reset form when creating new job
@@ -42,7 +58,8 @@ const JobPostForm = ({ job, onSubmit, onCancel }) => {
         salaryRange: '',
         jobType: '',
         experienceLevel: '',
-        scheduledFor: ''
+        scheduledFor: '',
+        screeningQuestions: []
       });
     }
   }, [job]);
@@ -54,16 +71,42 @@ const JobPostForm = ({ job, onSubmit, onCancel }) => {
     });
   };
 
+  const addScreeningQuestion = () => {
+    setFormData({
+      ...formData,
+      screeningQuestions: [
+        ...formData.screeningQuestions,
+        { questionText: '', expectedAnswer: true, knockout: false }
+      ]
+    });
+  };
+
+  const updateScreeningQuestion = (index, field, value) => {
+    setFormData({
+      ...formData,
+      screeningQuestions: formData.screeningQuestions.map((q, i) =>
+        i === index ? { ...q, [field]: value } : q
+      )
+    });
+  };
+
+  const removeScreeningQuestion = (index) => {
+    setFormData({
+      ...formData,
+      screeningQuestions: formData.screeningQuestions.filter((_, i) => i !== index)
+    });
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    
+
     // Validate required fields
-    if (!formData.title || !formData.company || !formData.description || 
+    if (!formData.title || !formData.company || !formData.description ||
         !formData.location || !formData.jobType || !formData.experienceLevel) {
       alert('Please fill in all required fields');
       return;
     }
-    
+
     // Validate skills format
     try {
       if (formData.requiredSkills) {
@@ -76,8 +119,18 @@ const JobPostForm = ({ job, onSubmit, onCancel }) => {
       alert('Skills must be in valid JSON format: ["skill1", "skill2"]');
       return;
     }
-    
-    onSubmit(formData);
+
+    // Drop any question row the recruiter added but never actually filled in, rather than
+    // sending candidates a blank question to answer.
+    const screeningQuestions = formData.screeningQuestions.filter((q) => q.questionText.trim());
+    for (const q of screeningQuestions) {
+      if (typeof q.expectedAnswer !== 'boolean') {
+        alert('Each screening question needs a Yes/No expected answer');
+        return;
+      }
+    }
+
+    onSubmit({ ...formData, screeningQuestions });
   };
 
   const jobTypes = ['Full-time', 'Part-time', 'Contract', 'Internship', 'Remote'];
@@ -285,6 +338,74 @@ const JobPostForm = ({ job, onSubmit, onCancel }) => {
               </p>
             </div>
           )}
+
+          <div className="pt-4 border-t border-gray-200">
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Screening Questions (optional)
+              </label>
+              <button
+                type="button"
+                onClick={addScreeningQuestion}
+                className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800 font-medium"
+              >
+                <Plus className="h-4 w-4 mr-1" /> Add question
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mb-3">
+              Candidates answer these Yes/No when applying. Mark one "Auto-reject" and an answer
+              that doesn't match the expected one rejects the application automatically, before
+              it reaches your queue.
+            </p>
+            <div className="space-y-3">
+              {formData.screeningQuestions.map((q, index) => (
+                <div key={index} className="border border-gray-200 rounded-md p-3 bg-gray-50">
+                  <div className="flex items-start gap-2">
+                    <input
+                      type="text"
+                      value={q.questionText}
+                      onChange={(e) => updateScreeningQuestion(index, 'questionText', e.target.value)}
+                      placeholder="e.g., Are you authorized to work in this country?"
+                      className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeScreeningQuestion(index)}
+                      aria-label={`Remove screening question ${index + 1}`}
+                      className="p-2 text-gray-400 hover:text-red-600"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-4 mt-2 text-sm">
+                    <label className="flex items-center gap-1.5">
+                      <span className="text-gray-600">Expected answer:</span>
+                      <select
+                        value={q.expectedAnswer ? 'yes' : 'no'}
+                        onChange={(e) => updateScreeningQuestion(index, 'expectedAnswer', e.target.value === 'yes')}
+                        className="border border-gray-300 rounded-md px-2 py-1 text-sm"
+                      >
+                        <option value="yes">Yes</option>
+                        <option value="no">No</option>
+                      </select>
+                    </label>
+                    <label className="flex items-center gap-1.5 text-gray-600 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={!!q.knockout}
+                        onChange={(e) => updateScreeningQuestion(index, 'knockout', e.target.checked)}
+                        className="h-4 w-4 text-red-600 rounded border-gray-300"
+                      />
+                      Auto-reject if answered incorrectly
+                    </label>
+                  </div>
+                </div>
+              ))}
+              {formData.screeningQuestions.length === 0 && (
+                <p className="text-sm text-gray-400">No screening questions yet.</p>
+              )}
+            </div>
+          </div>
 
           <div className="flex justify-end space-x-4 pt-6 border-t border-gray-200">
             <button
