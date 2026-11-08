@@ -58,6 +58,30 @@ public class MessageController {
         }
     }
 
+    /** Sends one message to every selected application's candidate for this job in a single
+     *  action - scoped by jobId purely so AccessPolicy's existing ownsJob() check (the same rule
+     *  guarding the applicant CSV export for this job) covers it; the actual per-recipient
+     *  authorization still happens in MessageService.sendMessage for each application. */
+    @PostMapping("/api/recruiters/jobs/{jobId}/applications/bulk-message")
+    public ResponseEntity<?> sendBulkMessage(@PathVariable Long jobId,
+                                              @RequestBody Map<String, Object> payload,
+                                              HttpServletRequest request) {
+        String body = (String) payload.get("body");
+        if (body == null || body.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "Message body cannot be empty"));
+        }
+
+        @SuppressWarnings("unchecked")
+        List<Object> rawIds = (List<Object>) payload.get("applicationIds");
+        if (rawIds == null || rawIds.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "applicationIds cannot be empty"));
+        }
+        List<Long> applicationIds = rawIds.stream().map(id -> Long.valueOf(id.toString())).collect(java.util.stream.Collectors.toList());
+
+        Map<String, Object> result = messageService.sendBulkMessage(applicationIds, callingUser(request).getId(), body.trim());
+        return ResponseEntity.ok(result);
+    }
+
     @PutMapping("/api/applications/{applicationId}/messages/read")
     public ResponseEntity<Map<String, Object>> markRead(@PathVariable Long applicationId, HttpServletRequest request) {
         messageService.markThreadRead(applicationId, callingUser(request).getId());

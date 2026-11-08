@@ -182,6 +182,71 @@ describe('ApplicationsList bulk actions', () => {
   });
 });
 
+describe('ApplicationsList bulk messaging', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    localStorage.setItem('user', JSON.stringify({ id: 1, role: 'ROLE_RECRUITER', recruiterId: 5 }));
+    api.get.mockImplementation((url) => {
+      if (url.includes('/resume-matching/job/') || url.includes('/applications/job/')) {
+        return Promise.resolve({ data: { applications: mockApplications } });
+      }
+      if (url.includes('/recruiters/user/')) {
+        return Promise.resolve({ data: { recruiter: { id: 5 } } });
+      }
+      return Promise.resolve({ data: [] });
+    });
+  });
+
+  it('opens a compose modal for every selected candidate and sends one message to all of them', async () => {
+    api.post.mockResolvedValue({ data: { sentCount: 2, failedCount: 0, failures: [] } });
+    const user = userEvent.setup();
+    render(<ApplicationsList job={mockJob} onClose={vi.fn()} />);
+
+    await screen.findByText('Bob Candidate');
+    await user.click(screen.getByLabelText(/Select all applications/i));
+    await user.click(screen.getByRole('button', { name: /Message \(2\)/i }));
+
+    expect(screen.getByText(/Message 2 candidates/i)).toBeInTheDocument();
+
+    const textarea = screen.getByPlaceholderText(/Write one message to send to everyone selected/i);
+    await user.type(textarea, 'Reminder: assessment due Friday');
+    await user.click(screen.getByRole('button', { name: /Send to 2/i }));
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith('/recruiters/jobs/10/applications/bulk-message', {
+        applicationIds: [101, 102],
+        body: 'Reminder: assessment due Friday',
+      });
+    });
+    expect(await screen.findByText(/Message sent to 2 candidates/i)).toBeInTheDocument();
+  });
+
+  it('disables the send button until a message is typed', async () => {
+    const user = userEvent.setup();
+    render(<ApplicationsList job={mockJob} onClose={vi.fn()} />);
+
+    await screen.findByText('Bob Candidate');
+    await user.click(screen.getByLabelText(/Select Bob Candidate/i));
+    await user.click(screen.getByRole('button', { name: /Message \(1\)/i }));
+
+    expect(screen.getByRole('button', { name: /Send to 1/i })).toBeDisabled();
+  });
+
+  it('reports partial failures without losing the successful sends', async () => {
+    api.post.mockResolvedValue({ data: { sentCount: 1, failedCount: 1, failures: [{ applicationId: 102, error: 'boom' }] } });
+    const user = userEvent.setup();
+    render(<ApplicationsList job={mockJob} onClose={vi.fn()} />);
+
+    await screen.findByText('Bob Candidate');
+    await user.click(screen.getByLabelText(/Select all applications/i));
+    await user.click(screen.getByRole('button', { name: /Message \(2\)/i }));
+    await user.type(screen.getByPlaceholderText(/Write one message/i), 'Hello');
+    await user.click(screen.getByRole('button', { name: /Send to 2/i }));
+
+    expect(await screen.findByText(/Sent to 1, failed for 1/i)).toBeInTheDocument();
+  });
+});
+
 describe('ApplicationsList Kanban Board View', () => {
   beforeEach(() => {
     vi.resetAllMocks();

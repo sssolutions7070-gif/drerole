@@ -35,6 +35,8 @@ const ApplicationsList = ({ job, onClose }) => {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [bulkActionLoading, setBulkActionLoading] = useState(false);
   const [bulkResultMessage, setBulkResultMessage] = useState('');
+  const [showBulkMessageModal, setShowBulkMessageModal] = useState(false);
+  const [sendingBulkMessage, setSendingBulkMessage] = useState(false);
   const [showCompareModal, setShowCompareModal] = useState(false);
   const [exportingCsv, setExportingCsv] = useState(false);
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'kanban'
@@ -444,6 +446,40 @@ const ApplicationsList = ({ job, onClose }) => {
     setSelectedIds(new Set());
     setBulkActionLoading(false);
     fetchApplications();
+  };
+
+  // One message to every selected candidate's own thread with the recruiter - previously a
+  // recruiter had to open each candidate's thread separately to send the same update/nudge to
+  // everyone shortlisted for (or still pending on) this job. Takes the body as an argument
+  // (from BulkMessageModal's own local state) rather than reading it from state up here: this
+  // component is redefined fresh on every render of ApplicationsList, so if the typed text lived
+  // in ApplicationsList's own state, every keystroke would re-render ApplicationsList and remount
+  // the modal (losing focus) - exactly like InterviewModal below keeps its own fields local for
+  // the same reason.
+  const handleSendBulkMessage = async (body) => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0 || !body.trim()) return;
+
+    setSendingBulkMessage(true);
+    setBulkResultMessage('');
+    try {
+      const response = await api.post(`/recruiters/jobs/${job.id}/applications/bulk-message`, {
+        applicationIds: ids,
+        body: body.trim(),
+      });
+      const { sentCount, failedCount } = response.data;
+      setBulkResultMessage(
+        failedCount === 0
+          ? `Message sent to ${sentCount} candidate${sentCount === 1 ? '' : 's'}.`
+          : `Sent to ${sentCount}, failed for ${failedCount}.`
+      );
+      setShowBulkMessageModal(false);
+      setSelectedIds(new Set());
+    } catch (error) {
+      alert('Failed to send bulk message: ' + (error.response?.data?.error || error.message));
+    } finally {
+      setSendingBulkMessage(false);
+    }
   };
 
   const handleExportCsv = async () => {
@@ -991,6 +1027,59 @@ const ApplicationsList = ({ job, onClose }) => {
               className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700"
             >
               Close
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Bulk Message Modal Component - one message to every selected candidate's own thread. The
+  // typed text is local state (like InterviewModal's fields below), not lifted to
+  // ApplicationsList - see the comment on handleSendBulkMessage for why that matters.
+  const BulkMessageModal = () => {
+    const [localBody, setLocalBody] = useState('');
+    const count = selectedIds.size;
+    return (
+      <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div className="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold">
+              Message {count} candidate{count === 1 ? '' : 's'}
+            </h3>
+            <button
+              onClick={() => setShowBulkMessageModal(false)}
+              aria-label="Close"
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          <textarea
+            value={localBody}
+            onChange={(e) => setLocalBody(e.target.value)}
+            rows={5}
+            placeholder="Write one message to send to everyone selected..."
+            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            Each candidate gets this in their own message thread with you - replies come back individually.
+          </p>
+
+          <div className="flex justify-end space-x-3 mt-4">
+            <button
+              onClick={() => setShowBulkMessageModal(false)}
+              className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => handleSendBulkMessage(localBody)}
+              disabled={!localBody.trim() || sendingBulkMessage}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+            >
+              {sendingBulkMessage ? 'Sending...' : `Send to ${count}`}
             </button>
           </div>
         </div>
@@ -1672,6 +1761,15 @@ const ApplicationsList = ({ job, onClose }) => {
                     <>
                       <button
                         type="button"
+                        onClick={() => setShowBulkMessageModal(true)}
+                        disabled={bulkActionLoading}
+                        className="inline-flex items-center px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-sm"
+                      >
+                        <MessageCircle className="h-4 w-4 mr-1.5" />
+                        Message ({selectedIds.size})
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => handleBulkAction('shortlist')}
                         disabled={bulkActionLoading}
                         className="inline-flex items-center px-3 py-1.5 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition-colors shadow-sm"
@@ -2128,6 +2226,7 @@ const ApplicationsList = ({ job, onClose }) => {
         {showTestModal && <TestAssignmentModal />}
         {showTestResultsModal && <TestResultsModal />}
         {showCompareModal && <CompareModal />}
+        {showBulkMessageModal && <BulkMessageModal />}
         {messageThreadApplication && (
           <MessageThread
             applicationId={messageThreadApplication.id}

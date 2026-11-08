@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -123,5 +124,43 @@ class MessageServiceTest {
         when(messageRepository.countByRecipientIdAndReadAtIsNull(candidate.getId())).thenReturn(3L);
 
         assertEquals(3L, service.getUnreadCount(candidate.getId()));
+    }
+
+    @Test
+    void bulkMessageSendsTheSameBodyToEveryApplicationsCandidate() {
+        User candidate2 = new User("candidate2@example.com", "hash", "Candidate Two");
+        candidate2.setId(3L);
+        Application application2 = new Application();
+        application2.setId(1001L);
+        application2.setUser(candidate2);
+        application2.setJobPosting(application.getJobPosting());
+
+        when(applicationRepository.findById(1000L)).thenReturn(Optional.of(application));
+        when(applicationRepository.findById(1001L)).thenReturn(Optional.of(application2));
+        when(messageRepository.save(any(Message.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Map<String, Object> result = service.sendBulkMessage(
+            java.util.List.of(1000L, 1001L), recruiterUser.getId(), "Reminder: assessment due Friday");
+
+        assertEquals(2, result.get("sentCount"));
+        assertEquals(0, result.get("failedCount"));
+        verify(realtimeNotifier).notifyUser(eq(candidate.getId()), eq("NEW_MESSAGE"), any());
+        verify(realtimeNotifier).notifyUser(eq(candidate2.getId()), eq("NEW_MESSAGE"), any());
+    }
+
+    @Test
+    void bulkMessageRecordsAPerRecipientFailureWithoutAbortingTheRestOfTheBatch() {
+        when(applicationRepository.findById(1000L)).thenReturn(Optional.of(application));
+        when(applicationRepository.findById(9999L)).thenReturn(Optional.empty());
+        when(messageRepository.save(any(Message.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Map<String, Object> result = service.sendBulkMessage(
+            java.util.List.of(1000L, 9999L), recruiterUser.getId(), "Hello");
+
+        assertEquals(1, result.get("sentCount"));
+        assertEquals(1, result.get("failedCount"));
+        @SuppressWarnings("unchecked")
+        java.util.List<Map<String, Object>> failures = (java.util.List<Map<String, Object>>) result.get("failures");
+        assertEquals(9999L, failures.get(0).get("applicationId"));
     }
 }

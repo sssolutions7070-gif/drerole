@@ -1,6 +1,8 @@
 package com.jobera.service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -87,6 +89,35 @@ public class MessageService {
         }
 
         return saved;
+    }
+
+    /** Sends the same message to every one of these applications' candidates in one action - a
+     *  recruiter reviewing a job's applicant list previously had to open each candidate's thread
+     *  separately to send the same nudge/update to all of them. Each recipient still gets an
+     *  ordinary 1:1 thread message (not a new "broadcast" concept), so replies work exactly like
+     *  any other thread. One recipient failing (e.g. a stale application id) doesn't abort the
+     *  rest of the batch. */
+    public Map<String, Object> sendBulkMessage(List<Long> applicationIds, Long senderId, String body) {
+        List<Long> sentTo = new ArrayList<>();
+        List<Map<String, Object>> failures = new ArrayList<>();
+
+        for (Long applicationId : applicationIds) {
+            try {
+                sendMessage(applicationId, senderId, body);
+                sentTo.add(applicationId);
+            } catch (Exception e) {
+                Map<String, Object> failure = new LinkedHashMap<>();
+                failure.put("applicationId", applicationId);
+                failure.put("error", e.getMessage());
+                failures.add(failure);
+            }
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("sentCount", sentTo.size());
+        result.put("failedCount", failures.size());
+        result.put("failures", failures);
+        return result;
     }
 
     public List<Message> getThread(Long applicationId) {
