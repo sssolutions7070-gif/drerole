@@ -16,6 +16,7 @@ import DisableTwoFactorModal from '../components/DisableTwoFactorModal';
 import SkillBadgesPanel from '../components/SkillBadgesPanel';
 import ActiveSessionsPanel from '../components/ActiveSessionsPanel';
 import ProfileViewsPanel from '../components/ProfileViewsPanel';
+import GoogleCalendarPanel from '../components/GoogleCalendarPanel';
 
 const UserProfile = () => {
   const [profile, setProfile] = useState(null);
@@ -956,6 +957,18 @@ const UserProfile = () => {
                 Every device currently signed into your account. Sign out any you don't recognize.
               </p>
               <ActiveSessionsPanel userId={currentUser.id} />
+            </div>
+
+            {/* Google Calendar Sync Section */}
+            <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-1 flex items-center">
+                <Calendar className="h-5 w-5 text-gray-600 mr-2" />
+                Google Calendar
+              </h3>
+              <p className="text-sm text-gray-500 mb-4">
+                Connect your Google Calendar so scheduled interviews appear there automatically.
+              </p>
+              <GoogleCalendarPanel />
             </div>
 
             {currentUser?.role === 'ROLE_USER' && (

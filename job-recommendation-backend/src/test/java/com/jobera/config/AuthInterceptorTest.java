@@ -62,6 +62,12 @@ class AuthInterceptorTest {
     }
 
     @Test
+    void theGoogleCalendarOAuthCallbackNeedsNoTokenEitherSinceGoogleRedirectsTheBareBrowserThere() throws Exception {
+        assertTrue(interceptor.preHandle(request("GET", "/api/calendar/google/callback"), new MockHttpServletResponse(), new Object()));
+        verifyNoInteractions(accessPolicy);
+    }
+
+    @Test
     void preflightRequestsPass() throws Exception {
         assertTrue(interceptor.preHandle(request("OPTIONS", "/api/jobs"), response, new Object()));
     }

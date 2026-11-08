@@ -1,5 +1,6 @@
 package com.jobera.security;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -70,5 +71,33 @@ class OAuthStateStoreTest {
     void eachIssuedStateIsUnique() {
         OAuthStateStore store = new OAuthStateStore(new MutableClock());
         assertNotEquals(store.issue(), store.issue());
+    }
+
+    @Test
+    void aUserBoundStateReturnsThatUserExactlyOnce() {
+        OAuthStateStore store = new OAuthStateStore(new MutableClock());
+        String state = store.issueForUser(42L);
+
+        assertEquals(42L, store.consumeUserId(state).orElseThrow());
+        assertTrue(store.consumeUserId(state).isEmpty());
+    }
+
+    @Test
+    void aUserBoundStateExpiresJustLikeAnOrdinaryOne() {
+        MutableClock clock = new MutableClock();
+        OAuthStateStore store = new OAuthStateStore(clock);
+        String state = store.issueForUser(42L);
+
+        clock.advance(Duration.ofMinutes(11));
+
+        assertTrue(store.consumeUserId(state).isEmpty());
+    }
+
+    @Test
+    void aPlainLoginStateHasNoUserToConsume() {
+        OAuthStateStore store = new OAuthStateStore(new MutableClock());
+        String state = store.issue();
+
+        assertTrue(store.consumeUserId(state).isEmpty());
     }
 }

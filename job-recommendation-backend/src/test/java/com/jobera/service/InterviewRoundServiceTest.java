@@ -37,6 +37,7 @@ class InterviewRoundServiceTest {
     @Mock ApplicationRepository applicationRepository;
     @Mock RealtimeNotifier realtimeNotifier;
     @Mock NotificationFeedService notificationFeedService;
+    @Mock GoogleCalendarService googleCalendarService;
 
     InterviewRoundService service;
 
@@ -47,7 +48,7 @@ class InterviewRoundServiceTest {
     @BeforeEach
     void setUp() {
         service = new InterviewRoundService(interviewRoundRepository, applicationRepository, realtimeNotifier,
-            notificationFeedService, "stun:stun.l.google.com:19302", "", "", "", "http://localhost:3000");
+            notificationFeedService, googleCalendarService, "stun:stun.l.google.com:19302", "", "", "", "http://localhost:3000");
 
         candidate = new User("candidate@example.com", "hash", "Candidate");
         candidate.setId(1L);

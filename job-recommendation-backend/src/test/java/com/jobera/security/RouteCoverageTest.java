@@ -41,6 +41,7 @@ class RouteCoverageTest {
         "/api/auth/forgot-password", "/api/auth/reset-password", "/api/auth/login/2fa",
         "/api/auth/oauth/google", "/api/auth/oauth/google/callback",
         "/api/auth/oauth/linkedin", "/api/auth/oauth/linkedin/callback",
+        "/api/calendar/google/callback",
         "/api/webhooks/stripe");
 
     private AccessPolicy policy() {

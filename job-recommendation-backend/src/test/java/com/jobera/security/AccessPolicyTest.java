@@ -173,6 +173,13 @@ class AccessPolicyTest {
     }
 
     @Test
+    void anyLoggedInUserCanManageTheirOwnGoogleCalendarConnection() {
+        assertTrue(allowed(candidate, "GET", "/api/calendar/google/connect"));
+        assertTrue(allowed(recruiterUser, "GET", "/api/calendar/google/status"));
+        assertTrue(allowed(candidate, "DELETE", "/api/calendar/google"));
+    }
+
+    @Test
     void candidatesCannotUseRecruiterEndpoints() {
         assertFalse(allowed(candidate, "POST", "/api/aptitude-tests/create"));
         assertFalse(allowed(candidate, "POST", "/api/dream-role-tests/create"));

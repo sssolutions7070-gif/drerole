@@ -232,6 +232,14 @@ public class AccessPolicy {
         rule("GET", "/api/interview-rounds/{roundId}/scorecard", c -> recruiterManagesRound(c, "roundId"));
         rule("GET", "/api/applications/{applicationId}/scorecards", c -> recruiterManagesApplication(c, "applicationId"));
 
+        // Google Calendar sync - connecting/disconnecting/checking status is about the caller's
+        // own account, not any particular job/application, so just "logged in" like /api/auth/me.
+        // The actual OAuth callback (/api/calendar/google/callback) is public - see
+        // AuthInterceptor.PUBLIC_PATHS - since Google redirects the bare browser there.
+        rule("GET", "/api/calendar/google/connect", authenticated);
+        rule("GET", "/api/calendar/google/status", authenticated);
+        rule("DELETE", "/api/calendar/google", authenticated);
+
         // Job offers, scoped to one application - the recruiter sends/withdraws it, either
         // participant can view it, and the service layer double-checks that only the candidate
         // themselves can accept or decline (not the recruiter who sent it)

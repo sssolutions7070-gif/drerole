@@ -81,6 +81,19 @@ export const accountAPI = {
     api.get(`/users/${userId}/profile-views`),
 };
 
+// Google Calendar sync - connecting/checking status/disconnecting is always about the signed-in
+// caller (resolved server-side from the auth token), so none of these take a userId.
+export const calendarAPI = {
+  getGoogleConnectUrl: () =>
+    api.get('/calendar/google/connect'),
+
+  getGoogleStatus: () =>
+    api.get('/calendar/google/status'),
+
+  disconnectGoogle: () =>
+    api.delete('/calendar/google'),
+};
+
 // Saved Jobs API calls
 export const savedJobsAPI = {
   // List a user's saved jobs

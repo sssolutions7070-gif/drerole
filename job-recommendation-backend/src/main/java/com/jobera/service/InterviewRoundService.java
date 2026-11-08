@@ -93,6 +93,7 @@ public class InterviewRoundService {
     private final ApplicationRepository applicationRepository;
     private final RealtimeNotifier realtimeNotifier;
     private final NotificationFeedService notificationFeedService;
+    private final GoogleCalendarService googleCalendarService;
     private final List<String> stunUrls;
     private final String turnUrl;
     private final String turnUsername;
@@ -104,6 +105,7 @@ public class InterviewRoundService {
                                   ApplicationRepository applicationRepository,
                                   RealtimeNotifier realtimeNotifier,
                                   NotificationFeedService notificationFeedService,
+                                  GoogleCalendarService googleCalendarService,
                                   @Value("${app.webrtc.stun-urls:stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302}") String stunUrls,
                                   @Value("${app.webrtc.turn-url:}") String turnUrl,
                                   @Value("${app.webrtc.turn-username:}") String turnUsername,
@@ -113,6 +115,7 @@ public class InterviewRoundService {
         this.applicationRepository = applicationRepository;
         this.realtimeNotifier = realtimeNotifier;
         this.notificationFeedService = notificationFeedService;
+        this.googleCalendarService = googleCalendarService;
         this.stunUrls = List.of(stunUrls.split("\\s*,\\s*"));
         this.turnUrl = turnUrl;
         this.turnUsername = turnUsername;
@@ -155,6 +158,8 @@ public class InterviewRoundService {
             "Interview round scheduled: " + title,
             scheduledAt != null ? "Scheduled for " + scheduledAt : "Time to be confirmed.",
             "/dashboard");
+
+        googleCalendarService.syncRound(saved, candidateUserId(application), recruiterUserId(application));
 
         return saved;
     }
@@ -223,6 +228,8 @@ public class InterviewRoundService {
                 "The candidate picked " + chosenSlot + ".",
                 "/recruiter/dashboard");
         }
+
+        googleCalendarService.syncRound(saved, candidateUserId(application), recruiterId);
 
         return saved;
     }
@@ -356,6 +363,8 @@ public class InterviewRoundService {
                 "Interview round rescheduled: " + round.getTitle(),
                 "New time: " + scheduledAt,
                 "/dashboard");
+
+            googleCalendarService.syncRound(saved, candidateUserId(application), recruiterUserId(application));
         });
 
         return saved;
