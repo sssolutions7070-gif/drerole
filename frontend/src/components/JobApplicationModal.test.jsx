@@ -156,3 +156,43 @@ describe('JobApplicationModal - screening questions', () => {
     expect(screen.queryByText(/Screening Questions/i)).not.toBeInTheDocument();
   });
 });
+
+describe('JobApplicationModal - education level normalization', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    localStorage.setItem('user', JSON.stringify({ id: 1, fullName: 'Asha Rao' }));
+  });
+
+  // A resume's educationLevel is free text and often won't exactly match one of the <select>'s
+  // option values ("Bachelor's Degree", etc). Before normalizeEducationLevel existed, a
+  // near-miss like "Bachelor's" (no "Degree") made the <select> silently fall back to its blank
+  // option, which then failed the field's `required` attribute and blocked submission with no
+  // visible error - these tests prove that trap is closed for several realistic near-misses.
+  it.each([
+    ["Bachelor's", "Bachelor's Degree"],
+    ['BS', "Bachelor's Degree"],
+    ["Master's", "Master's Degree"],
+    ['Ph.D.', 'PhD'],
+    ["Associate's", 'Associate Degree'],
+    ['Some Unrecognized Credential', "Bachelor's Degree"],
+  ])('normalizes resume educationLevel "%s" to a selectable option and still allows submission', async (rawValue, expectedOption) => {
+    api.get.mockImplementation((url) => {
+      if (url.includes('/resumes/user/')) {
+        return Promise.resolve({ data: { id: 50, filePath: '/r.pdf', skills: '["Java"]', experienceYears: 3, educationLevel: rawValue } });
+      }
+      return Promise.resolve({ data: {} });
+    });
+    api.post.mockResolvedValue({ data: { applicationId: 1, autoRejected: false } });
+    const onSuccess = vi.fn();
+    const user = userEvent.setup();
+
+    render(<JobApplicationModal job={job} onClose={() => {}} onSuccess={onSuccess} />);
+    await waitFor(() => expect(screen.queryByText(/No resume found/i)).not.toBeInTheDocument());
+
+    expect(screen.getByLabelText(/Education Level/i)).toHaveValue(expectedOption);
+
+    await user.click(screen.getByRole('button', { name: /submit application/i }));
+
+    await waitFor(() => expect(onSuccess).toHaveBeenCalled());
+  });
+});

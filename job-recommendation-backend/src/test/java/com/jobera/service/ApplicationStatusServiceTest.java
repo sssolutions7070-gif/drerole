@@ -122,6 +122,27 @@ class ApplicationStatusServiceTest {
     }
 
     @Test
+    void genericUpdateApplicationStatusToADecisionStatusRecordsFirstDecisionAt() {
+        Application application = application(10L);
+        when(applicationRepository.findById(10L)).thenReturn(Optional.of(application));
+
+        Application result = service.updateApplicationStatus(10L, "REJECTED", "not a fit");
+
+        assertEquals("REJECTED", result.getStatus());
+        assertNotNull(result.getFirstDecisionAt());
+    }
+
+    @Test
+    void genericUpdateApplicationStatusToANonDecisionStatusDoesNotRecordFirstDecisionAt() {
+        Application application = application(11L);
+        when(applicationRepository.findById(11L)).thenReturn(Optional.of(application));
+
+        Application result = service.updateApplicationStatus(11L, "TEST_ASSIGNED", null);
+
+        assertEquals(null, result.getFirstDecisionAt());
+    }
+
+    @Test
     void markingAsViewedNeverCountsAsADecision() {
         Application application = application(7L);
         when(applicationRepository.findById(7L)).thenReturn(Optional.of(application));

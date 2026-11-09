@@ -510,10 +510,9 @@ public class JobPostingService {
             throw new JobPostingException("You are not authorized to update this application");
         }
         
-        application.setStatus(newStatus);
+        application.setStatusRecordingDecisionIfApplicable(newStatus);
         application.setRecruiterNotes(notes);
-        application.setStatusUpdatedAt(LocalDateTime.now());
-        
+
         return applicationRepository.save(application);
     }
 

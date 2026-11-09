@@ -340,6 +340,22 @@ public class Application {
         }
     }
 
+    private static final java.util.Set<String> DECISION_STATUSES =
+        java.util.Set.of("SHORTLISTED", "INTERVIEW_SCHEDULED", "REJECTED", "OFFER_SENT");
+
+    /** For a caller that sets status to an arbitrary string rather than going through one of
+     *  the specific methods below (shortlist()/reject()/scheduleInterview()/sendOffer()) - it
+     *  doesn't know ahead of time whether the new status counts as a real decision, so it checks
+     *  against the same DECISION_STATUSES those methods implicitly encode, keeping
+     *  firstDecisionAt accurate no matter which path a status change comes through. */
+    public void setStatusRecordingDecisionIfApplicable(String newStatus) {
+        this.status = newStatus;
+        this.statusUpdatedAt = LocalDateTime.now();
+        if (DECISION_STATUSES.contains(newStatus)) {
+            recordFirstDecisionIfUnset();
+        }
+    }
+
     public void shortlist() {
         this.status = "SHORTLISTED";
         this.statusUpdatedAt = LocalDateTime.now();

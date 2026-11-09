@@ -105,10 +105,9 @@ public class ApplicationStatusService {
         }
         
         Application application = applicationOpt.get();
-        application.setStatus(newStatus);
+        application.setStatusRecordingDecisionIfApplicable(newStatus);
         application.setRecruiterNotes(recruiterNotes);
-        application.setStatusUpdatedAt(LocalDateTime.now());
-        
+
         return applicationRepository.save(application);
     }
     

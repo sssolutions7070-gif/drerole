@@ -1,6 +1,7 @@
 package com.jobera.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -529,5 +530,48 @@ class JobPostingServiceTest {
         service.searchJobs("java developer");
 
         org.mockito.Mockito.verify(jobPostingRepository).searchActiveJobsRanked("java developer");
+    }
+
+    private Application applicationOwnedByRecruiter(long applicationId, long recruiterId) {
+        Recruiter recruiter = new Recruiter();
+        recruiter.setId(recruiterId);
+        JobPosting job = new JobPosting();
+        job.setRecruiter(recruiter);
+        Application application = new Application();
+        application.setId(applicationId);
+        application.setJobPosting(job);
+        return application;
+    }
+
+    @Test
+    void updateApplicationStatusToADecisionStatusRecordsFirstDecisionAt() {
+        Application application = applicationOwnedByRecruiter(1L, 10L);
+        when(applicationRepository.findById(1L)).thenReturn(Optional.of(application));
+        when(applicationRepository.save(any(Application.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Application result = service.updateApplicationStatus(1L, 10L, "SHORTLISTED", "looks good");
+
+        assertEquals("SHORTLISTED", result.getStatus());
+        assertNotNull(result.getFirstDecisionAt());
+    }
+
+    @Test
+    void updateApplicationStatusToANonDecisionStatusDoesNotRecordFirstDecisionAt() {
+        Application application = applicationOwnedByRecruiter(1L, 10L);
+        when(applicationRepository.findById(1L)).thenReturn(Optional.of(application));
+        when(applicationRepository.save(any(Application.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Application result = service.updateApplicationStatus(1L, 10L, "VIEWED_BY_RECRUITER", null);
+
+        assertEquals(null, result.getFirstDecisionAt());
+    }
+
+    @Test
+    void updateApplicationStatusRejectsARecruiterWhoDoesNotOwnTheJob() {
+        Application application = applicationOwnedByRecruiter(1L, 10L);
+        when(applicationRepository.findById(1L)).thenReturn(Optional.of(application));
+
+        assertThrows(JobPostingService.JobPostingException.class,
+            () -> service.updateApplicationStatus(1L, 999L, "SHORTLISTED", null));
     }
 }

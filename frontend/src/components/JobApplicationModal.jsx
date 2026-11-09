@@ -14,6 +14,30 @@ const parseScreeningQuestions = (raw) => {
   }
 };
 
+// Exact values the Education Level <select> below lists as <option>s.
+const EDUCATION_LEVEL_OPTIONS = ["High School", "Associate Degree", "Bachelor's Degree", "Master's Degree", "PhD"];
+
+/** A resume's stored educationLevel can be free text ("Bachelor's", "B.S.", "bachelors degree")
+ *  that doesn't exactly match one of the <select>'s option values. React then can't select any
+ *  option for it, the DOM silently falls back to the first one ("" - blank), and that blank then
+ *  fails the field's `required` attribute and blocks native form submission with no visible
+ *  error. Normalizing to a known option (or the safe default) up front avoids that trap. */
+const normalizeEducationLevel = (raw) => {
+  if (EDUCATION_LEVEL_OPTIONS.includes(raw)) {
+    return raw;
+  }
+  if (!raw || typeof raw !== 'string') {
+    return "Bachelor's Degree";
+  }
+  const key = raw.trim().toLowerCase().replace(/[.\s]/g, '');
+  if (key.startsWith('phd') || key.startsWith('doctor')) return 'PhD';
+  if (key.startsWith('master') || key === 'ms' || key === 'ma') return "Master's Degree";
+  if (key.startsWith('associate')) return 'Associate Degree';
+  if (key.startsWith('highschool')) return 'High School';
+  if (key.startsWith('bachelor') || key === 'bs' || key === 'ba') return "Bachelor's Degree";
+  return "Bachelor's Degree";
+};
+
 const JobApplicationModal = ({ job, onClose, onSuccess, source = 'DIRECT' }) => {
   const [formData, setFormData] = useState({
     coverLetter: 'I am very interested in this position and believe my skills are a great match.',
@@ -91,7 +115,7 @@ const JobApplicationModal = ({ job, onClose, onSuccess, source = 'DIRECT' }) => 
         const parsedSkills = parseSkills(resumeData.skills);
 
         let experienceValue = resumeData.experienceYears ?? 0;
-        let educationValue  = resumeData.educationLevel  || "Bachelor's Degree";
+        let educationValue  = normalizeEducationLevel(resumeData.educationLevel);
 
         setFormData(prev => ({
           ...prev,
@@ -218,7 +242,7 @@ const JobApplicationModal = ({ job, onClose, onSuccess, source = 'DIRECT' }) => 
               ...prev,
               skills:     parsedSkills.length > 0 ? parsedSkills : prev.skills,
               experience: resumeData.experienceYears?.toString() || prev.experience,
-              education:  resumeData.educationLevel              || prev.education
+              education:  resumeData.educationLevel ? normalizeEducationLevel(resumeData.educationLevel) : prev.education
             }));
 
             setHasResume(parsedSkills.length > 0);
