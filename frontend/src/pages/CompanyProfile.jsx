@@ -240,6 +240,14 @@ const CompanyProfile = () => {
                   <span className="ml-1">{reviews.averageRating} ({reviews.totalReviews} {reviews.totalReviews === 1 ? 'review' : 'reviews'})</span>
                 </span>
               )}
+              {company.averageInterviewRating != null && (
+                <span className="flex items-center" title="How candidates who were actually interviewed rated the interview process itself">
+                  <StarRow rating={company.averageInterviewRating} />
+                  <span className="ml-1">
+                    {company.averageInterviewRating} interview experience ({company.interviewFeedbackCount} {company.interviewFeedbackCount === 1 ? 'rating' : 'ratings'})
+                  </span>
+                </span>
+              )}
             </div>
             {company.companyDescription && (
               <p className="mt-4 text-gray-700 whitespace-pre-line">{company.companyDescription}</p>

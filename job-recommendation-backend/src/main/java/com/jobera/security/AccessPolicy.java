@@ -223,6 +223,8 @@ public class AccessPolicy {
         rule("POST", "/api/interview-rounds/{roundId}/recording", c -> participatesInRound(c, "roundId"));
         rule("GET", "/api/interview-rounds/{roundId}/recording", c -> participatesInRound(c, "roundId"));
         rule("GET", "/api/interview-rounds/{roundId}/recording-insights", c -> participatesInRound(c, "roundId"));
+        rule("POST", "/api/interview-rounds/{roundId}/feedback", c -> participatesInRound(c, "roundId"));
+        rule("GET", "/api/interview-rounds/{roundId}/feedback", c -> participatesInRound(c, "roundId"));
         rule("POST", "/api/interview-rounds/{roundId}/copilot-probes", c -> recruiterManagesRound(c, "roundId"));
 
         // Structured interview scorecards - recruiter-only, a candidate never sees the internal

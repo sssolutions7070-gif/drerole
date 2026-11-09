@@ -9,6 +9,7 @@ vi.mock('../services/api');
 
 const company = { companyName: 'Acme', industry: 'Software', companySize: '100-500', companyWebsite: null, verified: false };
 const responsiveCompany = { ...company, responsiveBadge: true, averageHoursToFirstDecision: 24.0 };
+const ratedInterviewCompany = { ...company, averageInterviewRating: 4.5, interviewFeedbackCount: 3 };
 
 const reviewsWithReply = {
   averageRating: 4,
@@ -121,5 +122,22 @@ describe('CompanyProfile - responsiveness badge', () => {
 
     await screen.findByText('Acme');
     expect(screen.queryByText('Responsive')).not.toBeInTheDocument();
+  });
+
+  it('shows the candidate-rated interview average when there is feedback to show', async () => {
+    mockApiFor({ reviews: reviewsWithoutReply, role: 'ROLE_USER', companyData: ratedInterviewCompany });
+
+    renderPage();
+
+    expect(await screen.findByText(/4\.5 interview experience \(3 ratings\)/i)).toBeInTheDocument();
+  });
+
+  it('omits the interview-experience line when no one has rated a round yet', async () => {
+    mockApiFor({ reviews: reviewsWithoutReply, role: 'ROLE_USER', companyData: company });
+
+    renderPage();
+
+    await screen.findByText('Acme');
+    expect(screen.queryByText(/interview experience \(/i)).not.toBeInTheDocument();
   });
 });

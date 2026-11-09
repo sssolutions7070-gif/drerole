@@ -325,6 +325,21 @@ class AccessPolicyTest {
     }
 
     @Test
+    void interviewRoundFeedbackIsOpenToBothParticipantsButNotOutsiders() {
+        JobPosting job = jobOwnedBy(5, recruiter);
+        applicationFor(9, candidate, job);
+        roundFor(7, 9);
+
+        assertTrue(allowed(candidate, "POST", "/api/interview-rounds/7/feedback"));
+        assertTrue(allowed(recruiterUser, "POST", "/api/interview-rounds/7/feedback"));
+        assertFalse(allowed(otherCandidate, "POST", "/api/interview-rounds/7/feedback"));
+
+        assertTrue(allowed(candidate, "GET", "/api/interview-rounds/7/feedback"));
+        assertTrue(allowed(recruiterUser, "GET", "/api/interview-rounds/7/feedback"));
+        assertFalse(allowed(otherRecruiterUser, "GET", "/api/interview-rounds/7/feedback"));
+    }
+
+    @Test
     void directMessageThreadsAreLimitedToTheRecruiterAndTheNamedCandidate() {
         assertTrue(allowed(recruiterUser, "GET", "/api/recruiters/200/direct-messages/10"));
         assertTrue(allowed(recruiterUser, "POST", "/api/recruiters/200/direct-messages/10"));

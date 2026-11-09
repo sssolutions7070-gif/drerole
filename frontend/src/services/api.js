@@ -171,6 +171,14 @@ export const interviewRoundsAPI = {
 
   getRecordingInsights: (roundId) =>
     api.get(`/interview-rounds/${roundId}/recording-insights`),
+
+  // The candidate's own rating of this specific round (not the company overall - see
+  // interviewExperienceAPI for that). Feeds the recruiter's public accountability stats.
+  submitFeedback: (roundId, rating, comment) =>
+    api.post(`/interview-rounds/${roundId}/feedback`, { rating, comment }),
+
+  getFeedback: (roundId) =>
+    api.get(`/interview-rounds/${roundId}/feedback`),
 };
 
 // Structured interview scorecards - recruiter-only

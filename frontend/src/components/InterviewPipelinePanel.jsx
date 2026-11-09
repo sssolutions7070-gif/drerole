@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { X, Plus, Video, Calendar, Award, Download, CalendarPlus, Clock, Trash2, Film, Sparkles, CheckCircle2, Volume2, Activity, Copy, Check, Loader2 } from 'lucide-react';
 import { interviewRoundsAPI, scorecardAPI } from '../services/api';
 import ScorecardForm from './ScorecardForm';
+import InterviewRoundFeedbackForm from './InterviewRoundFeedbackForm';
 
 const parseSlots = (json) => {
   if (!json) return [];
@@ -59,6 +60,7 @@ const InterviewPipelinePanel = ({ applicationId, isRecruiter, onClose }) => {
   const [rescheduleTime, setRescheduleTime] = useState('');
 
   const [scorecardRoundId, setScorecardRoundId] = useState(null);
+  const [feedbackRoundId, setFeedbackRoundId] = useState(null);
   const [playingRecordingRound, setPlayingRecordingRound] = useState(null);
   const [insightsByRoundId, setInsightsByRoundId] = useState({});
   const [loadingInsights, setLoadingInsights] = useState(false);
@@ -328,6 +330,16 @@ const InterviewPipelinePanel = ({ applicationId, isRecruiter, onClose }) => {
                       {scorecardsByRoundId[round.id] ? 'Edit Scorecard' : 'Fill Scorecard'}
                     </button>
                   )}
+
+                  {!isRecruiter && round.status === 'COMPLETED' && (
+                    <button
+                      onClick={() => setFeedbackRoundId(round.id)}
+                      className="inline-flex items-center px-3 py-1.5 border border-amber-300 text-amber-700 rounded-md text-sm font-medium hover:bg-amber-50"
+                    >
+                      <Award className="h-4 w-4 mr-1" />
+                      Rate This Interview
+                    </button>
+                  )}
                 </div>
 
                 {isRecruiter && scorecardsByRoundId[round.id] && (
@@ -367,6 +379,16 @@ const InterviewPipelinePanel = ({ applicationId, isRecruiter, onClose }) => {
                         setScorecardRoundId(null);
                       }}
                       onCancel={() => setScorecardRoundId(null)}
+                    />
+                  </div>
+                )}
+
+                {feedbackRoundId === round.id && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <InterviewRoundFeedbackForm
+                      roundId={round.id}
+                      onSaved={() => setFeedbackRoundId(null)}
+                      onCancel={() => setFeedbackRoundId(null)}
                     />
                   </div>
                 )}

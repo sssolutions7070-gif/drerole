@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import InterviewPipelinePanel from './InterviewPipelinePanel';
@@ -102,6 +102,51 @@ describe('InterviewPipelinePanel', () => {
     renderPanel();
 
     expect(await screen.findByText('Application not found: 1000')).toBeInTheDocument();
+  });
+
+  describe('candidate round feedback', () => {
+    it('lets a candidate rate a completed round', async () => {
+      interviewRoundsAPI.list.mockResolvedValue({ data: [round({ status: 'COMPLETED' })] });
+
+      renderPanel({ isRecruiter: false });
+
+      await screen.findByText(/round 1: phone screen/i);
+      expect(screen.getByRole('button', { name: /rate this interview/i })).toBeInTheDocument();
+    });
+
+    it('does not offer feedback for a round that has not happened yet', async () => {
+      interviewRoundsAPI.list.mockResolvedValue({ data: [round({ status: 'SCHEDULED' })] });
+
+      renderPanel({ isRecruiter: false });
+
+      await screen.findByText(/round 1: phone screen/i);
+      expect(screen.queryByRole('button', { name: /rate this interview/i })).not.toBeInTheDocument();
+    });
+
+    it('never shows the feedback button to the recruiter', async () => {
+      interviewRoundsAPI.list.mockResolvedValue({ data: [round({ status: 'COMPLETED' })] });
+      scorecardAPI.getForApplication.mockResolvedValue({ data: [] });
+
+      renderPanel({ isRecruiter: true });
+
+      await screen.findByText(/round 1: phone screen/i);
+      expect(screen.queryByRole('button', { name: /rate this interview/i })).not.toBeInTheDocument();
+    });
+
+    it('opens the feedback form and submits a rating', async () => {
+      interviewRoundsAPI.list.mockResolvedValue({ data: [round({ status: 'COMPLETED' })] });
+      interviewRoundsAPI.getFeedback.mockResolvedValue({ data: null });
+      interviewRoundsAPI.submitFeedback.mockResolvedValue({ data: { rating: 5 } });
+      const user = userEvent.setup();
+
+      renderPanel({ isRecruiter: false });
+      await user.click(await screen.findByRole('button', { name: /rate this interview/i }));
+
+      await user.click(await screen.findByRole('button', { name: '5 stars' }));
+      await user.click(screen.getByRole('button', { name: /submit feedback/i }));
+
+      await waitFor(() => expect(interviewRoundsAPI.submitFeedback).toHaveBeenCalledWith(5000, 5, null));
+    });
   });
 
   describe('calendar sync', () => {

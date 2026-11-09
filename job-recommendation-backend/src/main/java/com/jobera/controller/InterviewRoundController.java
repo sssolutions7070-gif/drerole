@@ -22,8 +22,10 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.jobera.config.AuthInterceptor;
 import com.jobera.entity.InterviewRound;
+import com.jobera.entity.InterviewRoundFeedback;
 import com.jobera.entity.User;
 import com.jobera.service.AiInterviewClient;
+import com.jobera.service.InterviewRoundFeedbackService;
 import com.jobera.service.InterviewRoundService;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -37,15 +39,20 @@ public class InterviewRoundController {
     private static final String ERROR_KEY = "error";
 
     private final InterviewRoundService interviewRoundService;
+    private final InterviewRoundFeedbackService interviewRoundFeedbackService;
     private final AiInterviewClient aiInterviewClient;
 
-    public InterviewRoundController(InterviewRoundService interviewRoundService) {
-        this(interviewRoundService, null);
+    public InterviewRoundController(InterviewRoundService interviewRoundService,
+                                     InterviewRoundFeedbackService interviewRoundFeedbackService) {
+        this(interviewRoundService, interviewRoundFeedbackService, null);
     }
 
     @Autowired
-    public InterviewRoundController(InterviewRoundService interviewRoundService, AiInterviewClient aiInterviewClient) {
+    public InterviewRoundController(InterviewRoundService interviewRoundService,
+                                     InterviewRoundFeedbackService interviewRoundFeedbackService,
+                                     AiInterviewClient aiInterviewClient) {
         this.interviewRoundService = interviewRoundService;
+        this.interviewRoundFeedbackService = interviewRoundFeedbackService;
         this.aiInterviewClient = aiInterviewClient;
     }
 
@@ -157,6 +164,33 @@ public class InterviewRoundController {
         try {
             return ResponseEntity.ok(interviewRoundService.getJoinInfo(roundId, callingUser(request).getId()));
         } catch (InterviewRoundService.RoundNotFoundException | InterviewRoundService.ApplicationNotFoundException e) {
+            return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, e.getMessage()));
+        }
+    }
+
+    @PostMapping("/api/interview-rounds/{roundId}/feedback")
+    public ResponseEntity<?> submitFeedback(@PathVariable Long roundId, @RequestBody Map<String, Object> payload,
+                                             HttpServletRequest request) {
+        Integer rating = payload.get("rating") instanceof Number n ? n.intValue() : null;
+        String comment = (String) payload.get("comment");
+        try {
+            InterviewRoundFeedback feedback = interviewRoundFeedbackService.submitFeedback(
+                roundId, callingUser(request).getId(), rating, comment);
+            return ResponseEntity.ok(feedback);
+        } catch (InterviewRoundFeedbackService.RoundNotFoundException
+                 | InterviewRoundFeedbackService.RoundNotCompletedException
+                 | InterviewRoundFeedbackService.InvalidRatingException e) {
+            return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, e.getMessage()));
+        } catch (InterviewRoundFeedbackService.NotTheCandidateException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(ERROR_KEY, e.getMessage()));
+        }
+    }
+
+    @GetMapping("/api/interview-rounds/{roundId}/feedback")
+    public ResponseEntity<?> getFeedback(@PathVariable Long roundId) {
+        try {
+            return ResponseEntity.ok(interviewRoundFeedbackService.getFeedbackForRound(roundId).orElse(null));
+        } catch (InterviewRoundFeedbackService.RoundNotFoundException e) {
             return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, e.getMessage()));
         }
     }

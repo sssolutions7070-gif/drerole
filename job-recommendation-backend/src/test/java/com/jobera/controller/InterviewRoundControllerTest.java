@@ -23,6 +23,7 @@ import com.jobera.config.AuthInterceptor;
 import com.jobera.entity.InterviewRound;
 import com.jobera.entity.User;
 import com.jobera.service.AiInterviewClient;
+import com.jobera.service.InterviewRoundFeedbackService;
 import com.jobera.service.InterviewRoundService;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -31,6 +32,7 @@ import jakarta.servlet.http.HttpServletRequest;
 class InterviewRoundControllerTest {
 
     @Mock InterviewRoundService interviewRoundService;
+    @Mock InterviewRoundFeedbackService interviewRoundFeedbackService;
     @Mock AiInterviewClient aiInterviewClient;
 
     InterviewRoundController controller;
@@ -39,7 +41,7 @@ class InterviewRoundControllerTest {
 
     @BeforeEach
     void setUp() {
-        controller = new InterviewRoundController(interviewRoundService, aiInterviewClient);
+        controller = new InterviewRoundController(interviewRoundService, interviewRoundFeedbackService, aiInterviewClient);
         candidate = new User("candidate@example.com", "hash", "Candidate");
         candidate.setId(1L);
         request = mock(HttpServletRequest.class);
@@ -288,5 +290,60 @@ class InterviewRoundControllerTest {
         ResponseEntity<?> response = controller.getRecordingInsights(5000L);
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+    }
+
+    @Test
+    void submitFeedbackPassesTheRatingAndCommentToTheService() {
+        com.jobera.entity.InterviewRoundFeedback saved = new com.jobera.entity.InterviewRoundFeedback();
+        saved.setRating(5);
+        when(interviewRoundFeedbackService.submitFeedback(10L, 1L, 5, "Great"))
+            .thenReturn(saved);
+
+        ResponseEntity<?> response = controller.submitFeedback(10L, Map.of("rating", 5, "comment", "Great"), request);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(saved, response.getBody());
+    }
+
+    @Test
+    void submitFeedbackFromSomeoneOtherThanTheCandidateIsForbidden() {
+        when(interviewRoundFeedbackService.submitFeedback(10L, 1L, 5, null))
+            .thenThrow(new InterviewRoundFeedbackService.NotTheCandidateException());
+
+        ResponseEntity<?> response = controller.submitFeedback(10L, Map.of("rating", 5), request);
+
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+    }
+
+    @Test
+    void submitFeedbackBeforeTheRoundIsCompletedIsRejected() {
+        when(interviewRoundFeedbackService.submitFeedback(10L, 1L, 5, null))
+            .thenThrow(new InterviewRoundFeedbackService.RoundNotCompletedException());
+
+        ResponseEntity<?> response = controller.submitFeedback(10L, Map.of("rating", 5), request);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+    }
+
+    @Test
+    void getFeedbackReturnsWhateverTheServiceFoundForThatRound() {
+        com.jobera.entity.InterviewRoundFeedback existing = new com.jobera.entity.InterviewRoundFeedback();
+        existing.setRating(4);
+        when(interviewRoundFeedbackService.getFeedbackForRound(10L)).thenReturn(java.util.Optional.of(existing));
+
+        ResponseEntity<?> response = controller.getFeedback(10L);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(existing, response.getBody());
+    }
+
+    @Test
+    void getFeedbackReturnsNullWhenNoneHasBeenSubmittedYet() {
+        when(interviewRoundFeedbackService.getFeedbackForRound(10L)).thenReturn(java.util.Optional.empty());
+
+        ResponseEntity<?> response = controller.getFeedback(10L);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(null, response.getBody());
     }
 }

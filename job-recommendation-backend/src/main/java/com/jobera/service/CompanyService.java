@@ -37,15 +37,18 @@ public class CompanyService {
     private final JobPostingRepository jobPostingRepository;
     private final CompanyReviewService companyReviewService;
     private final ApplicationStatusService applicationStatusService;
+    private final InterviewRoundFeedbackService interviewRoundFeedbackService;
 
     public CompanyService(RecruiterRepository recruiterRepository,
                            JobPostingRepository jobPostingRepository,
                            CompanyReviewService companyReviewService,
-                           ApplicationStatusService applicationStatusService) {
+                           ApplicationStatusService applicationStatusService,
+                           InterviewRoundFeedbackService interviewRoundFeedbackService) {
         this.recruiterRepository = recruiterRepository;
         this.jobPostingRepository = jobPostingRepository;
         this.companyReviewService = companyReviewService;
         this.applicationStatusService = applicationStatusService;
+        this.interviewRoundFeedbackService = interviewRoundFeedbackService;
     }
 
     private List<JobPosting> openJobsFor(Long recruiterId) {
@@ -98,10 +101,16 @@ public class CompanyService {
 
         // "Responsive Employer" - how quickly this recruiter has historically made a real
         // decision on an application, across every job they've ever posted (not just open ones).
-        Map<String, Object> responsiveness = applicationStatusService.getResponsivenessSummary(
-            jobPostingRepository.findByRecruiterId(recruiterId));
+        List<JobPosting> allJobsEverPosted = jobPostingRepository.findByRecruiterId(recruiterId);
+        Map<String, Object> responsiveness = applicationStatusService.getResponsivenessSummary(allJobsEverPosted);
         profile.put("averageHoursToFirstDecision", responsiveness.get("averageHoursToFirstDecision"));
         profile.put("responsiveBadge", responsiveness.get("responsiveBadge"));
+
+        // How candidates who actually sat through an interview with this recruiter rated the
+        // experience itself - a second, independent accountability signal alongside speed.
+        Map<String, Object> interviewRatings = interviewRoundFeedbackService.getAverageRatingForRecruiter(allJobsEverPosted);
+        profile.put("averageInterviewRating", interviewRatings.get("averageInterviewRating"));
+        profile.put("interviewFeedbackCount", interviewRatings.get("interviewFeedbackCount"));
         return profile;
     }
 }

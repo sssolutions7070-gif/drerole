@@ -29,13 +29,14 @@ class CompanyServiceTest {
     @Mock JobPostingRepository jobPostingRepository;
     @Mock CompanyReviewService companyReviewService;
     @Mock ApplicationStatusService applicationStatusService;
+    @Mock InterviewRoundFeedbackService interviewRoundFeedbackService;
 
     CompanyService service;
 
     @BeforeEach
     void setUp() {
         service = new CompanyService(recruiterRepository, jobPostingRepository, companyReviewService,
-            applicationStatusService);
+            applicationStatusService, interviewRoundFeedbackService);
         lenient().when(companyReviewService.getPublicReviews(anyLong()))
             .thenReturn(Map.of("averageRating", 0.0, "totalReviews", 0));
         Map<String, Object> noResponsivenessYet = new java.util.HashMap<>();
@@ -44,6 +45,11 @@ class CompanyServiceTest {
         noResponsivenessYet.put("responsiveBadge", false);
         lenient().when(applicationStatusService.getResponsivenessSummary(org.mockito.ArgumentMatchers.any()))
             .thenReturn(noResponsivenessYet);
+        Map<String, Object> noInterviewRatingsYet = new java.util.HashMap<>();
+        noInterviewRatingsYet.put("averageInterviewRating", null);
+        noInterviewRatingsYet.put("interviewFeedbackCount", 0L);
+        lenient().when(interviewRoundFeedbackService.getAverageRatingForRecruiter(org.mockito.ArgumentMatchers.any()))
+            .thenReturn(noInterviewRatingsYet);
     }
 
     private Recruiter recruiter(long id, String name) {
@@ -165,6 +171,24 @@ class CompanyServiceTest {
 
         assertEquals(24.0, profile.get("averageHoursToFirstDecision"));
         assertEquals(true, profile.get("responsiveBadge"));
+    }
+
+    @Test
+    void companyProfileSurfacesTheCandidateRatedInterviewAverage() {
+        Recruiter recruiter = recruiter(1L, "Acme");
+        when(recruiterRepository.findById(1L)).thenReturn(Optional.of(recruiter));
+        when(jobPostingRepository.findByRecruiterIdAndIsActiveTrueAndModerationStatusOrderByPostedDateDesc(1L, "APPROVED"))
+            .thenReturn(List.of());
+        JobPosting someJob = new JobPosting();
+        someJob.setId(9L);
+        when(jobPostingRepository.findByRecruiterId(1L)).thenReturn(List.of(someJob));
+        when(interviewRoundFeedbackService.getAverageRatingForRecruiter(List.of(someJob)))
+            .thenReturn(Map.of("averageInterviewRating", 4.2, "interviewFeedbackCount", 3L));
+
+        Map<String, Object> profile = service.getCompanyProfile(1L);
+
+        assertEquals(4.2, profile.get("averageInterviewRating"));
+        assertEquals(3L, profile.get("interviewFeedbackCount"));
     }
 
     @Test
