@@ -36,13 +36,16 @@ public class CompanyService {
     private final RecruiterRepository recruiterRepository;
     private final JobPostingRepository jobPostingRepository;
     private final CompanyReviewService companyReviewService;
+    private final ApplicationStatusService applicationStatusService;
 
     public CompanyService(RecruiterRepository recruiterRepository,
                            JobPostingRepository jobPostingRepository,
-                           CompanyReviewService companyReviewService) {
+                           CompanyReviewService companyReviewService,
+                           ApplicationStatusService applicationStatusService) {
         this.recruiterRepository = recruiterRepository;
         this.jobPostingRepository = jobPostingRepository;
         this.companyReviewService = companyReviewService;
+        this.applicationStatusService = applicationStatusService;
     }
 
     private List<JobPosting> openJobsFor(Long recruiterId) {
@@ -92,6 +95,13 @@ public class CompanyService {
         Map<String, Object> reviewSummary = companyReviewService.getPublicReviews(recruiterId);
         profile.put("averageRating", reviewSummary.get("averageRating"));
         profile.put("totalReviews", reviewSummary.get("totalReviews"));
+
+        // "Responsive Employer" - how quickly this recruiter has historically made a real
+        // decision on an application, across every job they've ever posted (not just open ones).
+        Map<String, Object> responsiveness = applicationStatusService.getResponsivenessSummary(
+            jobPostingRepository.findByRecruiterId(recruiterId));
+        profile.put("averageHoursToFirstDecision", responsiveness.get("averageHoursToFirstDecision"));
+        profile.put("responsiveBadge", responsiveness.get("responsiveBadge"));
         return profile;
     }
 }

@@ -17,6 +17,11 @@ public interface JobPostingRepository extends JpaRepository<JobPosting, Long> {
     List<JobPosting> findByRecruiterIdAndIsActiveTrue(Long recruiterId);
     long countByRecruiterIdAndIsActiveTrue(Long recruiterId);
 
+    // Every job this recruiter has ever posted, active or not - used for the public responsiveness
+    // badge (CompanyService), since a recruiter's past decision-speed track record shouldn't
+    // disappear just because an old posting since closed.
+    List<JobPosting> findByRecruiterId(Long recruiterId);
+
     // A company's public profile page only shows its approved, active, not-yet-scheduled-for-later
     // postings - same rule as the general public listing, just scoped to one recruiter.
     @Query("SELECT jp FROM JobPosting jp WHERE jp.recruiter.id = :recruiterId AND jp.isActive = true " +

@@ -66,6 +66,14 @@ public class Application {
     
     @Column(name = "status_updated_at")
     private LocalDateTime statusUpdatedAt;
+
+    // Unlike statusUpdatedAt (re-stamped by @PreUpdate on every save, including a recruiter-notes
+    // edit that isn't a real decision), this is set exactly once - the first time a recruiter
+    // actually decides something (shortlist/interview/reject/offer), never on markAsViewed() or
+    // a candidate's own withdraw(). It's the honest "time to first response" timestamp used by
+    // CompanyService's public responsiveness badge and ApplicationStatusService's analytics.
+    @Column(name = "first_decision_at")
+    private LocalDateTime firstDecisionAt;
     
     @Column(name = "interview_date")
     private LocalDateTime interviewDate;
@@ -219,6 +227,9 @@ public class Application {
     
     public LocalDateTime getStatusUpdatedAt() { return statusUpdatedAt; }
     public void setStatusUpdatedAt(LocalDateTime statusUpdatedAt) { this.statusUpdatedAt = statusUpdatedAt; }
+
+    public LocalDateTime getFirstDecisionAt() { return firstDecisionAt; }
+    public void setFirstDecisionAt(LocalDateTime firstDecisionAt) { this.firstDecisionAt = firstDecisionAt; }
     
     public LocalDateTime getInterviewDate() { return interviewDate; }
     public void setInterviewDate(LocalDateTime interviewDate) { this.interviewDate = interviewDate; }
@@ -323,26 +334,36 @@ public class Application {
         }
     }
     
+    private void recordFirstDecisionIfUnset() {
+        if (this.firstDecisionAt == null) {
+            this.firstDecisionAt = LocalDateTime.now();
+        }
+    }
+
     public void shortlist() {
         this.status = "SHORTLISTED";
         this.statusUpdatedAt = LocalDateTime.now();
+        recordFirstDecisionIfUnset();
     }
-    
+
     public void scheduleInterview(LocalDateTime interviewDate, String location) {
         this.status = "INTERVIEW_SCHEDULED";
         this.interviewDate = interviewDate;
         this.interviewLocation = location;
         this.statusUpdatedAt = LocalDateTime.now();
+        recordFirstDecisionIfUnset();
     }
-    
+
     public void reject() {
         this.status = "REJECTED";
         this.statusUpdatedAt = LocalDateTime.now();
+        recordFirstDecisionIfUnset();
     }
-    
+
     public void sendOffer() {
         this.status = "OFFER_SENT";
         this.statusUpdatedAt = LocalDateTime.now();
+        recordFirstDecisionIfUnset();
     }
 
     public void withdraw() {

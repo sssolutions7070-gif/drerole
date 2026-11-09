@@ -28,14 +28,22 @@ class CompanyServiceTest {
     @Mock RecruiterRepository recruiterRepository;
     @Mock JobPostingRepository jobPostingRepository;
     @Mock CompanyReviewService companyReviewService;
+    @Mock ApplicationStatusService applicationStatusService;
 
     CompanyService service;
 
     @BeforeEach
     void setUp() {
-        service = new CompanyService(recruiterRepository, jobPostingRepository, companyReviewService);
+        service = new CompanyService(recruiterRepository, jobPostingRepository, companyReviewService,
+            applicationStatusService);
         lenient().when(companyReviewService.getPublicReviews(anyLong()))
             .thenReturn(Map.of("averageRating", 0.0, "totalReviews", 0));
+        Map<String, Object> noResponsivenessYet = new java.util.HashMap<>();
+        noResponsivenessYet.put("averageHoursToFirstDecision", null);
+        noResponsivenessYet.put("decidedApplicationCount", 0L);
+        noResponsivenessYet.put("responsiveBadge", false);
+        lenient().when(applicationStatusService.getResponsivenessSummary(org.mockito.ArgumentMatchers.any()))
+            .thenReturn(noResponsivenessYet);
     }
 
     private Recruiter recruiter(long id, String name) {
@@ -138,6 +146,25 @@ class CompanyServiceTest {
 
         assertEquals(4.5, profile.get("averageRating"));
         assertEquals(2, profile.get("totalReviews"));
+    }
+
+    @Test
+    void companyProfileSurfacesTheResponsivenessBadgeAndAverage() {
+        Recruiter recruiter = recruiter(1L, "Acme");
+        when(recruiterRepository.findById(1L)).thenReturn(Optional.of(recruiter));
+        when(jobPostingRepository.findByRecruiterIdAndIsActiveTrueAndModerationStatusOrderByPostedDateDesc(1L, "APPROVED"))
+            .thenReturn(List.of());
+        JobPosting someJob = new JobPosting();
+        someJob.setId(9L);
+        when(jobPostingRepository.findByRecruiterId(1L)).thenReturn(List.of(someJob));
+        Map<String, Object> responsive = Map.of(
+            "averageHoursToFirstDecision", 24.0, "decidedApplicationCount", 8L, "responsiveBadge", true);
+        when(applicationStatusService.getResponsivenessSummary(List.of(someJob))).thenReturn(responsive);
+
+        Map<String, Object> profile = service.getCompanyProfile(1L);
+
+        assertEquals(24.0, profile.get("averageHoursToFirstDecision"));
+        assertEquals(true, profile.get("responsiveBadge"));
     }
 
     @Test

@@ -246,8 +246,50 @@ public class ApplicationStatusService {
     private static final String STATUS_REJECTED = "REJECTED";
     private static final String STATUS_OFFER_SENT = "OFFER_SENT";
 
+    // Thresholds for the public "Responsive Employer" badge (CompanyService.getCompanyProfile):
+    // a small sample shouldn't earn a badge off a single lucky-fast decision, and 72 hours (3
+    // business days) is a deliberately generous bar - this rewards clearly-responsive recruiters
+    // without punishing normal review time.
+    private static final double RESPONSIVE_BADGE_MAX_HOURS = 72.0;
+    private static final long RESPONSIVE_BADGE_MIN_SAMPLE = 5;
+
     private static Double round1(double value) {
         return Math.round(value * 10.0) / 10.0;
+    }
+
+    private record DecisionStats(double sumHours, long count) {}
+
+    private DecisionStats decisionStatsFor(List<Application> applications) {
+        double sumHours = 0;
+        long count = 0;
+        for (Application a : applications) {
+            if (a.getFirstDecisionAt() != null && a.getApplicationDate() != null) {
+                sumHours += Duration.between(a.getApplicationDate(), a.getFirstDecisionAt()).toMinutes() / 60.0;
+                count++;
+            }
+        }
+        return new DecisionStats(sumHours, count);
+    }
+
+    private Map<String, Object> responsivenessFields(DecisionStats stats) {
+        Double averageHours = stats.count() > 0 ? round1(stats.sumHours() / stats.count()) : null;
+        Map<String, Object> fields = new HashMap<>();
+        fields.put("averageHoursToFirstDecision", averageHours);
+        fields.put("decidedApplicationCount", stats.count());
+        fields.put("responsiveBadge", stats.count() >= RESPONSIVE_BADGE_MIN_SAMPLE
+            && averageHours != null && averageHours <= RESPONSIVE_BADGE_MAX_HOURS);
+        return fields;
+    }
+
+    /** The public-facing version of the responsiveness numbers below - just the three fields a
+     *  company profile needs, computed from every application across every job this recruiter
+     *  has ever posted (not just currently-open ones, since past behavior still counts). */
+    public Map<String, Object> getResponsivenessSummary(List<JobPosting> jobs) {
+        List<Application> allApplications = new ArrayList<>();
+        for (JobPosting job : jobs) {
+            allApplications.addAll(getJobApplications(job.getId()));
+        }
+        return responsivenessFields(decisionStatsFor(allApplications));
     }
 
     /**
@@ -323,6 +365,9 @@ public class ApplicationStatusService {
         analytics.put("averageMatchPercentage", matchCount > 0 ? round1(sumMatchPercentage / matchCount) : null);
         analytics.put("averageHoursToFirstView", viewedWithTimestamps > 0 ? round1(sumHoursToFirstView / viewedWithTimestamps) : null);
         analytics.put("averageDaysToOffer", offersWithTimestamps > 0 ? round1(sumDaysToOffer / offersWithTimestamps) : null);
+        // Same responsiveness numbers shown publicly on this recruiter's company profile - visible
+        // here too so the badge isn't a mystery to the recruiter earning (or missing) it.
+        analytics.putAll(responsivenessFields(decisionStatsFor(allApplications)));
         analytics.put("jobs", perJob);
         // What candidates most often lack across every job this recruiter has posted - the
         // missingSkills recorded on each application at apply time, rolled up for the first time.

@@ -106,6 +106,30 @@ class ApplicationStatusServiceTest {
     }
 
     @Test
+    void firstDecisionAtIsSetOnceAndNeverMovedByALaterStatusChange() {
+        Application application = application(6L);
+        when(applicationRepository.findById(6L)).thenReturn(Optional.of(application));
+
+        service.shortlistApplication(6L, "promising");
+        LocalDateTime firstDecision = application.getFirstDecisionAt();
+        assertNotNull(firstDecision);
+
+        service.rejectApplication(6L, "changed our minds");
+
+        assertEquals(firstDecision, application.getFirstDecisionAt());
+    }
+
+    @Test
+    void markingAsViewedNeverCountsAsADecision() {
+        Application application = application(7L);
+        when(applicationRepository.findById(7L)).thenReturn(Optional.of(application));
+
+        service.markAsViewed(7L);
+
+        assertEquals(null, application.getFirstDecisionAt());
+    }
+
+    @Test
     void externalCandidatesWithNoLinkedUserAreNotPushedTo() {
         Application application = application(5L);
         application.setUser(null);
@@ -203,6 +227,62 @@ class ApplicationStatusServiceTest {
     }
 
     @Test
+    void analyticsComputesAverageTimeToFirstDecisionAndGrantsTheBadgeWithEnoughFastDecisions() {
+        JobPosting job = new JobPosting();
+        job.setId(1L);
+
+        List<Application> decided = new java.util.ArrayList<>();
+        for (int i = 0; i < 5; i++) {
+            Application a = analyticsApplication("SHORTLISTED", 70.0);
+            a.setApplicationDate(LocalDateTime.now().minusHours(30));
+            a.shortlist(); // sets firstDecisionAt = now, i.e. ~30 hours after applicationDate
+            decided.add(a);
+        }
+        when(applicationRepository.findByJobPostingId(1L)).thenReturn(decided);
+
+        Map<String, Object> analytics = service.getRecruiterAnalytics(java.util.List.of(job));
+
+        assertEquals(5L, analytics.get("decidedApplicationCount"));
+        assertEquals(30.0, (double) analytics.get("averageHoursToFirstDecision"), 0.2);
+        assertEquals(true, analytics.get("responsiveBadge"));
+    }
+
+    @Test
+    void theResponsivenessBadgeNeedsAMinimumSampleSizeEvenIfTheOneDecisionWasFast() {
+        JobPosting job = new JobPosting();
+        job.setId(1L);
+
+        Application fastButLonely = analyticsApplication("SHORTLISTED", 70.0);
+        fastButLonely.setApplicationDate(LocalDateTime.now().minusHours(1));
+        fastButLonely.shortlist();
+        when(applicationRepository.findByJobPostingId(1L)).thenReturn(java.util.List.of(fastButLonely));
+
+        Map<String, Object> analytics = service.getRecruiterAnalytics(java.util.List.of(job));
+
+        assertEquals(1L, analytics.get("decidedApplicationCount"));
+        assertEquals(false, analytics.get("responsiveBadge"));
+    }
+
+    @Test
+    void theResponsivenessBadgeIsWithheldWhenDecisionsAreSlowEvenWithEnoughSamples() {
+        JobPosting job = new JobPosting();
+        job.setId(1L);
+
+        List<Application> slow = new java.util.ArrayList<>();
+        for (int i = 0; i < 5; i++) {
+            Application a = analyticsApplication("REJECTED", 40.0);
+            a.setApplicationDate(LocalDateTime.now().minusDays(10));
+            a.reject(); // ~240 hours later, well past the 72-hour bar
+            slow.add(a);
+        }
+        when(applicationRepository.findByJobPostingId(1L)).thenReturn(slow);
+
+        Map<String, Object> analytics = service.getRecruiterAnalytics(java.util.List.of(job));
+
+        assertEquals(false, analytics.get("responsiveBadge"));
+    }
+
+    @Test
     void analyticsHandlesARecruiterWithNoApplicationsGracefully() {
         JobPosting job = new JobPosting();
         job.setId(1L);
@@ -216,6 +296,8 @@ class ApplicationStatusServiceTest {
         assertEquals(null, analytics.get("averageMatchPercentage"));
         assertEquals(null, analytics.get("averageHoursToFirstView"));
         assertEquals(null, analytics.get("averageDaysToOffer"));
+        assertEquals(null, analytics.get("averageHoursToFirstDecision"));
+        assertEquals(false, analytics.get("responsiveBadge"));
     }
 
     @Test

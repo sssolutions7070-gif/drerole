@@ -6,7 +6,7 @@ import {
   Mail, Phone, Calendar, BookOpen, BarChart3, X, Upload,
   MapPin, CheckCircle, XCircle, Clock, TrendingUp, Award,
   Target, Send, Filter, Download, ChevronDown, ChevronUp,
-  Sparkles, UserCheck, Key, FileText, Loader, Star, CreditCard, Users2, MessageSquare, BadgeCheck, Copy
+  Sparkles, UserCheck, Key, FileText, Loader, Star, CreditCard, Users2, MessageSquare, BadgeCheck, Copy, Zap
 } from 'lucide-react';
 import api from '../services/api';
 import JobPostForm from '../components/JobPostForm';
@@ -1019,6 +1019,21 @@ const RecruiterDashboard = () => {
                   <p className="text-xs text-gray-600 mt-4 flex items-center gap-1.5 pt-3 border-t border-blue-100/60">
                     <Clock className="h-4 w-4 text-blue-500 flex-shrink-0" />
                     <span>On average, your team first reviews candidate profiles within <strong>{analyticsData.averageHoursToFirstView} hours</strong> of submission.</span>
+                  </p>
+                )}
+
+                {analyticsData.averageHoursToFirstDecision != null && (
+                  <p className="text-xs text-gray-600 mt-2 flex items-center gap-1.5">
+                    <Zap className={`h-4 w-4 flex-shrink-0 ${analyticsData.responsiveBadge ? 'text-green-500' : 'text-gray-400'}`} />
+                    <span>
+                      You typically make a real decision (shortlist, interview, reject or offer) within{' '}
+                      <strong>{analyticsData.averageHoursToFirstDecision} hours</strong> of application
+                      {analyticsData.responsiveBadge && (
+                        <span className="ml-1.5 text-xs font-semibold text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
+                          Responsive Employer badge earned
+                        </span>
+                      )}
+                    </span>
                   </p>
                 )}
               </div>

@@ -4,6 +4,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Building, Globe, Users, Briefcase, MapPin, Clock, ArrowLeft, Star, MessageSquare } from 'lucide-react';
 import api from '../services/api';
 import VerifiedBadge from '../components/VerifiedBadge';
+import ResponsiveBadge from '../components/ResponsiveBadge';
 
 const OUTCOME_LABELS = {
   OFFER: 'Got an offer', REJECTED: 'Rejected', NO_RESPONSE: 'No response', WITHDREW: 'Withdrew',
@@ -212,6 +213,7 @@ const CompanyProfile = () => {
             <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
               {company.companyName}
               {company.verified && <VerifiedBadge />}
+              {company.responsiveBadge && <ResponsiveBadge />}
             </h1>
             <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-gray-500">
               {company.industry && <span>{company.industry}</span>}

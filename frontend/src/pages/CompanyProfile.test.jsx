@@ -8,6 +8,7 @@ import api from '../services/api';
 vi.mock('../services/api');
 
 const company = { companyName: 'Acme', industry: 'Software', companySize: '100-500', companyWebsite: null, verified: false };
+const responsiveCompany = { ...company, responsiveBadge: true, averageHoursToFirstDecision: 24.0 };
 
 const reviewsWithReply = {
   averageRating: 4,
@@ -27,10 +28,10 @@ const reviewsWithoutReply = {
 
 const experiences = { averageDifficulty: 0, totalExperiences: 0, experiences: [] };
 
-function mockApiFor({ reviews, role, recruiterProfileId }) {
+function mockApiFor({ reviews, role, recruiterProfileId, companyData = company }) {
   localStorage.setItem('user', JSON.stringify({ id: 99, role }));
   api.get.mockImplementation((url) => {
-    if (url === '/companies/5') return Promise.resolve({ data: company });
+    if (url === '/companies/5') return Promise.resolve({ data: companyData });
     if (url === '/companies/5/reviews') return Promise.resolve({ data: reviews });
     if (url === '/companies/5/interview-experiences') return Promise.resolve({ data: experiences });
     if (url.includes('/company-reviews/5')) return Promise.reject({ response: { status: 404 } });
@@ -96,5 +97,29 @@ describe('CompanyProfile - recruiter replies to reviews', () => {
 
     await screen.findByText('Good place');
     expect(screen.queryByPlaceholderText(/Reply as this company/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('CompanyProfile - responsiveness badge', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    localStorage.clear();
+  });
+
+  it('shows the Responsive badge when the company has earned it', async () => {
+    mockApiFor({ reviews: reviewsWithoutReply, role: 'ROLE_USER', companyData: responsiveCompany });
+
+    renderPage();
+
+    expect(await screen.findByText('Responsive')).toBeInTheDocument();
+  });
+
+  it('does not show the Responsive badge when the company has not earned it', async () => {
+    mockApiFor({ reviews: reviewsWithoutReply, role: 'ROLE_USER', companyData: company });
+
+    renderPage();
+
+    await screen.findByText('Acme');
+    expect(screen.queryByText('Responsive')).not.toBeInTheDocument();
   });
 });
