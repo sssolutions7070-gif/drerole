@@ -48,4 +48,17 @@ class SalaryInsightsControllerTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         verify(salaryInsightsService).getInsights(null, null, null);
     }
+
+    @Test
+    void negotiationAdvicePassesEveryFieldFromTheRequestBodyToTheService() {
+        Map<String, Object> advice = Map.of("suggestedTargetMin", 100000.0);
+        when(salaryInsightsService.getNegotiationAdvice("Backend Engineer", "Remote", "Senior", "$95,000"))
+            .thenReturn(advice);
+
+        ResponseEntity<Map<String, Object>> response = controller.getNegotiationAdvice(Map.of(
+            "jobTitle", "Backend Engineer", "location", "Remote", "experienceLevel", "Senior", "offeredSalary", "$95,000"));
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(100000.0, response.getBody().get("suggestedTargetMin"));
+    }
 }

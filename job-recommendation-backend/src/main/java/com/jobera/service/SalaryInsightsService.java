@@ -30,9 +30,11 @@ public class SalaryInsightsService {
         Pattern.compile("\\$?\\s*([0-9][0-9,]*(?:\\.[0-9]+)?)\\s*([kK])?");
 
     private final JobPostingRepository jobPostingRepository;
+    private final AiInterviewClient aiInterviewClient;
 
-    public SalaryInsightsService(JobPostingRepository jobPostingRepository) {
+    public SalaryInsightsService(JobPostingRepository jobPostingRepository, AiInterviewClient aiInterviewClient) {
         this.jobPostingRepository = jobPostingRepository;
+        this.aiInterviewClient = aiInterviewClient;
     }
 
     public record SalaryRange(double min, double max) {
@@ -112,6 +114,36 @@ public class SalaryInsightsService {
         result.put("byExperienceLevel", byLevel);
 
         return result;
+    }
+
+    /** Reuses getInsights()'s own market aggregation as the factual grounding for an AI-written
+     *  negotiation talking-points/counter-offer suggestion (AiInterviewClient.
+     *  generateNegotiationAdvice) - the model turns real posted-range data plus the candidate's
+     *  own offer into concrete advice, rather than inventing salary numbers itself. */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> getNegotiationAdvice(String jobTitle, String location, String experienceLevel,
+                                                      String offeredSalaryText) {
+        Map<String, Object> insights = getInsights(jobTitle, location, experienceLevel);
+        Map<String, Object> overall = (Map<String, Object>) insights.get("overall");
+
+        Double marketMin = toDouble(overall.get("minSalary"));
+        Double marketMedian = toDouble(overall.get("medianSalary"));
+        Double marketMax = toDouble(overall.get("maxSalary"));
+        int sampleSize = (int) overall.get("count");
+
+        Double offeredSalary = parseRange(offeredSalaryText).map(SalaryRange::midpoint).orElse(null);
+
+        Map<String, Object> advice = aiInterviewClient.generateNegotiationAdvice(
+            jobTitle, offeredSalary, marketMin, marketMedian, marketMax, sampleSize);
+
+        Map<String, Object> result = new LinkedHashMap<>(advice);
+        result.put("offeredSalary", offeredSalary);
+        result.put("marketData", overall);
+        return result;
+    }
+
+    private Double toDouble(Object value) {
+        return value instanceof Number n ? n.doubleValue() : null;
     }
 
     private boolean matchesFilter(String fieldValue, String filter) {

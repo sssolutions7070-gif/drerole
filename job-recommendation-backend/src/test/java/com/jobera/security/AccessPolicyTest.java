@@ -173,6 +173,11 @@ class AccessPolicyTest {
     }
 
     @Test
+    void anyLoggedInUserCanAskForNegotiationAdvice() {
+        assertTrue(allowed(candidate, "POST", "/api/salary-insights/negotiation-advice"));
+    }
+
+    @Test
     void anyLoggedInUserCanManageTheirOwnGoogleCalendarConnection() {
         assertTrue(allowed(candidate, "GET", "/api/calendar/google/connect"));
         assertTrue(allowed(recruiterUser, "GET", "/api/calendar/google/status"));

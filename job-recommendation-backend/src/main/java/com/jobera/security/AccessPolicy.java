@@ -140,6 +140,7 @@ public class AccessPolicy {
         rule("GET", "/api/companies/{recruiterId}/interview-experiences", authenticated);
         rule("GET", "/api/jobs/{jobId}", authenticated);
         rule("GET", "/api/salary-insights", authenticated);
+        rule("POST", "/api/salary-insights/negotiation-advice", authenticated);
 
         // Any recruiter can browse the open-to-work pool - it's not scoped to one company,
         // same as any recruiter being able to post a job in the first place.

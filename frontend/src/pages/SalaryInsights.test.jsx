@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import SalaryInsights from './SalaryInsights';
@@ -17,16 +17,16 @@ const insights = (overrides = {}) => ({
   ...overrides,
 });
 
+const renderPage = () => render(
+  <MemoryRouter>
+    <SalaryInsights />
+  </MemoryRouter>
+);
+
 describe('SalaryInsights', () => {
   beforeEach(() => {
     vi.resetAllMocks();
   });
-
-  const renderPage = () => render(
-    <MemoryRouter>
-      <SalaryInsights />
-    </MemoryRouter>
-  );
 
   it('loads and shows overall stats on mount', async () => {
     salaryInsightsAPI.get.mockResolvedValue({ data: insights() });
@@ -76,5 +76,60 @@ describe('SalaryInsights', () => {
     renderPage();
 
     expect(await screen.findByText(/failed to load salary insights/i)).toBeInTheDocument();
+  });
+});
+
+describe('SalaryInsights - negotiation assistant', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    localStorage.clear();
+    salaryInsightsAPI.get.mockResolvedValue({ data: insights() });
+  });
+
+  it('prompts a signed-out visitor to sign in instead of showing the form', async () => {
+    renderPage();
+
+    expect(await screen.findByText(/negotiation assistant/i)).toBeInTheDocument();
+    expect(screen.getByText(/sign in to get personalized negotiation advice/i)).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText(/e\.g\. \$95,000/i)).not.toBeInTheDocument();
+  });
+
+  it('lets a signed-in candidate request and see negotiation advice', async () => {
+    localStorage.setItem('user', JSON.stringify({ id: 1, fullName: 'Asha Rao' }));
+    salaryInsightsAPI.getNegotiationAdvice.mockResolvedValue({
+      data: {
+        assessment: 'This offer is below the market median.',
+        suggestedTargetMin: 105000,
+        suggestedTargetMax: 125000,
+        talkingPoints: ['Cite the market median', 'Ask directly for more'],
+        openingLine: "Thanks for the offer, I'd like to discuss compensation.",
+      },
+    });
+    const user = userEvent.setup();
+
+    renderPage();
+    await screen.findByText(/negotiation assistant/i);
+
+    await user.type(screen.getByPlaceholderText(/e\.g\. \$95,000/i), '$95,000');
+    await user.click(screen.getByRole('button', { name: /get negotiation advice/i }));
+
+    await waitFor(() => expect(salaryInsightsAPI.getNegotiationAdvice).toHaveBeenCalledWith(
+      undefined, undefined, undefined, '$95,000'));
+    expect(await screen.findByText('This offer is below the market median.')).toBeInTheDocument();
+    expect(screen.getByText('Cite the market median')).toBeInTheDocument();
+    expect(screen.getByText(/thanks for the offer/i)).toBeInTheDocument();
+  });
+
+  it('shows an error instead of silently failing', async () => {
+    localStorage.setItem('user', JSON.stringify({ id: 1, fullName: 'Asha Rao' }));
+    salaryInsightsAPI.getNegotiationAdvice.mockRejectedValue({ response: { data: { error: 'AI service unavailable' } } });
+    const user = userEvent.setup();
+
+    renderPage();
+    await screen.findByText(/negotiation assistant/i);
+
+    await user.click(screen.getByRole('button', { name: /get negotiation advice/i }));
+
+    expect(await screen.findByText('AI service unavailable')).toBeInTheDocument();
   });
 });

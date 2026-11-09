@@ -846,6 +846,104 @@ public class AiInterviewClient {
         return Map.of("coverLetter", letter);
     }
 
+    /** marketMin/marketMedian/marketMax come from SalaryInsightsService's aggregation of posted
+     *  ranges for this role/location/experience level - real market data, not AI guesswork. The
+     *  model's job is just to turn those numbers plus the candidate's actual offer into a
+     *  concrete target and talking points, not to invent the numbers itself. marketSampleSize
+     *  lets both the prompt and the fallback be honest when there isn't much data to go on. */
+    public Map<String, Object> generateNegotiationAdvice(String jobTitle, Double offeredSalary,
+                                                            Double marketMin, Double marketMedian, Double marketMax,
+                                                            int marketSampleSize) {
+        if (!isConfigured()) {
+            return generateFallbackNegotiationAdvice(jobTitle, offeredSalary, marketMin, marketMedian, marketMax, marketSampleSize);
+        }
+
+        String prompt = "You are a calm, practical salary-negotiation coach. A candidate has a job offer and real "
+            + "market data (from actual posted salary ranges, not a guess) for comparable roles.\n\n"
+            + "Job title: " + nullToEmpty(jobTitle) + "\n"
+            + "Offered salary: " + (offeredSalary != null ? offeredSalary : "not specified") + "\n"
+            + "Market data sample size: " + marketSampleSize + " comparable postings\n"
+            + "Market minimum: " + (marketMin != null ? marketMin : "unknown") + "\n"
+            + "Market median: " + (marketMedian != null ? marketMedian : "unknown") + "\n"
+            + "Market maximum: " + (marketMax != null ? marketMax : "unknown") + "\n\n"
+            + "Suggest a reasonable counter-offer range and 3-4 concrete talking points the candidate can use, "
+            + "grounded in the market data given (don't invent numbers that aren't derivable from it). If the "
+            + "sample size is small or the offer is already at or above the market median, say so plainly instead "
+            + "of pushing for more regardless. Also write one short opening line they could actually say out loud "
+            + "to start the conversation.\n"
+            + "Respond with ONLY a valid JSON object with these exact keys:\n"
+            + "{\n"
+            + "  \"suggestedTargetMin\": <number>,\n"
+            + "  \"suggestedTargetMax\": <number>,\n"
+            + "  \"assessment\": \"...\",\n"
+            + "  \"talkingPoints\": [\"...\", \"...\", \"...\"],\n"
+            + "  \"openingLine\": \"...\"\n"
+            + "}";
+
+        try {
+            String raw = callClaude(prompt);
+            String json = extractJson(raw);
+            JsonNode root = objectMapper.readTree(json);
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("suggestedTargetMin", root.has("suggestedTargetMin") ? root.get("suggestedTargetMin").asDouble() : marketMedian);
+            result.put("suggestedTargetMax", root.has("suggestedTargetMax") ? root.get("suggestedTargetMax").asDouble() : marketMax);
+            result.put("assessment", root.has("assessment") ? root.get("assessment").asText() : "");
+            result.put("openingLine", root.has("openingLine") ? root.get("openingLine").asText() : "");
+
+            List<String> talkingPoints = new ArrayList<>();
+            if (root.has("talkingPoints") && root.get("talkingPoints").isArray()) {
+                for (JsonNode t : root.get("talkingPoints")) talkingPoints.add(t.asText());
+            }
+            result.put("talkingPoints", talkingPoints.isEmpty()
+                ? generateFallbackNegotiationAdvice(jobTitle, offeredSalary, marketMin, marketMedian, marketMax, marketSampleSize).get("talkingPoints")
+                : talkingPoints);
+
+            return result;
+        } catch (Exception e) {
+            return generateFallbackNegotiationAdvice(jobTitle, offeredSalary, marketMin, marketMedian, marketMax, marketSampleSize);
+        }
+    }
+
+    public Map<String, Object> generateFallbackNegotiationAdvice(String jobTitle, Double offeredSalary,
+                                                                    Double marketMin, Double marketMedian, Double marketMax,
+                                                                    int marketSampleSize) {
+        Map<String, Object> result = new HashMap<>();
+        String title = (jobTitle != null && !jobTitle.isBlank()) ? jobTitle : "this role";
+        List<String> talkingPoints = new ArrayList<>();
+
+        if (marketSampleSize == 0 || marketMedian == null) {
+            result.put("suggestedTargetMin", offeredSalary);
+            result.put("suggestedTargetMax", offeredSalary);
+            result.put("assessment", "There isn't enough posted salary data for " + title
+                + " yet to benchmark this offer - focus your case on your own experience and the value you bring instead of a market comparison.");
+            talkingPoints.add("Point to specific, quantifiable achievements from your past roles.");
+            talkingPoints.add("Ask what budget flexibility exists for this position before naming a number.");
+            talkingPoints.add("Consider negotiating non-salary terms (signing bonus, equity, remote flexibility) if the base is firm.");
+        } else if (offeredSalary != null && offeredSalary >= marketMedian) {
+            result.put("suggestedTargetMin", offeredSalary);
+            result.put("suggestedTargetMax", Math.max(offeredSalary, marketMax != null ? marketMax : offeredSalary));
+            result.put("assessment", "This offer is already at or above the market median for " + title
+                + " (based on " + marketSampleSize + " comparable postings) - there's limited room to push on base salary alone.");
+            talkingPoints.add("Acknowledge the offer is competitive, then ask about other levers: signing bonus, equity, or an earlier review date.");
+            talkingPoints.add("If you still want more, anchor to the top of the posted range rather than an arbitrary number.");
+        } else {
+            double targetMin = marketMedian;
+            double targetMax = marketMax != null ? marketMax : marketMedian * 1.1;
+            result.put("suggestedTargetMin", targetMin);
+            result.put("suggestedTargetMax", targetMax);
+            result.put("assessment", "This offer is below the market median for " + title
+                + " (based on " + marketSampleSize + " comparable postings) - there's a reasonable case to ask for more.");
+            talkingPoints.add("Share that your research across " + marketSampleSize + " comparable postings shows a median closer to " + Math.round(marketMedian) + ".");
+            talkingPoints.add("Reiterate your specific skills and experience that match the role's requirements.");
+            talkingPoints.add("Ask directly: \"Is there flexibility to move the base closer to " + Math.round(targetMax) + "?\"");
+        }
+
+        result.put("talkingPoints", talkingPoints);
+        result.put("openingLine", "Thank you for the offer - I'm excited about this role. Before I accept, I'd like to talk through the compensation a bit.");
+        return result;
+    }
+
     public Map<String, Object> generateInterviewScorecard(String roundTitle, String roundType,
                                                           String candidateNotes, String codeSnippet) {
         if (!isConfigured()) {

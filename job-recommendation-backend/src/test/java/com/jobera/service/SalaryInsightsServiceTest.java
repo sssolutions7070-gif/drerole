@@ -22,12 +22,13 @@ import com.jobera.repository.JobPostingRepository;
 class SalaryInsightsServiceTest {
 
     @Mock JobPostingRepository jobPostingRepository;
+    @Mock AiInterviewClient aiInterviewClient;
 
     SalaryInsightsService service;
 
     @BeforeEach
     void setUp() {
-        service = new SalaryInsightsService(jobPostingRepository);
+        service = new SalaryInsightsService(jobPostingRepository, aiInterviewClient);
     }
 
     private JobPosting posting(String title, String location, String experienceLevel, String salaryRange) {
@@ -139,5 +140,40 @@ class SalaryInsightsServiceTest {
         Map<String, Object> overall = (Map<String, Object>) insights.get("overall");
 
         assertEquals(70000L, overall.get("medianSalary"));
+    }
+
+    @Test
+    void negotiationAdvicePassesTheRealMarketNumbersAndParsedOfferToTheAiClient() {
+        List<JobPosting> postings = List.of(
+            posting("Backend Engineer", "Remote", "Senior", "$100,000 - $140,000"),
+            posting("Backend Engineer", "Remote", "Senior", "$120,000 - $160,000")
+        );
+        when(jobPostingRepository.findByIsActiveTrueAndModerationStatusOrderByPostedDateDesc(JobPosting.MODERATION_APPROVED))
+            .thenReturn(postings);
+        Map<String, Object> aiResult = Map.of(
+            "suggestedTargetMin", 120000.0, "suggestedTargetMax", 140000.0,
+            "assessment", "Below market", "talkingPoints", List.of("Ask for more"), "openingLine", "Hi"
+        );
+        when(aiInterviewClient.generateNegotiationAdvice("Backend Engineer", 95000.0, 100000.0, 130000.0, 160000.0, 2))
+            .thenReturn(aiResult);
+
+        Map<String, Object> result = service.getNegotiationAdvice("Backend Engineer", "Remote", "Senior", "$95,000");
+
+        assertEquals(120000.0, result.get("suggestedTargetMin"));
+        assertEquals(95000.0, result.get("offeredSalary"));
+        assertTrue(result.containsKey("marketData"));
+    }
+
+    @Test
+    void negotiationAdviceWorksWithNoOfferedSalaryProvided() {
+        when(jobPostingRepository.findByIsActiveTrueAndModerationStatusOrderByPostedDateDesc(JobPosting.MODERATION_APPROVED))
+            .thenReturn(List.of());
+        when(aiInterviewClient.generateNegotiationAdvice("Analyst", null, null, null, null, 0))
+            .thenReturn(Map.of("suggestedTargetMin", 0.0, "suggestedTargetMax", 0.0, "assessment", "No data",
+                "talkingPoints", List.of(), "openingLine", ""));
+
+        Map<String, Object> result = service.getNegotiationAdvice("Analyst", null, null, null);
+
+        assertEquals(null, result.get("offeredSalary"));
     }
 }

@@ -277,6 +277,10 @@ export const skillBadgeAPI = {
 export const salaryInsightsAPI = {
   get: (title, location, experienceLevel) =>
     api.get('/salary-insights', { params: { title, location, experienceLevel } }),
+
+  // Personalized to the caller's own offer - unlike get() above, this needs a logged-in user.
+  getNegotiationAdvice: (jobTitle, location, experienceLevel, offeredSalary) =>
+    api.post('/salary-insights/negotiation-advice', { jobTitle, location, experienceLevel, offeredSalary }),
 };
 
 // Browsing the open-to-work candidate pool - not scoped to one recruiter/company

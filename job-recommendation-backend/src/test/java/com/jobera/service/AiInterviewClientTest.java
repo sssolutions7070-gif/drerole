@@ -298,4 +298,68 @@ class AiInterviewClientTest {
         assertNotNull(letter);
         assertTrue(letter.contains("this role"));
     }
+
+    @Test
+    void generateNegotiationAdviceParsesACleanJsonResponse() {
+        lenient().when(restTemplate.postForObject(any(String.class), any(), eq(Map.class)))
+            .thenReturn(claudeResponse("{\"suggestedTargetMin\": 110000, \"suggestedTargetMax\": 125000, "
+                + "\"assessment\": \"Below market\", \"talkingPoints\": [\"Cite the median\", \"Ask directly\"], "
+                + "\"openingLine\": \"Thanks for the offer.\"}"));
+
+        Map<String, Object> result = configured.generateNegotiationAdvice(
+            "Backend Engineer", 95000.0, 100000.0, 115000.0, 130000.0, 4);
+
+        assertEquals(110000.0, result.get("suggestedTargetMin"));
+        assertEquals(125000.0, result.get("suggestedTargetMax"));
+        assertEquals(2, ((List<?>) result.get("talkingPoints")).size());
+        assertEquals("Thanks for the offer.", result.get("openingLine"));
+    }
+
+    @Test
+    void generateNegotiationAdviceFallsBackWhenUnconfigured() {
+        Map<String, Object> result = unconfigured.generateNegotiationAdvice(
+            "Backend Engineer", 95000.0, 100000.0, 115000.0, 130000.0, 4);
+
+        assertNotNull(result.get("assessment"));
+        assertFalse(((List<?>) result.get("talkingPoints")).isEmpty());
+    }
+
+    @Test
+    void generateNegotiationAdviceFallsBackOnANetworkFailure() {
+        lenient().when(restTemplate.postForObject(any(String.class), any(), eq(Map.class)))
+            .thenThrow(new RestClientException("boom"));
+
+        Map<String, Object> result = configured.generateNegotiationAdvice(
+            "Backend Engineer", 95000.0, 100000.0, 115000.0, 130000.0, 4);
+
+        assertNotNull(result.get("talkingPoints"));
+    }
+
+    @Test
+    void fallbackNegotiationAdviceIsHonestWhenThereIsNoMarketDataYet() {
+        Map<String, Object> result = unconfigured.generateNegotiationAdvice(
+            "Rare Niche Role", 95000.0, null, null, null, 0);
+
+        assertTrue(((String) result.get("assessment")).toLowerCase().contains("not enough")
+            || ((String) result.get("assessment")).toLowerCase().contains("isn't enough"));
+        assertEquals(95000.0, result.get("suggestedTargetMin"));
+    }
+
+    @Test
+    void fallbackNegotiationAdviceSuggestsPushingHigherWhenOfferIsBelowMedian() {
+        Map<String, Object> result = unconfigured.generateNegotiationAdvice(
+            "Backend Engineer", 90000.0, 100000.0, 120000.0, 140000.0, 5);
+
+        assertEquals(120000.0, result.get("suggestedTargetMin"));
+        assertTrue((double) result.get("suggestedTargetMax") >= 120000.0);
+    }
+
+    @Test
+    void fallbackNegotiationAdviceAcknowledgesAnOfferAlreadyAtOrAboveMarket() {
+        Map<String, Object> result = unconfigured.generateNegotiationAdvice(
+            "Backend Engineer", 150000.0, 100000.0, 120000.0, 140000.0, 5);
+
+        assertEquals(150000.0, result.get("suggestedTargetMin"));
+        assertTrue(((String) result.get("assessment")).toLowerCase().contains("already"));
+    }
 }
