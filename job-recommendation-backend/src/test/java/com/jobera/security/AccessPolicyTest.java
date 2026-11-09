@@ -173,6 +173,16 @@ class AccessPolicyTest {
     }
 
     @Test
+    void rejectionExplanationIsOpenToEitherParticipantButNotOutsiders() {
+        JobPosting job = jobOwnedBy(5, recruiter);
+        applicationFor(9, candidate, job);
+
+        assertTrue(allowed(candidate, "GET", "/api/applications/9/rejection-explanation"));
+        assertTrue(allowed(recruiterUser, "GET", "/api/applications/9/rejection-explanation"));
+        assertFalse(allowed(otherCandidate, "GET", "/api/applications/9/rejection-explanation"));
+    }
+
+    @Test
     void anyLoggedInUserCanAskForNegotiationAdvice() {
         assertTrue(allowed(candidate, "POST", "/api/salary-insights/negotiation-advice"));
     }

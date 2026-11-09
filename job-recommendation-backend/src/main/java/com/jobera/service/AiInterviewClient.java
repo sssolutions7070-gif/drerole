@@ -944,6 +944,77 @@ public class AiInterviewClient {
         return result;
     }
 
+    /** Turns the match data this app already records on every application (matchedSkills/
+     *  missingSkills/matchPercentage - populated at apply time by the resume matcher) into a
+     *  constructive explanation for a candidate who was rejected, instead of leaving them with
+     *  nothing but a bare status change. recruiterNotes, when present, is folded in as context
+     *  (it may be a knockout-screening-question reason or the recruiter's own note) - never
+     *  invented, never contradicted. */
+    public Map<String, Object> generateRejectionExplanation(String jobTitle, Double matchPercentage,
+                                                               List<String> matchedSkills, List<String> missingSkills,
+                                                               String recruiterNotes) {
+        if (!isConfigured()) {
+            return generateFallbackRejectionExplanation(jobTitle, matchPercentage, matchedSkills, missingSkills, recruiterNotes);
+        }
+
+        String prompt = "You are a supportive, honest career coach. A candidate was rejected from a job application "
+            + "and wants to understand why, in a way that actually helps them improve - not vague corporate language.\n\n"
+            + "Job title: " + nullToEmpty(jobTitle) + "\n"
+            + "Resume match score: " + (matchPercentage != null ? Math.round(matchPercentage) + "%" : "not available") + "\n"
+            + "Skills that matched the role: " + (matchedSkills != null && !matchedSkills.isEmpty() ? String.join(", ", matchedSkills) : "none recorded") + "\n"
+            + "Skills the role needed that weren't on their resume: " + (missingSkills != null && !missingSkills.isEmpty() ? String.join(", ", missingSkills) : "none recorded") + "\n"
+            + "The recruiter's own note on this rejection (may be blank): " + nullToEmpty(recruiterNotes) + "\n\n"
+            + "Write a short (3-5 sentence), warm but honest explanation grounded ONLY in the data above - don't "
+            + "invent reasons that aren't supported by it. If a missing-skills list exists, name 1-2 of the most "
+            + "important ones and suggest a concrete next step for closing that gap. If there's barely any data to "
+            + "go on, say so honestly rather than guessing. Respond with ONLY the explanation text - no JSON, no "
+            + "markdown, no preamble.";
+
+        try {
+            String explanation = callClaude(prompt).trim();
+            if (explanation.isEmpty()) {
+                return generateFallbackRejectionExplanation(jobTitle, matchPercentage, matchedSkills, missingSkills, recruiterNotes);
+            }
+            return Map.of("explanation", explanation);
+        } catch (Exception e) {
+            return generateFallbackRejectionExplanation(jobTitle, matchPercentage, matchedSkills, missingSkills, recruiterNotes);
+        }
+    }
+
+    public Map<String, Object> generateFallbackRejectionExplanation(String jobTitle, Double matchPercentage,
+                                                                       List<String> matchedSkills, List<String> missingSkills,
+                                                                       String recruiterNotes) {
+        String title = (jobTitle != null && !jobTitle.isBlank()) ? jobTitle : "this role";
+        StringBuilder explanation = new StringBuilder();
+
+        if (recruiterNotes != null && !recruiterNotes.isBlank()) {
+            explanation.append(recruiterNotes.trim());
+            if (!recruiterNotes.trim().endsWith(".")) {
+                explanation.append(".");
+            }
+            explanation.append(" ");
+        }
+
+        if (missingSkills != null && !missingSkills.isEmpty()) {
+            String topGaps = String.join(", ", missingSkills.subList(0, Math.min(2, missingSkills.size())));
+            explanation.append("Based on your application, the recruiter was likely looking for stronger alignment on ")
+                .append(topGaps).append(" for the ").append(title).append(" role. ")
+                .append("Building up hands-on experience or a project showcasing ").append(topGaps)
+                .append(" could strengthen a future application.");
+        } else if (matchPercentage != null && matchPercentage > 0) {
+            explanation.append("Your resume matched about ").append(Math.round(matchPercentage))
+                .append("% of this role's listed requirements for ").append(title)
+                .append(". There isn't a specific skill gap on record, so this may have come down to other ")
+                .append("candidates' experience level or fit for the team - it's worth asking the recruiter directly if you'd like more detail.");
+        } else {
+            explanation.append("There isn't enough match data on this application to point to a specific reason - ")
+                .append("consider reaching out to the recruiter directly for more specific feedback on your application for ")
+                .append(title).append(".");
+        }
+
+        return Map.of("explanation", explanation.toString().trim());
+    }
+
     public Map<String, Object> generateInterviewScorecard(String roundTitle, String roundType,
                                                           String candidateNotes, String codeSnippet) {
         if (!isConfigured()) {

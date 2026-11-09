@@ -203,6 +203,7 @@ public class AccessPolicy {
         rule("GET", "/api/applications/recruiter/{recruiterId}/**", ownRecruiterId("recruiterId"));
         rule("PUT", "/api/applications/{applicationId}/*", c -> recruiterManagesApplication(c, "applicationId"));
         rule("POST", "/api/applications/{applicationId}/withdraw", c -> participatesInApplication(c, "applicationId"));
+        rule("GET", "/api/applications/{applicationId}/rejection-explanation", c -> participatesInApplication(c, "applicationId"));
         rule("POST", "/api/applications/{applicationId}/follow-up", c -> recruiterManagesApplication(c, "applicationId"));
 
         // Messaging between a candidate and the recruiter behind their application

@@ -2,6 +2,7 @@ package com.jobera.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -32,13 +33,14 @@ class ApplicationStatusServiceTest {
     @Mock NotificationService notificationService;
     @Mock RealtimeNotifier realtimeNotifier;
     @Mock NotificationFeedService notificationFeedService;
+    @Mock AiInterviewClient aiInterviewClient;
 
     ApplicationStatusService service;
 
     @BeforeEach
     void setUp() {
         service = new ApplicationStatusService(applicationRepository, notificationService, realtimeNotifier,
-            notificationFeedService);
+            notificationFeedService, aiInterviewClient);
     }
 
     private Application application(long id) {
@@ -127,6 +129,47 @@ class ApplicationStatusServiceTest {
         service.markAsViewed(7L);
 
         assertEquals(null, application.getFirstDecisionAt());
+    }
+
+    @Test
+    void getRejectionExplanationPassesTheApplicationsOwnMatchDataToTheAiClient() {
+        Application application = new Application();
+        application.setId(8L);
+        JobPosting job = new JobPosting();
+        job.setTitle("Backend Developer");
+        application.setJobPosting(job);
+        application.setStatus("REJECTED");
+        application.setMatchPercentage(72.0);
+        application.setMatchedSkills("[\"Java\"]");
+        application.setMissingSkills("[\"Kubernetes\"]");
+        application.setRecruiterNotes("Not quite the right fit");
+        when(applicationRepository.findById(8L)).thenReturn(Optional.of(application));
+        when(aiInterviewClient.generateRejectionExplanation(
+            "Backend Developer", 72.0, List.of("Java"), List.of("Kubernetes"), "Not quite the right fit"))
+            .thenReturn(Map.of("explanation", "You matched on Java but the role needed Kubernetes."));
+
+        Map<String, Object> result = service.getRejectionExplanation(8L);
+
+        assertEquals("You matched on Java but the role needed Kubernetes.", result.get("explanation"));
+    }
+
+    @Test
+    void getRejectionExplanationFailsForAnApplicationThatWasNeverRejected() {
+        Application application = new Application();
+        application.setId(9L);
+        application.setStatus("SHORTLISTED");
+        when(applicationRepository.findById(9L)).thenReturn(Optional.of(application));
+
+        assertThrows(ApplicationStatusService.ApplicationNotRejectedException.class,
+            () -> service.getRejectionExplanation(9L));
+    }
+
+    @Test
+    void getRejectionExplanationFailsForAnUnknownApplication() {
+        when(applicationRepository.findById(404L)).thenReturn(Optional.empty());
+
+        assertThrows(ApplicationStatusService.ApplicationStatusException.class,
+            () -> service.getRejectionExplanation(404L));
     }
 
     @Test

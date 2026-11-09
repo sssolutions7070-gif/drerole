@@ -492,6 +492,11 @@ export const applicationStatusAPI = {
   // withdraws an already-sent offer
   withdrawApplication: (applicationId) =>
     api.post(`/applications/${applicationId}/withdraw`),
+
+  // AI-generated, constructive explanation grounded in this application's own match data -
+  // only meaningful once its status is REJECTED.
+  getRejectionExplanation: (applicationId) =>
+    api.get(`/applications/${applicationId}/rejection-explanation`),
 };
 
 // Enhanced Job Management API calls

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Briefcase, Calendar, Clock, Eye, CheckCircle, XCircle, Star, MapPin, ChevronDown, ChevronUp, RefreshCw, AlertCircle, MessageCircle, Video, FileCheck, BookOpen, Award, Ban } from 'lucide-react';
+import { Briefcase, Calendar, Clock, Eye, CheckCircle, XCircle, Star, MapPin, ChevronDown, ChevronUp, RefreshCw, AlertCircle, MessageCircle, Video, FileCheck, BookOpen, Award, Ban, HelpCircle } from 'lucide-react';
 import api, { applicationStatusAPI } from '../services/api';
 import MessageThread from '../components/MessageThread';
 import InterviewPipelinePanel from '../components/InterviewPipelinePanel';
 import OfferPanel from '../components/OfferPanel';
+import RejectionExplanationModal from '../components/RejectionExplanationModal';
 
 const UserApplications = () => {
   const [applications, setApplications] = useState([]);
@@ -14,6 +15,7 @@ const UserApplications = () => {
   const [messageThreadApplication, setMessageThreadApplication] = useState(null);
   const [pipelineApplicationId, setPipelineApplicationId] = useState(null);
   const [offerApplicationId, setOfferApplicationId] = useState(null);
+  const [rejectionExplanationApplicationId, setRejectionExplanationApplicationId] = useState(null);
 
   useEffect(() => {
     fetchUserApplications();
@@ -330,6 +332,15 @@ const UserApplications = () => {
                         Offer
                       </button>
                     )}
+                    {application.status === 'REJECTED' && (
+                      <button
+                        onClick={() => setRejectionExplanationApplicationId(application.id)}
+                        className="text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center"
+                      >
+                        <HelpCircle className="h-4 w-4 mr-1" />
+                        Why was I rejected?
+                      </button>
+                    )}
                     {canWithdraw(application.status) && (
                       <button
                         onClick={() => handleWithdraw(application.id)}
@@ -480,6 +491,12 @@ const UserApplications = () => {
           applicationId={offerApplicationId}
           isRecruiter={false}
           onClose={() => setOfferApplicationId(null)}
+        />
+      )}
+      {rejectionExplanationApplicationId && (
+        <RejectionExplanationModal
+          applicationId={rejectionExplanationApplicationId}
+          onClose={() => setRejectionExplanationApplicationId(null)}
         />
       )}
     </div>

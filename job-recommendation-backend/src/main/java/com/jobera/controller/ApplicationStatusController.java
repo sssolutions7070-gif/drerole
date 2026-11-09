@@ -474,6 +474,17 @@ public class ApplicationStatusController {
         }
     }
 
+    @GetMapping("/{applicationId}/rejection-explanation")
+    public ResponseEntity<Map<String, Object>> getRejectionExplanation(@PathVariable Long applicationId) {
+        try {
+            return ResponseEntity.ok(applicationStatusService.getRejectionExplanation(applicationId));
+        } catch (ApplicationStatusService.ApplicationNotRejectedException e) {
+            return ResponseEntity.badRequest().body(Map.of(RESPONSE_KEY_ERROR, e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(RESPONSE_KEY_ERROR, "Failed to generate a rejection explanation: " + e.getMessage()));
+        }
+    }
+
     @PostMapping("/{applicationId}/follow-up")
     public ResponseEntity<Map<String, Object>> sendFollowUp(
             @PathVariable Long applicationId,

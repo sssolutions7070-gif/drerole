@@ -362,4 +362,64 @@ class AiInterviewClientTest {
         assertEquals(150000.0, result.get("suggestedTargetMin"));
         assertTrue(((String) result.get("assessment")).toLowerCase().contains("already"));
     }
+
+    @Test
+    void generateRejectionExplanationReturnsTheModelsFreeProseText() {
+        lenient().when(restTemplate.postForObject(any(String.class), any(), eq(Map.class)))
+            .thenReturn(claudeResponse("You were a strong candidate, but the role needed more Kubernetes experience."));
+
+        Map<String, Object> result = configured.generateRejectionExplanation(
+            "Backend Engineer", 75.0, List.of("Java", "Spring"), List.of("Kubernetes"), null);
+
+        assertEquals("You were a strong candidate, but the role needed more Kubernetes experience.", result.get("explanation"));
+    }
+
+    @Test
+    void generateRejectionExplanationFallsBackWhenUnconfigured() {
+        Map<String, Object> result = unconfigured.generateRejectionExplanation(
+            "Backend Engineer", 75.0, List.of("Java"), List.of("Kubernetes", "AWS"), null);
+
+        String explanation = (String) result.get("explanation");
+        assertTrue(explanation.contains("Kubernetes"));
+    }
+
+    @Test
+    void generateRejectionExplanationFallsBackOnANetworkFailure() {
+        lenient().when(restTemplate.postForObject(any(String.class), any(), eq(Map.class)))
+            .thenThrow(new RestClientException("boom"));
+
+        Map<String, Object> result = configured.generateRejectionExplanation(
+            "Backend Engineer", 75.0, List.of("Java"), List.of("Kubernetes"), null);
+
+        assertNotNull(result.get("explanation"));
+    }
+
+    @Test
+    void fallbackRejectionExplanationPrefersTheRecruitersOwnNoteWhenThereIsOne() {
+        Map<String, Object> result = unconfigured.generateRejectionExplanation(
+            "Backend Engineer", 40.0, List.of(), List.of("Kubernetes"),
+            "Did not meet a required screening question: \"Authorized to work?\"");
+
+        String explanation = (String) result.get("explanation");
+        assertTrue(explanation.contains("Authorized to work?"));
+    }
+
+    @Test
+    void fallbackRejectionExplanationNamesTheTopMissingSkillsWhenThereAreNoRecruiterNotes() {
+        Map<String, Object> result = unconfigured.generateRejectionExplanation(
+            "Backend Engineer", 60.0, List.of("Java"), List.of("Kubernetes", "AWS", "Terraform"), null);
+
+        String explanation = (String) result.get("explanation");
+        assertTrue(explanation.contains("Kubernetes"));
+        assertTrue(explanation.contains("AWS"));
+    }
+
+    @Test
+    void fallbackRejectionExplanationIsHonestWhenThereIsNoDataAtAll() {
+        Map<String, Object> result = unconfigured.generateRejectionExplanation(
+            "Backend Engineer", null, List.of(), List.of(), null);
+
+        String explanation = (String) result.get("explanation");
+        assertTrue(explanation.toLowerCase().contains("enough"));
+    }
 }

@@ -27,15 +27,42 @@ public class ApplicationStatusService {
     private final NotificationService notificationService;
     private final RealtimeNotifier realtimeNotifier;
     private final NotificationFeedService notificationFeedService;
+    private final AiInterviewClient aiInterviewClient;
 
     public ApplicationStatusService(ApplicationRepository applicationRepository,
                                     NotificationService notificationService,
                                     RealtimeNotifier realtimeNotifier,
-                                    NotificationFeedService notificationFeedService) {
+                                    NotificationFeedService notificationFeedService,
+                                    AiInterviewClient aiInterviewClient) {
         this.applicationRepository = applicationRepository;
         this.notificationService = notificationService;
         this.realtimeNotifier = realtimeNotifier;
         this.notificationFeedService = notificationFeedService;
+        this.aiInterviewClient = aiInterviewClient;
+    }
+
+    public static class ApplicationNotRejectedException extends RuntimeException {
+        public ApplicationNotRejectedException() {
+            super("This application hasn't been rejected - there's nothing to explain yet");
+        }
+    }
+
+    /** Candidate-facing: why this specific application was rejected, in plain constructive
+     *  language, grounded in the match data already recorded on it (see
+     *  AiInterviewClient.generateRejectionExplanation) rather than a bare status change. */
+    public Map<String, Object> getRejectionExplanation(Long applicationId) {
+        Application application = applicationRepository.findById(applicationId)
+            .orElseThrow(() -> new ApplicationStatusException("Application not found with ID: " + applicationId));
+        if (!STATUS_REJECTED.equals(application.getStatus())) {
+            throw new ApplicationNotRejectedException();
+        }
+
+        return aiInterviewClient.generateRejectionExplanation(
+            jobTitleOf(application),
+            application.getMatchPercentage(),
+            SkillGapAnalyzer.parseSkillList(application.getMatchedSkills()),
+            SkillGapAnalyzer.parseSkillList(application.getMissingSkills()),
+            application.getRecruiterNotes());
     }
 
     private String jobTitleOf(Application application) {

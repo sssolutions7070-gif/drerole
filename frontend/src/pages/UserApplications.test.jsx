@@ -87,3 +87,54 @@ describe('UserApplications withdrawal', () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe('UserApplications rejection explanation', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    localStorage.setItem('user', JSON.stringify({ id: 1, fullName: 'Asha' }));
+  });
+
+  it('shows a "Why was I rejected?" button only for a rejected application', async () => {
+    api.get.mockResolvedValue({ data: { applications: [application({ status: 'REJECTED' })] } });
+
+    render(<UserApplications />);
+
+    expect(await screen.findByRole('button', { name: /why was i rejected/i })).toBeInTheDocument();
+  });
+
+  it('does not show the button for an application still in progress', async () => {
+    api.get.mockResolvedValue({ data: { applications: [application()] } });
+
+    render(<UserApplications />);
+
+    await screen.findByText('Backend Engineer');
+    expect(screen.queryByRole('button', { name: /why was i rejected/i })).not.toBeInTheDocument();
+  });
+
+  it('opens the explanation modal and shows the AI-generated text', async () => {
+    api.get.mockResolvedValue({ data: { applications: [application({ status: 'REJECTED' })] } });
+    applicationStatusAPI.getRejectionExplanation.mockResolvedValue({
+      data: { explanation: 'You matched on Java but the role needed Kubernetes.' },
+    });
+    const user = userEvent.setup();
+
+    render(<UserApplications />);
+    await user.click(await screen.findByRole('button', { name: /why was i rejected/i }));
+
+    expect(await screen.findByText('You matched on Java but the role needed Kubernetes.')).toBeInTheDocument();
+    expect(applicationStatusAPI.getRejectionExplanation).toHaveBeenCalledWith(1);
+  });
+
+  it('shows an error instead of silently failing', async () => {
+    api.get.mockResolvedValue({ data: { applications: [application({ status: 'REJECTED' })] } });
+    applicationStatusAPI.getRejectionExplanation.mockRejectedValue({
+      response: { data: { error: "This application hasn't been rejected - there's nothing to explain yet" } },
+    });
+    const user = userEvent.setup();
+
+    render(<UserApplications />);
+    await user.click(await screen.findByRole('button', { name: /why was i rejected/i }));
+
+    expect(await screen.findByText(/nothing to explain yet/i)).toBeInTheDocument();
+  });
+});
