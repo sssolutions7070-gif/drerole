@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import CandidateDiscoveryPanel from './CandidateDiscoveryPanel';
-import { candidateDiscoveryAPI, directMessageAPI } from '../services/api';
+import { candidateDiscoveryAPI, directMessageAPI, outreachSequenceAPI } from '../services/api';
 
 vi.mock('../services/api');
 
@@ -173,6 +173,46 @@ describe('CandidateDiscoveryPanel', () => {
 
     await screen.findByText('Alice Anderson');
     expect(screen.queryByText(/video intro/i)).not.toBeInTheDocument();
+  });
+
+  it('does not show an Outreach button when no recruiterId is given', async () => {
+    candidateDiscoveryAPI.discover.mockResolvedValue({ data: [candidate()] });
+
+    render(<CandidateDiscoveryPanel />);
+
+    await screen.findByText('Alice Anderson');
+    expect(screen.queryByText(/outreach/i)).not.toBeInTheDocument();
+  });
+
+  it('starts an outreach sequence for a candidate', async () => {
+    candidateDiscoveryAPI.discover.mockResolvedValue({ data: [candidate()] });
+    outreachSequenceAPI.list.mockResolvedValue({ data: [] });
+    outreachSequenceAPI.start.mockResolvedValue({ data: { id: 1 } });
+    const user = userEvent.setup();
+
+    render(<CandidateDiscoveryPanel recruiterId={100} />);
+    await user.click(await screen.findByRole('button', { name: /^outreach$/i }));
+
+    const textareas = await screen.findAllByPlaceholderText(/message to send/i);
+    await user.type(textareas[0], 'Hi Alice, loved your profile!');
+    await user.click(screen.getByRole('button', { name: /start sequence/i }));
+
+    await waitFor(() => {
+      expect(outreachSequenceAPI.start).toHaveBeenCalledWith(100, 1, expect.arrayContaining([
+        expect.objectContaining({ message: 'Hi Alice, loved your profile!' }),
+      ]));
+    });
+  });
+
+  it('lists outreach sequences for the recruiter', async () => {
+    candidateDiscoveryAPI.discover.mockResolvedValue({ data: [candidate()] });
+    outreachSequenceAPI.list.mockResolvedValue({
+      data: [{ id: 1, candidateName: 'Alice Anderson', status: 'ACTIVE', currentStep: 1, totalSteps: 2 }],
+    });
+
+    render(<CandidateDiscoveryPanel recruiterId={100} />);
+
+    expect(await screen.findByText('Step 1 of 2')).toBeInTheDocument();
   });
 
   it('can message a candidate directly from the profile modal', async () => {

@@ -181,6 +181,9 @@ public class AccessPolicy {
         rule("GET", "/api/recruiters/{recruiterId}/direct-messages", ownRecruiterId("recruiterId"));
         rule("GET", "/api/recruiters/{recruiterId}/direct-messages/{candidateUserId}", participatesInDirectThread());
         rule("POST", "/api/recruiters/{recruiterId}/direct-messages/{candidateUserId}", participatesInDirectThread());
+        rule("POST", "/api/recruiters/{recruiterId}/outreach-sequences", ownRecruiterId("recruiterId"));
+        rule("GET", "/api/recruiters/{recruiterId}/outreach-sequences", ownRecruiterId("recruiterId"));
+        rule("DELETE", "/api/recruiters/{recruiterId}/outreach-sequences/{sequenceId}", ownRecruiterId("recruiterId"));
         rule("GET", "/api/recruiters/{recruiterId}/talent-pool", ownRecruiterId("recruiterId"));
         rule("PUT", "/api/recruiters/{recruiterId}/talent-pool/{candidateUserId}/note", ownRecruiterId("recruiterId"));
         rule("GET", "/api/recruiters/{recruiterId}/saved-searches", ownRecruiterId("recruiterId"));

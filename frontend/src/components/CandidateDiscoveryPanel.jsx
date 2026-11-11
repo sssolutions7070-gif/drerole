@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Search, MapPin, FileText, MessageCircle, Sparkles, Bookmark, Bell, BellOff, Trash2, X, Check, UserCircle, Video } from 'lucide-react';
+import { Search, MapPin, FileText, MessageCircle, Sparkles, Bookmark, Bell, BellOff, Trash2, X, Check, UserCircle, Video, Send } from 'lucide-react';
 import { candidateDiscoveryAPI, savedCandidateSearchAPI } from '../services/api';
 import DirectMessageThread from './DirectMessageThread';
+import OutreachSequenceModal from './OutreachSequenceModal';
+import OutreachSequencesPanel from './OutreachSequencesPanel';
 import { BACKEND_ORIGIN } from '../config';
 
 const getVideoUrl = (path) => {
@@ -21,6 +23,8 @@ const CandidateDiscoveryPanel = ({ recruiterId }) => {
   const [aiSearching, setAiSearching] = useState(false);
   const [messagingCandidate, setMessagingCandidate] = useState(null);
   const [viewingCandidate, setViewingCandidate] = useState(null);
+  const [outreachCandidate, setOutreachCandidate] = useState(null);
+  const [outreachRefreshKey, setOutreachRefreshKey] = useState(0);
 
   const handleViewProfile = (candidate) => {
     setViewingCandidate(candidate);
@@ -382,6 +386,14 @@ const CandidateDiscoveryPanel = ({ recruiterId }) => {
                   >
                     <MessageCircle className="h-3 w-3" /> Message
                   </button>
+                  {recruiterId && (
+                    <button
+                      onClick={() => setOutreachCandidate(candidate)}
+                      className="inline-flex items-center gap-1 text-xs text-purple-600 hover:text-purple-800 border border-purple-200 rounded-full px-2 py-1"
+                    >
+                      <Send className="h-3 w-3" /> Outreach
+                    </button>
+                  )}
                 </div>
               </div>
               {candidate.bio && <p className="text-sm text-gray-600 mt-2">{candidate.bio}</p>}
@@ -405,6 +417,17 @@ const CandidateDiscoveryPanel = ({ recruiterId }) => {
           onClose={() => setMessagingCandidate(null)}
         />
       )}
+
+      {outreachCandidate && (
+        <OutreachSequenceModal
+          recruiterId={recruiterId}
+          candidate={outreachCandidate}
+          onClose={() => setOutreachCandidate(null)}
+          onStarted={() => setOutreachRefreshKey((k) => k + 1)}
+        />
+      )}
+
+      {recruiterId && <OutreachSequencesPanel recruiterId={recruiterId} refreshKey={outreachRefreshKey} />}
 
       {viewingCandidate && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
@@ -447,7 +470,15 @@ const CandidateDiscoveryPanel = ({ recruiterId }) => {
                 <FileText className="h-3 w-3" /> Resume on file
               </span>
             )}
-            <div className="flex justify-end pt-2 border-t border-gray-100 mt-3">
+            <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 mt-3">
+              {recruiterId && (
+                <button
+                  onClick={() => { setOutreachCandidate(viewingCandidate); setViewingCandidate(null); }}
+                  className="inline-flex items-center gap-1 text-sm text-purple-600 hover:text-purple-800 border border-purple-200 rounded-full px-3 py-1.5"
+                >
+                  <Send className="h-4 w-4" /> Start Outreach
+                </button>
+              )}
               <button
                 onClick={() => { setMessagingCandidate(viewingCandidate); setViewingCandidate(null); }}
                 className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 border border-blue-200 rounded-full px-3 py-1.5"

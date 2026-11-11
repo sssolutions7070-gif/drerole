@@ -313,6 +313,20 @@ export const savedCandidateSearchAPI = {
     api.post(`/recruiters/${recruiterId}/saved-searches/${searchId}/check`),
 };
 
+// Multi-step automated outreach campaigns to a sourced candidate - step 0 sends immediately,
+// later steps fire once their delay elapses, and the whole sequence stops once the candidate
+// replies (see OutreachSequenceService)
+export const outreachSequenceAPI = {
+  list: (recruiterId) =>
+    api.get(`/recruiters/${recruiterId}/outreach-sequences`),
+
+  start: (recruiterId, candidateUserId, steps) =>
+    api.post(`/recruiters/${recruiterId}/outreach-sequences`, { candidateUserId, steps }),
+
+  stop: (recruiterId, sequenceId) =>
+    api.delete(`/recruiters/${recruiterId}/outreach-sequences/${sequenceId}`),
+};
+
 // Platform-wide growth and funnel metrics for the admin dashboard
 export const platformAnalyticsAPI = {
   getOverview: () =>
