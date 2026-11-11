@@ -78,7 +78,7 @@ const MessageThread = ({ applicationId, title, onClose }) => {
             <MessageCircle className="h-5 w-5 text-blue-600" />
             <h2 className="text-lg font-semibold text-gray-900 truncate">{title || 'Messages'}</h2>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-600">
             <X className="h-6 w-6" />
           </button>
         </div>

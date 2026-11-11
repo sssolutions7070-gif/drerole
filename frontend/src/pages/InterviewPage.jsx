@@ -397,7 +397,8 @@ const InterviewPage = () => {
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold text-gray-900">Application Details</h2>
             <button 
-              onClick={() => setShowDetailsModal(false)} 
+              onClick={() => setShowDetailsModal(false)}
+              aria-label="Close"
               className="text-gray-400 hover:text-gray-600"
             >
               <XCircle className="h-6 w-6" />

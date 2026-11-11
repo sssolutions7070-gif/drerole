@@ -311,7 +311,8 @@ const ExternalJobResults = ({ job, onClose }) => {
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold">Schedule Interview</h3>
             <button 
-              onClick={() => setShowInterviewModal(false)} 
+              onClick={() => setShowInterviewModal(false)}
+              aria-label="Close"
               className="text-gray-400 hover:text-gray-600"
             >
               <X className="h-5 w-5" />
@@ -462,7 +463,7 @@ const ExternalJobResults = ({ job, onClose }) => {
             <p className="text-gray-600">{job.title} at {job.company}</p>
             <p className="text-sm text-gray-500 mt-1">Job ID: {job.id}</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-2">
+          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-600 p-2">
             <X className="h-6 w-6" />
           </button>
         </div>

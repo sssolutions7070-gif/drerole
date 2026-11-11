@@ -95,6 +95,7 @@ const JobRatingModal = ({ job, userRating, onClose, onSuccess }) => {
           </h2>
           <button
             onClick={onClose}
+            aria-label="Close"
             className="text-gray-400 hover:text-gray-600"
           >
             <X className="h-6 w-6" />

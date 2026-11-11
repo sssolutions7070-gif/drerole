@@ -974,6 +974,7 @@ const Jobs = () => {
               <h2 className="text-2xl font-bold text-gray-900">{selectedJob.title}</h2>
               <button 
                 onClick={() => setSelectedJob(null)}
+                aria-label="Close"
                 className="text-gray-400 hover:text-gray-600"
               >
                 <X className="h-5 w-5" />

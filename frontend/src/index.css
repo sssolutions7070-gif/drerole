@@ -82,45 +82,59 @@
 
 /* Light colored badge/alert backgrounds (bg-{color}-50 / -100), each paired with that color's
  * darker text shade (-700/-800/-900) - flipped to a dark badge (color-900 bg, color-200 text)
- * rather than left as a near-white box on a dark page. */
+ * rather than left as a near-white box on a dark page. The -500/-600 tier is included in the
+ * same text-color rule: those are the shade this app uses constantly for plain icons/links on
+ * the page background (text-blue-600 alone: 185 uses), but they're *also* commonly paired with
+ * a -50/-100 badge background for an icon chip (e.g. a blue icon inside a bg-blue-100 circle) -
+ * without this, that background flips dark while the icon stays its original mid-tone color,
+ * landing a similar blue-on-blue (or red-on-red, etc.) combination with too little contrast to
+ * read. Reusing the exact same light color already chosen for -700/800/900 keeps this simple
+ * rather than inventing a second palette. */
 .dark .bg-blue-50, .dark .bg-blue-100 { background-color: #1e3a8a; }
-.dark .text-blue-700, .dark .text-blue-800, .dark .text-blue-900 { color: #bfdbfe; }
+.dark .text-blue-500, .dark .text-blue-600, .dark .text-blue-700, .dark .text-blue-800, .dark .text-blue-900 { color: #bfdbfe; }
+.dark .border-blue-400, .dark .border-blue-500, .dark .border-blue-600 { border-color: #60a5fa; }
 
 .dark .bg-green-50, .dark .bg-green-100 { background-color: #14532d; }
-.dark .text-green-700, .dark .text-green-800, .dark .text-green-900 { color: #bbf7d0; }
+.dark .text-green-500, .dark .text-green-600, .dark .text-green-700, .dark .text-green-800, .dark .text-green-900 { color: #bbf7d0; }
+.dark .border-green-400, .dark .border-green-500, .dark .border-green-600 { border-color: #4ade80; }
 
 .dark .bg-red-50, .dark .bg-red-100 { background-color: #7f1d1d; }
-.dark .text-red-700, .dark .text-red-800, .dark .text-red-900 { color: #fecaca; }
+.dark .text-red-500, .dark .text-red-600, .dark .text-red-700, .dark .text-red-800, .dark .text-red-900 { color: #fecaca; }
+.dark .border-red-400, .dark .border-red-500, .dark .border-red-600 { border-color: #f87171; }
 
 .dark .bg-yellow-50, .dark .bg-yellow-100 { background-color: #713f12; }
-.dark .text-yellow-700, .dark .text-yellow-800, .dark .text-yellow-900 { color: #fef08a; }
+.dark .text-yellow-500, .dark .text-yellow-600, .dark .text-yellow-700, .dark .text-yellow-800, .dark .text-yellow-900 { color: #fef08a; }
+.dark .border-yellow-500 { border-color: #facc15; }
 
 .dark .bg-amber-50, .dark .bg-amber-100 { background-color: #78350f; }
-.dark .text-amber-700, .dark .text-amber-800, .dark .text-amber-900 { color: #fde68a; }
+.dark .text-amber-500, .dark .text-amber-600, .dark .text-amber-700, .dark .text-amber-800, .dark .text-amber-900 { color: #fde68a; }
+.dark .border-amber-400, .dark .border-amber-500 { border-color: #fbbf24; }
 
 .dark .bg-purple-50, .dark .bg-purple-100 { background-color: #581c87; }
-.dark .text-purple-700, .dark .text-purple-800, .dark .text-purple-900 { color: #e9d5ff; }
+.dark .text-purple-500, .dark .text-purple-600, .dark .text-purple-700, .dark .text-purple-800, .dark .text-purple-900 { color: #e9d5ff; }
+.dark .border-purple-400, .dark .border-purple-500, .dark .border-purple-600 { border-color: #c084fc; }
 
 .dark .bg-indigo-50, .dark .bg-indigo-100 { background-color: #312e81; }
-.dark .text-indigo-700, .dark .text-indigo-800, .dark .text-indigo-900 { color: #c7d2fe; }
+.dark .text-indigo-500, .dark .text-indigo-600, .dark .text-indigo-700, .dark .text-indigo-800, .dark .text-indigo-900 { color: #c7d2fe; }
 
 .dark .bg-pink-50, .dark .bg-pink-100 { background-color: #831843; }
-.dark .text-pink-700, .dark .text-pink-800, .dark .text-pink-900 { color: #fbcfe8; }
+.dark .text-pink-500, .dark .text-pink-600, .dark .text-pink-700, .dark .text-pink-800, .dark .text-pink-900 { color: #fbcfe8; }
 
 .dark .bg-orange-50, .dark .bg-orange-100 { background-color: #7c2d12; }
-.dark .text-orange-700, .dark .text-orange-800, .dark .text-orange-900 { color: #fed7aa; }
+.dark .text-orange-500, .dark .text-orange-600, .dark .text-orange-700, .dark .text-orange-800, .dark .text-orange-900 { color: #fed7aa; }
+.dark .border-orange-500 { border-color: #fb923c; }
 
 .dark .bg-teal-50, .dark .bg-teal-100 { background-color: #134e4a; }
-.dark .text-teal-700, .dark .text-teal-800, .dark .text-teal-900 { color: #99f6e4; }
+.dark .text-teal-500, .dark .text-teal-600, .dark .text-teal-700, .dark .text-teal-800, .dark .text-teal-900 { color: #99f6e4; }
 
 .dark .bg-cyan-50, .dark .bg-cyan-100 { background-color: #164e63; }
-.dark .text-cyan-700, .dark .text-cyan-800, .dark .text-cyan-900 { color: #a5f3fc; }
+.dark .text-cyan-500, .dark .text-cyan-600, .dark .text-cyan-700, .dark .text-cyan-800, .dark .text-cyan-900 { color: #a5f3fc; }
 
 .dark .bg-emerald-50, .dark .bg-emerald-100 { background-color: #064e3b; }
-.dark .text-emerald-700, .dark .text-emerald-800, .dark .text-emerald-900 { color: #a7f3d0; }
+.dark .text-emerald-500, .dark .text-emerald-600, .dark .text-emerald-700, .dark .text-emerald-800, .dark .text-emerald-900 { color: #a7f3d0; }
 
 .dark .bg-rose-50, .dark .bg-rose-100 { background-color: #881337; }
-.dark .text-rose-700, .dark .text-rose-800, .dark .text-rose-900 { color: #fecdd3; }
+.dark .text-rose-500, .dark .text-rose-600, .dark .text-rose-700, .dark .text-rose-800, .dark .text-rose-900 { color: #fecdd3; }
 
 .dark .bg-lime-50, .dark .bg-lime-100 { background-color: #365314; }
-.dark .text-lime-700, .dark .text-lime-800, .dark .text-lime-900 { color: #d9f99d; }
+.dark .text-lime-500, .dark .text-lime-600, .dark .text-lime-700, .dark .text-lime-800, .dark .text-lime-900 { color: #d9f99d; }

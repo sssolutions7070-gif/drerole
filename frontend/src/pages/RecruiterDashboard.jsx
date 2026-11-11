@@ -304,17 +304,17 @@ const RecruiterDashboard = () => {
     <div className="max-w-7xl mx-auto py-8 px-4">
       {/* Header */}
       <div className="mb-8">
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div>
             <h1 className="text-3xl font-bold text-gray-800">Recruiter Dashboard</h1>
             <p className="text-gray-600 mt-2">
               Manage your job postings, view applications, and conduct aptitude tests
             </p>
           </div>
-          <div className="flex space-x-3">
+          <div className="flex flex-wrap gap-3">
             <button
               onClick={navigateToInterviewPage}
-              className="bg-purple-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-purple-700 transition-colors flex items-center"
+              className="bg-purple-600 text-white px-4 sm:px-6 py-3 rounded-lg font-semibold hover:bg-purple-700 transition-colors flex items-center"
             >
               <Calendar className="h-5 w-5 mr-2" />
               Interview Management
@@ -324,14 +324,14 @@ const RecruiterDashboard = () => {
                 setActiveTab('tests');
                 setShowTestManagement(true);
               }}
-              className="bg-indigo-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors flex items-center"
+              className="bg-indigo-600 text-white px-4 sm:px-6 py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors flex items-center"
             >
               <BookOpen className="h-5 w-5 mr-2" />
               Test Management
             </button>
             <button
               onClick={() => setShowJobForm(true)}
-              className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center"
+              className="bg-blue-600 text-white px-4 sm:px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center"
             >
               <Plus className="h-5 w-5 mr-2" />
               Post New Job
@@ -547,7 +547,7 @@ const RecruiterDashboard = () => {
         <div className="space-y-6">
           {jobs.map((job) => (
             <div key={job.id} className="bg-white rounded-lg shadow-lg border border-gray-200 p-6">
-              <div className="flex justify-between items-start mb-4">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2 flex-wrap">
                     <h3 className="text-xl font-semibold text-gray-800">{job.title}</h3>
@@ -624,7 +624,7 @@ const RecruiterDashboard = () => {
                   </div>
                 </div>
                 
-                <div className="ml-4 flex flex-col space-y-2">
+                <div className="sm:ml-4 flex flex-col space-y-2">
                   <button
                     onClick={() => viewApplications(job)}
                     className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 transition-colors"
@@ -952,7 +952,7 @@ const RecruiterDashboard = () => {
 
               {/* Visual Hiring Funnel Drop-off Bar */}
               <div className="bg-gradient-to-r from-slate-50 to-blue-50/40 border border-blue-100 rounded-xl p-5 mb-8">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
                   <div>
                     <h4 className="font-semibold text-gray-800 flex items-center gap-2">
                       <TrendingUp className="h-5 w-5 text-blue-600" /> Hiring Funnel & Candidate Conversion
@@ -961,7 +961,7 @@ const RecruiterDashboard = () => {
                       Conversion progression from candidate application to formal job offer.
                     </p>
                   </div>
-                  <span className="text-xs bg-blue-100 text-blue-800 font-medium px-2.5 py-1 rounded-full">
+                  <span className="text-xs bg-blue-100 text-blue-800 font-medium px-2.5 py-1 rounded-full self-start sm:self-auto">
                     {analyticsData.averageDaysToOffer != null ? `⚡ Time-to-Offer: ${analyticsData.averageDaysToOffer} Days` : '⚡ High Velocity'}
                   </span>
                 </div>

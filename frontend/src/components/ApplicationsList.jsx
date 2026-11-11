@@ -676,7 +676,8 @@ const ApplicationsList = ({ job, onClose }) => {
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold">Assign Test</h3>
             <button 
-              onClick={() => setShowTestModal(false)} 
+              onClick={() => setShowTestModal(false)}
+              aria-label="Close"
               className="text-gray-400 hover:text-gray-600"
             >
               <X className="h-5 w-5" />
@@ -947,7 +948,8 @@ const ApplicationsList = ({ job, onClose }) => {
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold">Test Results</h3>
             <button 
-              onClick={() => setShowTestResultsModal(false)} 
+              onClick={() => setShowTestResultsModal(false)}
+              aria-label="Close"
               className="text-gray-400 hover:text-gray-600"
             >
               <X className="h-5 w-5" />
@@ -1142,7 +1144,8 @@ const ApplicationsList = ({ job, onClose }) => {
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold">Schedule Interview</h3>
             <button 
-              onClick={() => setShowInterviewModal(false)} 
+              onClick={() => setShowInterviewModal(false)}
+              aria-label="Close"
               className="text-gray-400 hover:text-gray-600"
             >
               <X className="h-5 w-5" />
@@ -1293,7 +1296,7 @@ const ApplicationsList = ({ job, onClose }) => {
               {showStatusModal === 'offer' && 'Send Offer'}
               {showStatusModal === 'shortlist' && 'Shortlist Application'}
             </h3>
-            <button onClick={() => setShowStatusModal(false)} className="text-gray-400 hover:text-gray-600">
+            <button onClick={() => setShowStatusModal(false)} aria-label="Close" className="text-gray-400 hover:text-gray-600">
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -1452,7 +1455,7 @@ const ApplicationsList = ({ job, onClose }) => {
               </button>
             </div>
 
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-colors">
+            <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-colors">
               <X className="h-6 w-6" />
             </button>
           </div>

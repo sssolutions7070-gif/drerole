@@ -561,7 +561,7 @@ const ExternalJobManagement = ({ recruiterId }) => {
     return (
       <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
         <div className="relative top-10 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white max-h-[90vh] overflow-y-auto">
-          <div className="flex justify-between items-center mb-6"><h2 className="text-2xl font-bold text-gray-900">Candidate Details</h2><button onClick={() => setShowCandidateDetails(false)} className="text-gray-400 hover:text-gray-600"><X className="h-6 w-6" /></button></div>
+          <div className="flex justify-between items-center mb-6"><h2 className="text-2xl font-bold text-gray-900">Candidate Details</h2><button onClick={() => setShowCandidateDetails(false)} aria-label="Close" className="text-gray-400 hover:text-gray-600"><X className="h-6 w-6" /></button></div>
           <div className="bg-gray-50 rounded-lg p-4 mb-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div><p className="text-sm text-gray-500">Full Name</p><p className="font-semibold text-lg">{candidateAnalysis.fullName}</p></div>
@@ -601,7 +601,7 @@ const ExternalJobManagement = ({ recruiterId }) => {
         <div className="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold text-gray-900">Confirm Delete</h2>
-            <button onClick={() => { setShowDeleteConfirm(false); setJobToDelete(null); }} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+            <button onClick={() => { setShowDeleteConfirm(false); setJobToDelete(null); }} aria-label="Close" className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
           </div>
           <div className="mb-6">
             <p className="text-gray-700 mb-2">Are you sure you want to delete the job posting:</p>
@@ -698,7 +698,7 @@ const ExternalJobManagement = ({ recruiterId }) => {
       {showCreateForm && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
           <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
-            <div className="flex justify-between items-center mb-6"><h2 className="text-2xl font-bold text-gray-900">Create External Job Posting</h2><button onClick={() => setShowCreateForm(false)} className="text-gray-400 hover:text-gray-600"><X className="h-6 w-6" /></button></div>
+            <div className="flex justify-between items-center mb-6"><h2 className="text-2xl font-bold text-gray-900">Create External Job Posting</h2><button onClick={() => setShowCreateForm(false)} aria-label="Close" className="text-gray-400 hover:text-gray-600"><X className="h-6 w-6" /></button></div>
             <form onSubmit={handleCreateJob} className="space-y-4">
               <div className="grid grid-cols-2 gap-4"><input type="text" placeholder="Job Title *" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} className="border border-gray-300 rounded-lg px-3 py-2" required /><input type="text" placeholder="Company *" value={formData.company} onChange={(e) => setFormData({...formData, company: e.target.value})} className="border border-gray-300 rounded-lg px-3 py-2" required /></div>
               <textarea placeholder="Job Description *" value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} rows={4} className="border border-gray-300 rounded-lg px-3 py-2 w-full" required />
@@ -725,7 +725,7 @@ const ExternalJobManagement = ({ recruiterId }) => {
                 <p className="text-sm text-blue-600 mt-1">💡 Files will be uploaded in chunks of {CHUNK_SIZE} for better performance.</p>
                 <p className="text-xs text-green-600 mt-1">✅ Supports unlimited files! {CHUNK_SIZE} files per chunk.</p>
               </div>
-              <button onClick={() => { setShowUploadModal(false); setSelectedFiles([]); setUploadStatus(null); setUploadProgress(0); }} className="text-gray-400 hover:text-gray-600">
+              <button onClick={() => { setShowUploadModal(false); setSelectedFiles([]); setUploadStatus(null); setUploadProgress(0); }} aria-label="Close" className="text-gray-400 hover:text-gray-600">
                 <X className="h-6 w-6" />
               </button>
             </div>
@@ -800,7 +800,7 @@ const ExternalJobManagement = ({ recruiterId }) => {
       {showSelectModal && selectedJob && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
           <div className="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
-            <div className="flex justify-between items-center mb-6"><h2 className="text-2xl font-bold text-gray-900">Select Top Candidates</h2><button onClick={() => setShowSelectModal(false)} className="text-gray-400 hover:text-gray-600"><X className="h-6 w-6" /></button></div>
+            <div className="flex justify-between items-center mb-6"><h2 className="text-2xl font-bold text-gray-900">Select Top Candidates</h2><button onClick={() => setShowSelectModal(false)} aria-label="Close" className="text-gray-400 hover:text-gray-600"><X className="h-6 w-6" /></button></div>
             <div className="space-y-4">
               <div><label className="block text-sm font-medium text-gray-700 mb-2">Number of Candidates to Shortlist</label><input type="number" value={numberOfCandidates} onChange={(e) => setNumberOfCandidates(parseInt(e.target.value))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-lg" min="1" max="1000" /><p className="text-xs text-gray-500 mt-1">The system will analyze all uploaded resumes and select the top candidates based on skill match</p></div>
               <div className="bg-yellow-50 p-4 rounded-lg"><h4 className="font-semibold text-yellow-800 mb-2">What will happen?</h4><ul className="text-sm text-yellow-700 space-y-1"><li>✓ AI will analyze all uploaded resumes</li><li>✓ Top {numberOfCandidates} candidates will be shortlisted</li><li>✓ New users get auto-generated passwords</li><li>✓ Existing users keep their DreamRole credentials</li><li>✓ You can download credentials CSV file</li></ul></div>

@@ -1100,7 +1100,7 @@ const TestManagement = ({ recruiterId }) => {
           <div className="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-bold">Create Manual Test</h3>
-              <button onClick={() => setShowCreateForm(false)} className="text-gray-400 hover:text-gray-600">
+              <button onClick={() => setShowCreateForm(false)} aria-label="Close" className="text-gray-400 hover:text-gray-600">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -1183,7 +1183,7 @@ const TestManagement = ({ recruiterId }) => {
                   Add questions for the manual test. Current: {questions.length} questions
                 </p>
               </div>
-              <button onClick={() => setShowAddQuestions(false)} className="text-gray-400 hover:text-gray-600">
+              <button onClick={() => setShowAddQuestions(false)} aria-label="Close" className="text-gray-400 hover:text-gray-600">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -1358,7 +1358,8 @@ const TestManagement = ({ recruiterId }) => {
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold">Schedule Interview</h3>
               <button 
-                onClick={() => setShowInterviewModal(false)} 
+                onClick={() => setShowInterviewModal(false)}
+                aria-label="Close"
                 className="text-gray-400 hover:text-gray-600"
               >
                 <X className="h-5 w-5" />
@@ -1480,7 +1481,7 @@ const TestManagement = ({ recruiterId }) => {
                 <AlertTriangle className="h-5 w-5 mr-2 text-amber-600" />
                 Proctoring Flags
               </h3>
-              <button onClick={() => setViewingViolationsFor(null)} className="text-gray-400 hover:text-gray-600">
+              <button onClick={() => setViewingViolationsFor(null)} aria-label="Close" className="text-gray-400 hover:text-gray-600">
                 <X className="h-5 w-5" />
               </button>
             </div>

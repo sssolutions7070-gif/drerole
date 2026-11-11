@@ -225,7 +225,7 @@ const DreamRoleTestCreator = ({ recruiterId, onClose, onSuccess }) => {
           <h2 className="text-2xl font-bold text-gray-900">
             {step === 1 ? 'Create DreamRole Test' : 'Add Technical Questions'}
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-600">
             <X className="h-6 w-6" />
           </button>
         </div>

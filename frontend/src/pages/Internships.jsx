@@ -821,6 +821,7 @@ const Internships = () => {
               <h2 className="text-2xl font-bold text-gray-900">{selectedInternship.title}</h2>
               <button 
                 onClick={() => setSelectedInternship(null)}
+                aria-label="Close"
                 className="text-gray-400 hover:text-gray-600"
               >
                 <X className="h-5 w-5" />
@@ -988,7 +989,7 @@ const Internships = () => {
           <div className="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold">Rate {selectedInternship.title}</h2>
-              <button onClick={() => setShowRatingModal(false)} className="text-gray-400 hover:text-gray-600">
+              <button onClick={() => setShowRatingModal(false)} aria-label="Close" className="text-gray-400 hover:text-gray-600">
                 <X className="h-6 w-6" />
               </button>
             </div>

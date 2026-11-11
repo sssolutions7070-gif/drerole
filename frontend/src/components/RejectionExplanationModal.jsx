@@ -32,7 +32,7 @@ const RejectionExplanationModal = ({ applicationId, onClose }) => {
           <h2 className="text-lg font-semibold text-gray-900 flex items-center">
             <HelpCircle className="h-5 w-5 mr-2 text-blue-600" /> Why was I rejected?
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-600">
             <X className="h-6 w-6" />
           </button>
         </div>

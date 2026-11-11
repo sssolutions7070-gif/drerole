@@ -265,6 +265,7 @@ const CandidateDiscoveryPanel = ({ recruiterId }) => {
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-5 relative">
             <button
               onClick={() => setShowSaveModal(false)}
+              aria-label="Close"
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
             >
               <X className="h-5 w-5" />
@@ -402,7 +403,7 @@ const CandidateDiscoveryPanel = ({ recruiterId }) => {
                 <h3 className="text-lg font-semibold text-gray-900">{viewingCandidate.fullName}</h3>
                 {viewingCandidate.headline && <p className="text-sm text-gray-600">{viewingCandidate.headline}</p>}
               </div>
-              <button onClick={() => setViewingCandidate(null)} className="text-gray-400 hover:text-gray-600">
+              <button onClick={() => setViewingCandidate(null)} aria-label="Close" className="text-gray-400 hover:text-gray-600">
                 <X className="h-5 w-5" />
               </button>
             </div>

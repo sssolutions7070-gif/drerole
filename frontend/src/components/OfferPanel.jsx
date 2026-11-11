@@ -338,7 +338,7 @@ const OfferPanel = ({ applicationId, isRecruiter, onClose }) => {
             <h2 className="text-lg font-semibold text-gray-900 flex items-center">
               <FileCheck className="h-5 w-5 mr-2 text-green-600" /> Offer
             </h2>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-600">
               <X className="h-6 w-6" />
             </button>
           </div>
@@ -373,6 +373,7 @@ const OfferPanel = ({ applicationId, isRecruiter, onClose }) => {
                 <button
                   type="button"
                   onClick={() => setShowOfferLetter(false)}
+                  aria-label="Close"
                   className="p-1.5 text-gray-400 hover:text-gray-600 rounded"
                 >
                   <X className="h-5 w-5" />

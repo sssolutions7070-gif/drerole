@@ -145,6 +145,7 @@ const JobPostForm = ({ job, onSubmit, onCancel }) => {
           </h2>
           <button
             onClick={onCancel}
+            aria-label="Close"
             className="text-gray-400 hover:text-gray-600"
           >
             <X className="h-6 w-6" />
