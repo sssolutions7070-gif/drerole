@@ -49,6 +49,15 @@ public class WebConfig implements WebMvcConfigurer {
                 .addResourceLocations(profilesPath)
                 .setCachePeriod(3600)
                 .resourceChain(true);
-        
+
+        // Video intros are shown to recruiters alongside a candidate's profile, same public
+        // visibility as the profile picture above.
+        Path videoIntrosDir = Paths.get("uploads/video-intros").toAbsolutePath().normalize();
+        String videoIntrosPath = "file:" + videoIntrosDir.toString() + "/";
+
+        registry.addResourceHandler("/uploads/video-intros/**")
+                .addResourceLocations(videoIntrosPath)
+                .setCachePeriod(3600)
+                .resourceChain(true);
     }
 }

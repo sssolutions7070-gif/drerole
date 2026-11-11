@@ -150,6 +150,31 @@ describe('CandidateDiscoveryPanel', () => {
     expect((await screen.findAllByText('Loves distributed systems')).length).toBeGreaterThanOrEqual(1);
   });
 
+  it('shows a video intro badge and plays the video in the profile modal', async () => {
+    candidateDiscoveryAPI.discover.mockResolvedValue({
+      data: [candidate({ videoIntroUrl: '/uploads/video-intros/1_abc.mp4' })],
+    });
+    candidateDiscoveryAPI.recordView.mockResolvedValue({});
+
+    const user = userEvent.setup();
+    render(<CandidateDiscoveryPanel />);
+
+    expect(await screen.findByText(/video intro/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /View Profile/i }));
+
+    expect(screen.getByTestId('candidate-video-intro')).toBeInTheDocument();
+  });
+
+  it('does not show a video intro badge when the candidate has none', async () => {
+    candidateDiscoveryAPI.discover.mockResolvedValue({ data: [candidate()] });
+
+    render(<CandidateDiscoveryPanel />);
+
+    await screen.findByText('Alice Anderson');
+    expect(screen.queryByText(/video intro/i)).not.toBeInTheDocument();
+  });
+
   it('can message a candidate directly from the profile modal', async () => {
     candidateDiscoveryAPI.discover.mockResolvedValue({ data: [candidate()] });
     candidateDiscoveryAPI.recordView.mockResolvedValue({});

@@ -71,6 +71,7 @@ public class CandidateDiscoveryService {
         view.put("location", user.getLocation());
         view.put("skills", skills);
         view.put("hasResume", hasResume);
+        view.put("videoIntroUrl", user.getVideoIntroUrl());
         return view;
     }
 }

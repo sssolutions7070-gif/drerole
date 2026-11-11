@@ -59,7 +59,12 @@ public class User {
     
     @Column(name = "profile_picture")
     private String profilePicture;
-    
+
+    // A short self-recorded video introduction candidates can attach to their profile,
+    // viewable by recruiters alongside the resume. Null until they upload one.
+    @Column(name = "video_intro_url")
+    private String videoIntroUrl;
+
     @Column(updatable = false)
     private LocalDateTime createdAt;
     
@@ -193,6 +198,8 @@ public class User {
     public void setGithub(String github) { this.github = github; }
     public String getProfilePicture() { return profilePicture; }
     public void setProfilePicture(String profilePicture) { this.profilePicture = profilePicture; }
+    public String getVideoIntroUrl() { return videoIntroUrl; }
+    public void setVideoIntroUrl(String videoIntroUrl) { this.videoIntroUrl = videoIntroUrl; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }

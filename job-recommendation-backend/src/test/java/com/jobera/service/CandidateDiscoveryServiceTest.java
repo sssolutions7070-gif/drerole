@@ -53,6 +53,7 @@ class CandidateDiscoveryServiceTest {
     @Test
     void returnsOnlyOpenToWorkCandidates() {
         User alice = user(1, "Alice", "Remote");
+        alice.setVideoIntroUrl("/uploads/video-intros/1_abc.mp4");
         when(userRepository.findByOpenToWorkTrueAndIsActiveTrue()).thenReturn(List.of(alice));
         when(userSkillRepository.findByUserId(1L)).thenReturn(List.of(skill(alice, "Java")));
         when(resumeRepository.findByUserId(1L)).thenReturn(List.of(new Resume()));
@@ -62,6 +63,7 @@ class CandidateDiscoveryServiceTest {
         assertEquals(1, results.size());
         assertEquals("Alice", results.get(0).get("fullName"));
         assertEquals(true, results.get(0).get("hasResume"));
+        assertEquals("/uploads/video-intros/1_abc.mp4", results.get(0).get("videoIntroUrl"));
     }
 
     @Test

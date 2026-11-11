@@ -122,6 +122,7 @@ public class UserProfileController {
             profile.put(FIELD_LINKEDIN, user.getLinkedin());
             profile.put(FIELD_GITHUB, user.getGithub());
             profile.put("profilePicture", user.getProfilePicture());
+            profile.put("videoIntroUrl", user.getVideoIntroUrl());
             profile.put(FIELD_JOB_ALERTS_ENABLED, user.getJobAlertsEnabled());
             profile.put(FIELD_TWO_FACTOR_ENABLED, user.getTwoFactorEnabled());
             profile.put(FIELD_OPEN_TO_WORK, user.getOpenToWork());
@@ -383,7 +384,82 @@ public class UserProfileController {
             return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "Failed to upload image: " + e.getMessage()));
         }
     }
-    
+
+    private static final long MAX_VIDEO_INTRO_BYTES = 50L * 1024 * 1024;
+    private static final List<String> ALLOWED_VIDEO_EXTENSIONS = List.of(".mp4", ".webm", ".mov");
+
+    @PostMapping("/{userId}/video-intro")
+    public ResponseEntity<Map<String, String>> uploadVideoIntro(
+            @PathVariable Long userId,
+            @RequestParam("file") MultipartFile file) {
+        try {
+            Optional<User> userOpt = userRepository.findById(userId);
+            if (userOpt.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+
+            if (file.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "File is empty"));
+            }
+            if (file.getSize() > MAX_VIDEO_INTRO_BYTES) {
+                return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "Video must be under 50MB"));
+            }
+
+            String originalFilename = file.getOriginalFilename();
+            String extension = "";
+            if (originalFilename != null && originalFilename.contains(".")) {
+                extension = originalFilename.substring(originalFilename.lastIndexOf(".")).toLowerCase();
+            }
+            if (!ALLOWED_VIDEO_EXTENSIONS.contains(extension)) {
+                return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "Unsupported video format. Use MP4, WebM, or MOV"));
+            }
+
+            String uploadDir = "uploads/video-intros/";
+            Path uploadPath = Paths.get(uploadDir).toAbsolutePath().normalize();
+            if (!Files.exists(uploadPath)) {
+                Files.createDirectories(uploadPath);
+                log.debug("Created upload directory: " + uploadPath);
+            }
+
+            String fileName = userId + "_" + System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 8) + extension;
+            Path filePath = uploadPath.resolve(fileName);
+            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+            String fileUrl = "/uploads/video-intros/" + fileName;
+
+            User user = userOpt.get();
+            user.setVideoIntroUrl(fileUrl);
+            userRepository.save(user);
+
+            log.debug("Video intro updated for user " + userId + ": " + fileUrl);
+
+            Map<String, String> response = new HashMap<>();
+            response.put(MESSAGE_KEY, "Video intro uploaded successfully");
+            response.put("videoIntroUrl", fileUrl);
+
+            return ResponseEntity.ok(response);
+
+        } catch (IOException e) {
+            log.error("Error uploading video intro: " + e.getMessage());
+            log.error("Unexpected error", e);
+            return ResponseEntity.badRequest().body(Map.of(ERROR_KEY, "Failed to upload video: " + e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/{userId}/video-intro")
+    public ResponseEntity<Map<String, String>> deleteVideoIntro(@PathVariable Long userId) {
+        Optional<User> userOpt = userRepository.findById(userId);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        User user = userOpt.get();
+        user.setVideoIntroUrl(null);
+        userRepository.save(user);
+
+        return ResponseEntity.ok(Map.of(MESSAGE_KEY, "Video intro removed"));
+    }
+
     @PostMapping("/{userId}/skills")
     public ResponseEntity<Map<String, Object>> addSkill(
             @PathVariable Long userId,

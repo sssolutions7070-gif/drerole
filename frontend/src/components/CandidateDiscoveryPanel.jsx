@@ -1,7 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { Search, MapPin, FileText, MessageCircle, Sparkles, Bookmark, Bell, BellOff, Trash2, X, Check, UserCircle } from 'lucide-react';
+import { Search, MapPin, FileText, MessageCircle, Sparkles, Bookmark, Bell, BellOff, Trash2, X, Check, UserCircle, Video } from 'lucide-react';
 import { candidateDiscoveryAPI, savedCandidateSearchAPI } from '../services/api';
 import DirectMessageThread from './DirectMessageThread';
+import { BACKEND_ORIGIN } from '../config';
+
+const getVideoUrl = (path) => {
+  if (!path) return null;
+  return path.startsWith('http') ? path : `${BACKEND_ORIGIN}${path}`;
+};
 
 /** Any recruiter's window into the "open to work" candidate pool - people who opted in to be
  *  discoverable even if they've never applied to one of this recruiter's postings. */
@@ -359,6 +365,11 @@ const CandidateDiscoveryPanel = ({ recruiterId }) => {
                       <FileText className="h-3 w-3" /> Resume on file
                     </span>
                   )}
+                  {candidate.videoIntroUrl && (
+                    <span className="inline-flex items-center gap-1 text-xs text-indigo-700 bg-indigo-100 px-2 py-1 rounded-full">
+                      <Video className="h-3 w-3" /> Video intro
+                    </span>
+                  )}
                   <button
                     onClick={() => handleViewProfile(candidate)}
                     className="inline-flex items-center gap-1 text-xs text-gray-600 hover:text-gray-800 border border-gray-200 rounded-full px-2 py-1"
@@ -411,6 +422,14 @@ const CandidateDiscoveryPanel = ({ recruiterId }) => {
               <p className="text-sm text-gray-500 flex items-center gap-1 mb-3">
                 <MapPin className="h-4 w-4" /> {viewingCandidate.location}
               </p>
+            )}
+            {viewingCandidate.videoIntroUrl && (
+              <video
+                data-testid="candidate-video-intro"
+                src={getVideoUrl(viewingCandidate.videoIntroUrl)}
+                controls
+                className="w-full rounded-lg max-h-56 bg-black mb-3"
+              />
             )}
             {viewingCandidate.bio && <p className="text-sm text-gray-700 mb-3">{viewingCandidate.bio}</p>}
             {viewingCandidate.skills?.length > 0 && (
