@@ -247,6 +247,90 @@ describe('ApplicationsList bulk messaging', () => {
   });
 });
 
+describe('ApplicationsList follow-up nudges', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    localStorage.setItem('user', JSON.stringify({ id: 1, role: 'ROLE_RECRUITER', recruiterId: 5 }));
+    api.get.mockImplementation((url) => {
+      if (url.includes('/resume-matching/job/') || url.includes('/applications/job/')) {
+        return Promise.resolve({ data: { applications: mockApplications } });
+      }
+      if (url.includes('/recruiters/user/')) {
+        return Promise.resolve({ data: { recruiter: { id: 5 } } });
+      }
+      return Promise.resolve({ data: [] });
+    });
+  });
+
+  it('sends a follow-up with the chosen template to one candidate', async () => {
+    api.post.mockResolvedValue({ data: { message: 'Follow-up nudge sent successfully', followUpCount: 1 } });
+    const user = userEvent.setup();
+    render(<ApplicationsList job={mockJob} onClose={vi.fn()} />);
+    await screen.findByText('Bob Candidate');
+
+    const followUpButtons = screen.getAllByRole('button', { name: /^Follow-Up/i });
+    await user.click(followUpButtons[0]);
+
+    expect(screen.getByRole('heading', { name: 'Send Follow-Up' })).toBeInTheDocument();
+    await user.selectOptions(screen.getByDisplayValue('General check-in'), 'INTERVIEW_REMINDER');
+    await user.click(screen.getByRole('button', { name: /^Send Follow-Up$/i }));
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith('/applications/101/follow-up', {
+        templateType: 'INTERVIEW_REMINDER',
+        customMessage: undefined,
+      });
+    });
+  });
+
+  it('includes a typed custom message when one is given', async () => {
+    api.post.mockResolvedValue({ data: {} });
+    const user = userEvent.setup();
+    render(<ApplicationsList job={mockJob} onClose={vi.fn()} />);
+    await screen.findByText('Bob Candidate');
+
+    await user.click(screen.getAllByRole('button', { name: /^Follow-Up/i })[0]);
+    await user.type(screen.getByPlaceholderText(/Leave blank to use the template/i), 'Just checking in!');
+    await user.click(screen.getByRole('button', { name: /^Send Follow-Up$/i }));
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith('/applications/101/follow-up', {
+        templateType: 'CHECK_IN',
+        customMessage: 'Just checking in!',
+      });
+    });
+  });
+
+  it('does not offer a follow-up on a rejected application', async () => {
+    api.get.mockImplementation((url) => {
+      if (url.includes('/resume-matching/job/') || url.includes('/applications/job/')) {
+        return Promise.resolve({ data: { applications: [{ ...mockApplications[0], status: 'REJECTED' }] } });
+      }
+      if (url.includes('/recruiters/user/')) {
+        return Promise.resolve({ data: { recruiter: { id: 5 } } });
+      }
+      return Promise.resolve({ data: [] });
+    });
+    render(<ApplicationsList job={mockJob} onClose={vi.fn()} />);
+
+    await screen.findByText('Bob Candidate');
+    expect(screen.queryByRole('button', { name: /^Follow-Up/i })).not.toBeInTheDocument();
+  });
+
+  it('shows an error instead of silently failing', async () => {
+    api.post.mockRejectedValue({ response: { data: { error: 'Application not found' } } });
+    const user = userEvent.setup();
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    render(<ApplicationsList job={mockJob} onClose={vi.fn()} />);
+    await screen.findByText('Bob Candidate');
+
+    await user.click(screen.getAllByRole('button', { name: /^Follow-Up/i })[0]);
+    await user.click(screen.getByRole('button', { name: /^Send Follow-Up$/i }));
+
+    await waitFor(() => expect(alertSpy).toHaveBeenCalledWith('Failed to send follow-up: Application not found'));
+  });
+});
+
 describe('ApplicationsList Kanban Board View', () => {
   beforeEach(() => {
     vi.resetAllMocks();

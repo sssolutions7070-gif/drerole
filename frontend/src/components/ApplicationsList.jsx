@@ -5,7 +5,7 @@ import {
   Briefcase, RefreshCw, Eye, Clock, CheckCircle, XCircle,
   Calendar as CalendarIcon, MapPin, MessageCircle, TrendingUp,
   FileText, Percent, Target, Award, Sparkles, Video, FileCheck,
-  Columns, GripVertical, List, Search, EyeOff, ShieldCheck, GitCompare
+  Columns, GripVertical, List, Search, EyeOff, ShieldCheck, GitCompare, Bell
 } from 'lucide-react';
 import api from '../services/api';
 import MessageThread from './MessageThread';
@@ -38,6 +38,8 @@ const ApplicationsList = ({ job, onClose }) => {
   const [showBulkMessageModal, setShowBulkMessageModal] = useState(false);
   const [sendingBulkMessage, setSendingBulkMessage] = useState(false);
   const [showCompareModal, setShowCompareModal] = useState(false);
+  const [followUpApplicationId, setFollowUpApplicationId] = useState(null);
+  const [sendingFollowUp, setSendingFollowUp] = useState(false);
   const [exportingCsv, setExportingCsv] = useState(false);
   const [viewMode, setViewMode] = useState('list'); // 'list' | 'kanban'
   const [searchQuery, setSearchQuery] = useState('');
@@ -479,6 +481,26 @@ const ApplicationsList = ({ job, onClose }) => {
       alert('Failed to send bulk message: ' + (error.response?.data?.error || error.message));
     } finally {
       setSendingBulkMessage(false);
+    }
+  };
+
+  // A gentle nudge to one candidate (interview reminder, assessment nudge, status check-in, or a
+  // custom note) - backed by ApplicationStatusService.sendFollowUp, which records it on the
+  // candidate's own notification feed. Takes templateType/customMessage as arguments rather than
+  // reading them off component state, same reason as handleSendBulkMessage above.
+  const handleSendFollowUp = async (templateType, customMessage) => {
+    if (!followUpApplicationId) return;
+    setSendingFollowUp(true);
+    try {
+      await api.post(`/applications/${followUpApplicationId}/follow-up`, {
+        templateType,
+        customMessage: customMessage?.trim() || undefined,
+      });
+      setFollowUpApplicationId(null);
+    } catch (error) {
+      alert('Failed to send follow-up: ' + (error.response?.data?.error || error.message));
+    } finally {
+      setSendingFollowUp(false);
     }
   };
 
@@ -1082,6 +1104,71 @@ const ApplicationsList = ({ job, onClose }) => {
               className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
             >
               {sendingBulkMessage ? 'Sending...' : `Send to ${count}`}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const FOLLOW_UP_TEMPLATES = [
+    { value: 'CHECK_IN', label: 'General check-in' },
+    { value: 'INTERVIEW_REMINDER', label: 'Interview reminder' },
+    { value: 'ASSESSMENT_NUDGE', label: 'Assessment nudge' },
+    { value: 'NEXT_STEPS', label: 'Next steps update' },
+  ];
+
+  const FollowUpModal = () => {
+    const [templateType, setTemplateType] = useState('CHECK_IN');
+    const [customMessage, setCustomMessage] = useState('');
+
+    return (
+      <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div className="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold">Send Follow-Up</h3>
+            <button
+              onClick={() => setFollowUpApplicationId(null)}
+              aria-label="Close"
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          <label className="block text-sm font-medium text-gray-700 mb-1">Template</label>
+          <select
+            value={templateType}
+            onChange={(e) => setTemplateType(e.target.value)}
+            className="w-full border border-gray-300 rounded-md px-3 py-2 mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {FOLLOW_UP_TEMPLATES.map((t) => (
+              <option key={t.value} value={t.value}>{t.label}</option>
+            ))}
+          </select>
+
+          <label className="block text-sm font-medium text-gray-700 mb-1">Custom message (optional)</label>
+          <textarea
+            value={customMessage}
+            onChange={(e) => setCustomMessage(e.target.value)}
+            rows={3}
+            placeholder="Leave blank to use the template's default wording..."
+            className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+
+          <div className="flex justify-end space-x-3 mt-4">
+            <button
+              onClick={() => setFollowUpApplicationId(null)}
+              className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => handleSendFollowUp(templateType, customMessage)}
+              disabled={sendingFollowUp}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+            >
+              {sendingFollowUp ? 'Sending...' : 'Send Follow-Up'}
             </button>
           </div>
         </div>
@@ -2127,6 +2214,17 @@ const ApplicationsList = ({ job, onClose }) => {
                       Message Candidate
                     </button>
 
+                    {application.status !== 'REJECTED' && application.status !== 'WITHDRAWN' && (
+                      <button
+                        onClick={() => setFollowUpApplicationId(application.id)}
+                        title={application.followUpCount ? `Sent ${application.followUpCount} follow-up${application.followUpCount === 1 ? '' : 's'} already` : 'Send a follow-up nudge'}
+                        className="inline-flex items-center px-3 py-2 border border-amber-300 text-amber-700 rounded-md text-sm font-medium hover:bg-amber-50"
+                      >
+                        <Bell className="h-4 w-4 mr-1" />
+                        Follow-Up{application.followUpCount > 0 ? ` (${application.followUpCount})` : ''}
+                      </button>
+                    )}
+
                     {application.status !== 'REJECTED' && (
                       <button
                         onClick={() => setPipelineApplicationId(application.id)}
@@ -2230,6 +2328,7 @@ const ApplicationsList = ({ job, onClose }) => {
         {showTestResultsModal && <TestResultsModal />}
         {showCompareModal && <CompareModal />}
         {showBulkMessageModal && <BulkMessageModal />}
+        {followUpApplicationId && <FollowUpModal />}
         {messageThreadApplication && (
           <MessageThread
             applicationId={messageThreadApplication.id}
