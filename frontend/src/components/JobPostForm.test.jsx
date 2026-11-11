@@ -1,7 +1,10 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import JobPostForm from './JobPostForm';
+import api from '../services/api';
+
+vi.mock('../services/api');
 
 const fillRequiredFields = async (user) => {
   await user.type(screen.getByLabelText(/Job Title/i), 'Backend Engineer');
@@ -81,5 +84,55 @@ describe('JobPostForm screening questions', () => {
     render(<JobPostForm job={job} onSubmit={vi.fn()} onCancel={vi.fn()} />);
 
     expect(screen.getByDisplayValue('Authorized to work?')).toBeInTheDocument();
+  });
+});
+
+describe('JobPostForm AI-suggested screening questions', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('asks for a title and description before suggesting', async () => {
+    const user = userEvent.setup();
+    render(<JobPostForm job={null} onSubmit={vi.fn()} onCancel={vi.fn()} />);
+
+    await user.click(screen.getByRole('button', { name: /Suggest with AI/i }));
+
+    expect(await screen.findByText(/add a title and description first/i)).toBeInTheDocument();
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it('appends AI-suggested questions to the list', async () => {
+    api.post.mockResolvedValue({
+      data: {
+        screeningQuestions: [
+          { questionText: 'Are you authorized to work in this country?', expectedAnswer: true, knockout: true },
+        ],
+      },
+    });
+    const user = userEvent.setup();
+    render(<JobPostForm job={null} onSubmit={vi.fn()} onCancel={vi.fn()} />);
+
+    await user.type(screen.getByLabelText(/Job Title/i), 'Backend Engineer');
+    await user.type(screen.getByLabelText(/Job Description/i), 'Build APIs');
+    await user.click(screen.getByRole('button', { name: /Suggest with AI/i }));
+
+    expect(api.post).toHaveBeenCalledWith('/recruiters/jobs/suggest-screening-questions', expect.objectContaining({
+      title: 'Backend Engineer',
+      description: 'Build APIs',
+    }));
+    expect(await screen.findByDisplayValue('Are you authorized to work in this country?')).toBeInTheDocument();
+  });
+
+  it('shows an error when the suggestion request fails', async () => {
+    api.post.mockRejectedValue({ response: { data: { error: 'AI service unavailable' } } });
+    const user = userEvent.setup();
+    render(<JobPostForm job={null} onSubmit={vi.fn()} onCancel={vi.fn()} />);
+
+    await user.type(screen.getByLabelText(/Job Title/i), 'Backend Engineer');
+    await user.type(screen.getByLabelText(/Job Description/i), 'Build APIs');
+    await user.click(screen.getByRole('button', { name: /Suggest with AI/i }));
+
+    expect(await screen.findByText('AI service unavailable')).toBeInTheDocument();
   });
 });

@@ -422,6 +422,79 @@ public class AiInterviewClient {
         return bank.size() > count ? bank.subList(0, count) : bank;
     }
 
+    /** Yes/No knockout questions a recruiter can drop straight into a job posting's
+     *  screeningQuestions field (see JobPostingService.createJobPosting) - each item is
+     *  {questionText, expectedAnswer, knockout}. */
+    public List<Map<String, Object>> generateScreeningQuestions(String jobTitle, String jobDescription,
+                                                                  String requiredSkills, int count) {
+        if (!isConfigured()) {
+            return generateFallbackScreeningQuestions(jobTitle, requiredSkills, count);
+        }
+
+        String prompt = "You are an expert recruiter. Based on this job posting, write exactly " + count
+            + " Yes/No screening questions a candidate answers when applying - the kind that quickly weed out "
+            + "unqualified applicants (work authorization, required certifications, minimum years of experience, "
+            + "willingness to relocate/work on-site, availability, salary expectations fitting the range, etc). "
+            + "Phrase each question so the qualifying answer is 'Yes'.\n\n"
+            + "Job title: " + nullToEmpty(jobTitle) + "\n"
+            + "Required skills: " + nullToEmpty(requiredSkills) + "\n"
+            + "Job description: " + nullToEmpty(jobDescription) + "\n\n"
+            + "For each question, provide:\n"
+            + "- \"questionText\": the Yes/No question\n"
+            + "- \"expectedAnswer\": true (the qualifying answer is always Yes, as instructed above)\n"
+            + "- \"knockout\": true if answering No should auto-reject the application, false if it's just informational\n\n"
+            + "Respond with ONLY a valid JSON array of " + count + " objects, nothing else.";
+
+        try {
+            String responseText = callClaude(prompt);
+            JsonNode array = objectMapper.readTree(extractJson(responseText));
+            List<Map<String, Object>> list = new ArrayList<>();
+            for (JsonNode node : array) {
+                Map<String, Object> map = new HashMap<>();
+                map.put("questionText", node.path("questionText").asText(""));
+                map.put("expectedAnswer", node.path("expectedAnswer").asBoolean(true));
+                map.put("knockout", node.path("knockout").asBoolean(false));
+                if (!map.get("questionText").toString().isBlank()) {
+                    list.add(map);
+                }
+            }
+            if (!list.isEmpty()) {
+                return list.size() > count ? list.subList(0, count) : list;
+            }
+        } catch (Exception e) {
+            // Gracefully fall back to generic templates
+        }
+
+        return generateFallbackScreeningQuestions(jobTitle, requiredSkills, count);
+    }
+
+    private List<Map<String, Object>> generateFallbackScreeningQuestions(String jobTitle, String requiredSkills,
+                                                                           int count) {
+        List<Map<String, Object>> bank = new ArrayList<>();
+        bank.add(screeningQuestion("Are you legally authorized to work in this location?", true, true));
+        bank.add(screeningQuestion("Are you available to start within the next 30 days?", true, false));
+        bank.add(screeningQuestion(
+            "Do you have prior hands-on experience" + (jobTitle != null && !jobTitle.isBlank() ? " as a " + jobTitle : "") + "?",
+            true, true));
+
+        String firstSkill = requiredSkills == null ? "" : requiredSkills.split(",")[0].trim();
+        if (!firstSkill.isBlank()) {
+            bank.add(screeningQuestion("Do you have working experience with " + firstSkill + "?", true, true));
+        }
+        bank.add(screeningQuestion("Are you comfortable with the compensation range listed for this role?", true, false));
+        bank.add(screeningQuestion("Are you open to on-site or hybrid work if required for this role?", true, false));
+
+        return bank.size() > count ? bank.subList(0, count) : bank;
+    }
+
+    private Map<String, Object> screeningQuestion(String questionText, boolean expectedAnswer, boolean knockout) {
+        Map<String, Object> q = new HashMap<>();
+        q.put("questionText", questionText);
+        q.put("expectedAnswer", expectedAnswer);
+        q.put("knockout", knockout);
+        return q;
+    }
+
     public Map<String, Object> generateResumeTailoring(String jobTitle, String jobDescription,
                                                         List<String> userSkills, List<String> missingSkills,
                                                         int currentMatchScore) {

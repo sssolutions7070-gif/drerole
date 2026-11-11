@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jobera.entity.Application;
 import com.jobera.entity.JobPosting;
+import com.jobera.service.AiInterviewClient;
 import com.jobera.service.JobPostingService;
 import com.jobera.service.RecruiterService;
 import org.springframework.http.HttpHeaders;
@@ -25,11 +26,19 @@ public class JobManagementController {
 
     private final JobPostingService jobPostingService;
     private final RecruiterService recruiterService;
+    private final AiInterviewClient aiInterviewClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public JobManagementController(JobPostingService jobPostingService, RecruiterService recruiterService) {
+    @org.springframework.beans.factory.annotation.Autowired
+    public JobManagementController(JobPostingService jobPostingService, RecruiterService recruiterService,
+                                    AiInterviewClient aiInterviewClient) {
         this.jobPostingService = jobPostingService;
         this.recruiterService = recruiterService;
+        this.aiInterviewClient = aiInterviewClient;
+    }
+
+    public JobManagementController(JobPostingService jobPostingService, RecruiterService recruiterService) {
+        this(jobPostingService, recruiterService, null);
     }
 
     /** The request body sends screeningQuestions as a real nested JSON array (not a
@@ -91,7 +100,27 @@ public class JobManagementController {
             return ResponseEntity.badRequest().body(Map.of("error", "Failed to create job: " + e.getMessage()));
         }
     }
-    
+
+    /** Drafts a starter set of Yes/No screening questions from the job's title/description/
+     *  skills - the recruiter reviews and edits them before the posting is saved, same
+     *  shape as formData.screeningQuestions in JobPostForm. */
+    @PostMapping("/suggest-screening-questions")
+    public ResponseEntity<Map<String, Object>> suggestScreeningQuestions(@RequestBody Map<String, Object> request) {
+        try {
+            String title = (String) request.get("title");
+            String description = (String) request.get("description");
+            String requiredSkills = (String) request.get("requiredSkills");
+
+            List<Map<String, Object>> questions = aiInterviewClient.generateScreeningQuestions(
+                title, description, requiredSkills, 4);
+
+            return ResponseEntity.ok(Map.of("screeningQuestions", questions));
+        } catch (Exception e) {
+            log.error("❌ ERROR suggesting screening questions: " + e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("error", "Failed to suggest screening questions: " + e.getMessage()));
+        }
+    }
+
     @PutMapping("/{jobId}")
     public ResponseEntity<Map<String, Object>> updateJob(
             @PathVariable Long jobId, 

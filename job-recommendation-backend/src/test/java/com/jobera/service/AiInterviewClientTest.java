@@ -139,6 +139,43 @@ class AiInterviewClientTest {
     }
 
     @Test
+    void generateScreeningQuestionsParsesClaudeResponse() {
+        String json = "[{\"questionText\":\"Are you authorized to work in this country?\",\"expectedAnswer\":true,\"knockout\":true}]";
+        lenient().when(restTemplate.postForObject(any(String.class), any(), eq(Map.class)))
+            .thenReturn(claudeResponse(json));
+
+        List<Map<String, Object>> questions = configured.generateScreeningQuestions(
+            "Backend Engineer", "Build APIs", "Java, Spring", 1);
+
+        assertEquals(1, questions.size());
+        assertEquals("Are you authorized to work in this country?", questions.get(0).get("questionText"));
+        assertEquals(true, questions.get(0).get("expectedAnswer"));
+        assertEquals(true, questions.get(0).get("knockout"));
+    }
+
+    @Test
+    void generateScreeningQuestionsFallsBackWhenUnconfigured() {
+        List<Map<String, Object>> fallback = unconfigured.generateScreeningQuestions(
+            "Backend Engineer", "Build APIs", "Java, Spring", 4);
+
+        assertEquals(4, fallback.size());
+        assertTrue(fallback.get(0).containsKey("questionText"));
+        assertTrue(fallback.get(0).containsKey("expectedAnswer"));
+        assertTrue(fallback.get(0).containsKey("knockout"));
+    }
+
+    @Test
+    void generateScreeningQuestionsFallsBackOnUnparseableResponse() {
+        lenient().when(restTemplate.postForObject(any(String.class), any(), eq(Map.class)))
+            .thenReturn(claudeResponse("not json at all"));
+
+        List<Map<String, Object>> fallback = configured.generateScreeningQuestions(
+            "Backend Engineer", "Build APIs", "Java", 3);
+
+        assertEquals(3, fallback.size());
+    }
+
+    @Test
     void generateResumeTailoringFallsBackWhenUnconfigured() {
         Map<String, Object> result = unconfigured.generateResumeTailoring(
             "Full Stack Engineer",

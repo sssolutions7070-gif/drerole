@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Star, Plus, Trash2 } from 'lucide-react';
+import { X, Star, Plus, Trash2, Sparkles } from 'lucide-react';
+import api from '../services/api';
 
 /** Parses the job's screeningQuestions (a JSON string from the backend, or already an array if
  *  a fresh form submission round-tripped through state) into a plain array, tolerating
@@ -95,6 +96,34 @@ const JobPostForm = ({ job, onSubmit, onCancel }) => {
       ...formData,
       screeningQuestions: formData.screeningQuestions.filter((_, i) => i !== index)
     });
+  };
+
+  const [suggestingQuestions, setSuggestingQuestions] = useState(false);
+  const [suggestError, setSuggestError] = useState('');
+
+  const handleSuggestScreeningQuestions = async () => {
+    if (!formData.title.trim() || !formData.description.trim()) {
+      setSuggestError('Add a title and description first so the AI has something to work with.');
+      return;
+    }
+    try {
+      setSuggestingQuestions(true);
+      setSuggestError('');
+      const response = await api.post('/recruiters/jobs/suggest-screening-questions', {
+        title: formData.title,
+        description: formData.description,
+        requiredSkills: formData.requiredSkills,
+      });
+      const suggested = response.data?.screeningQuestions || [];
+      setFormData((prev) => ({
+        ...prev,
+        screeningQuestions: [...prev.screeningQuestions, ...suggested],
+      }));
+    } catch (err) {
+      setSuggestError(err.response?.data?.error || 'Failed to suggest screening questions');
+    } finally {
+      setSuggestingQuestions(false);
+    }
   };
 
   const handleSubmit = (e) => {
@@ -345,19 +374,31 @@ const JobPostForm = ({ job, onSubmit, onCancel }) => {
               <label className="block text-sm font-medium text-gray-700">
                 Screening Questions (optional)
               </label>
-              <button
-                type="button"
-                onClick={addScreeningQuestion}
-                className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800 font-medium"
-              >
-                <Plus className="h-4 w-4 mr-1" /> Add question
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleSuggestScreeningQuestions}
+                  disabled={suggestingQuestions}
+                  className="inline-flex items-center text-sm text-purple-600 hover:text-purple-800 font-medium disabled:opacity-50"
+                >
+                  <Sparkles className="h-4 w-4 mr-1" />
+                  {suggestingQuestions ? 'Suggesting...' : 'Suggest with AI'}
+                </button>
+                <button
+                  type="button"
+                  onClick={addScreeningQuestion}
+                  className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  <Plus className="h-4 w-4 mr-1" /> Add question
+                </button>
+              </div>
             </div>
             <p className="text-xs text-gray-500 mb-3">
               Candidates answer these Yes/No when applying. Mark one "Auto-reject" and an answer
               that doesn't match the expected one rejects the application automatically, before
               it reaches your queue.
             </p>
+            {suggestError && <p className="text-xs text-red-600 mb-3">{suggestError}</p>}
             <div className="space-y-3">
               {formData.screeningQuestions.map((q, index) => (
                 <div key={index} className="border border-gray-200 rounded-md p-3 bg-gray-50">
