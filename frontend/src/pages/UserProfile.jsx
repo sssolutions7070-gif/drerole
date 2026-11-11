@@ -16,6 +16,7 @@ import DisableTwoFactorModal from '../components/DisableTwoFactorModal';
 import SkillBadgesPanel from '../components/SkillBadgesPanel';
 import ActiveSessionsPanel from '../components/ActiveSessionsPanel';
 import ProfileViewsPanel from '../components/ProfileViewsPanel';
+import ProfileStrengthPanel from '../components/ProfileStrengthPanel';
 import GoogleCalendarPanel from '../components/GoogleCalendarPanel';
 
 const UserProfile = () => {
@@ -576,6 +577,11 @@ const UserProfile = () => {
                   </button>
                 </div>
               )}
+            </div>
+
+            {/* Profile Strength */}
+            <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-6 mt-6">
+              <ProfileStrengthPanel userId={currentUser.id} />
             </div>
           </div>
 

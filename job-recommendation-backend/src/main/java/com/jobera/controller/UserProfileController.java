@@ -36,6 +36,7 @@ import com.jobera.repository.UserEducationRepository;
 import com.jobera.repository.UserExperienceRepository;
 import com.jobera.repository.UserRepository;
 import com.jobera.repository.UserSkillRepository;
+import com.jobera.service.ProfileStrengthService;
 
 @RestController
 @RequestMapping("/api/users")
@@ -64,22 +65,34 @@ public class UserProfileController {
     private final UserExperienceRepository userExperienceRepository;
     private final UserCertificationRepository userCertificationRepository;
     private final ResumeRepository resumeRepository;
+    private final ProfileStrengthService profileStrengthService;
     private final ObjectMapper objectMapper;
-    
+
     public UserProfileController(
             UserRepository userRepository,
             UserSkillRepository userSkillRepository,
             UserEducationRepository userEducationRepository,
             UserExperienceRepository userExperienceRepository,
             UserCertificationRepository userCertificationRepository,
-            ResumeRepository resumeRepository) {
+            ResumeRepository resumeRepository,
+            ProfileStrengthService profileStrengthService) {
         this.userRepository = userRepository;
         this.userSkillRepository = userSkillRepository;
         this.userEducationRepository = userEducationRepository;
         this.userExperienceRepository = userExperienceRepository;
         this.userCertificationRepository = userCertificationRepository;
         this.resumeRepository = resumeRepository;
+        this.profileStrengthService = profileStrengthService;
         this.objectMapper = new ObjectMapper();
+    }
+
+    @GetMapping("/{userId}/profile-strength")
+    public ResponseEntity<Map<String, Object>> getProfileStrength(@PathVariable Long userId) {
+        try {
+            return ResponseEntity.ok(profileStrengthService.calculate(userId));
+        } catch (ProfileStrengthService.UserNotFoundException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
     
     @GetMapping("/{userId}/profile")
