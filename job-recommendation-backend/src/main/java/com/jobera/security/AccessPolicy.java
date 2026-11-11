@@ -236,6 +236,11 @@ public class AccessPolicy {
         rule("GET", "/api/interview-rounds/{roundId}/scorecard", c -> recruiterManagesRound(c, "roundId"));
         rule("GET", "/api/applications/{applicationId}/scorecards", c -> recruiterManagesApplication(c, "applicationId"));
 
+        // Collaborative hiring comments - internal team notes, never shown to the candidate
+        rule("POST", "/api/applications/{applicationId}/comments", c -> recruiterManagesApplication(c, "applicationId"));
+        rule("GET", "/api/applications/{applicationId}/comments", c -> recruiterManagesApplication(c, "applicationId"));
+        rule("DELETE", "/api/applications/{applicationId}/comments/{commentId}", c -> recruiterManagesApplication(c, "applicationId"));
+
         // Google Calendar sync - connecting/disconnecting/checking status is about the caller's
         // own account, not any particular job/application, so just "logged in" like /api/auth/me.
         // The actual OAuth callback (/api/calendar/google/callback) is public - see

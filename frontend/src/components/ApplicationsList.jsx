@@ -5,12 +5,13 @@ import {
   Briefcase, RefreshCw, Eye, Clock, CheckCircle, XCircle,
   Calendar as CalendarIcon, MapPin, MessageCircle, TrendingUp,
   FileText, Percent, Target, Award, Sparkles, Video, FileCheck,
-  Columns, GripVertical, List, Search, EyeOff, ShieldCheck, GitCompare, Bell
+  Columns, GripVertical, List, Search, EyeOff, ShieldCheck, GitCompare, Bell, MessageSquare
 } from 'lucide-react';
 import api from '../services/api';
 import MessageThread from './MessageThread';
 import InterviewPipelinePanel from './InterviewPipelinePanel';
 import OfferPanel from './OfferPanel';
+import ApplicationCommentsPanel from './ApplicationCommentsPanel';
 
 const ApplicationsList = ({ job, onClose }) => {
   const [applications, setApplications] = useState([]);
@@ -20,6 +21,7 @@ const ApplicationsList = ({ job, onClose }) => {
   const [messageThreadApplication, setMessageThreadApplication] = useState(null);
   const [pipelineApplicationId, setPipelineApplicationId] = useState(null);
   const [offerApplicationId, setOfferApplicationId] = useState(null);
+  const [commentsApplicationId, setCommentsApplicationId] = useState(null);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showInterviewModal, setShowInterviewModal] = useState(false);
   const [showTestModal, setShowTestModal] = useState(false);
@@ -2245,6 +2247,14 @@ const ApplicationsList = ({ job, onClose }) => {
                       </button>
                     )}
 
+                    <button
+                      onClick={() => setCommentsApplicationId(application.id)}
+                      className="inline-flex items-center px-3 py-2 border border-blue-300 text-blue-700 rounded-md text-sm font-medium hover:bg-blue-50"
+                    >
+                      <MessageSquare className="h-4 w-4 mr-1" />
+                      Team Notes
+                    </button>
+
                     {application.status === 'SHORTLISTED' && (
                       <button
                         onClick={() => handleAssignTest(application)}
@@ -2321,6 +2331,12 @@ const ApplicationsList = ({ job, onClose }) => {
             applicationId={offerApplicationId}
             isRecruiter={true}
             onClose={() => setOfferApplicationId(null)}
+          />
+        )}
+        {commentsApplicationId && (
+          <ApplicationCommentsPanel
+            applicationId={commentsApplicationId}
+            onClose={() => setCommentsApplicationId(null)}
           />
         )}
         {showStatusModal && <StatusUpdateModal />}
