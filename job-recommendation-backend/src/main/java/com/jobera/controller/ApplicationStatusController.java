@@ -552,6 +552,13 @@ public class ApplicationStatusController {
             jobInfo.put("company", application.getJobPosting().getCompany());
             jobInfo.put("location", application.getJobPosting().getLocation());
             jobInfo.put("jobType", application.getJobPosting().getJobType());
+            // Added for the candidate-facing job comparison view - salary/skills/rating a
+            // candidate would want to see side by side across a few applications.
+            jobInfo.put("salaryRange", application.getJobPosting().getSalaryRange());
+            jobInfo.put("requiredSkills", application.getJobPosting().getRequiredSkills());
+            jobInfo.put("experienceLevel", application.getJobPosting().getExperienceLevel());
+            jobInfo.put("averageRating", application.getJobPosting().getAverageRating());
+            jobInfo.put("totalRatings", application.getJobPosting().getTotalRatings());
             response.put("job", jobInfo);
         }
         

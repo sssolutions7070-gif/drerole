@@ -5,6 +5,9 @@ import MessageThread from '../components/MessageThread';
 import InterviewPipelinePanel from '../components/InterviewPipelinePanel';
 import OfferPanel from '../components/OfferPanel';
 import RejectionExplanationModal from '../components/RejectionExplanationModal';
+import JobComparisonModal from '../components/JobComparisonModal';
+
+const MAX_COMPARE = 3;
 
 const UserApplications = () => {
   const [applications, setApplications] = useState([]);
@@ -16,6 +19,20 @@ const UserApplications = () => {
   const [pipelineApplicationId, setPipelineApplicationId] = useState(null);
   const [offerApplicationId, setOfferApplicationId] = useState(null);
   const [rejectionExplanationApplicationId, setRejectionExplanationApplicationId] = useState(null);
+  const [compareIds, setCompareIds] = useState([]);
+  const [showComparisonModal, setShowComparisonModal] = useState(false);
+
+  const toggleCompareSelection = (applicationId) => {
+    setCompareIds((prev) => {
+      if (prev.includes(applicationId)) {
+        return prev.filter((id) => id !== applicationId);
+      }
+      if (prev.length >= MAX_COMPARE) {
+        return prev;
+      }
+      return [...prev, applicationId];
+    });
+  };
 
   useEffect(() => {
     fetchUserApplications();
@@ -216,14 +233,24 @@ const UserApplications = () => {
           <h1 className="text-2xl font-bold text-gray-900 mb-2">My Applications</h1>
           <p className="text-gray-600">Track the status of all your job applications in real-time</p>
         </div>
-        <button
-          onClick={handleRefresh}
-          disabled={refreshing}
-          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-        >
-          <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          {compareIds.length >= 2 && (
+            <button
+              onClick={() => setShowComparisonModal(true)}
+              className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+            >
+              Compare ({compareIds.length})
+            </button>
+          )}
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -263,6 +290,16 @@ const UserApplications = () => {
               <div className="p-6">
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
+                    <label className="flex items-center gap-2 text-sm text-gray-500 mb-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={compareIds.includes(application.id)}
+                        onChange={() => toggleCompareSelection(application.id)}
+                        disabled={!compareIds.includes(application.id) && compareIds.length >= MAX_COMPARE}
+                        className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      Select to compare
+                    </label>
                     <h3 className="text-xl font-semibold text-gray-900 mb-1">
                       {application.job?.title || 'Unknown Position'}
                     </h3>
@@ -497,6 +534,12 @@ const UserApplications = () => {
         <RejectionExplanationModal
           applicationId={rejectionExplanationApplicationId}
           onClose={() => setRejectionExplanationApplicationId(null)}
+        />
+      )}
+      {showComparisonModal && (
+        <JobComparisonModal
+          applications={applications.filter((app) => compareIds.includes(app.id))}
+          onClose={() => setShowComparisonModal(false)}
         />
       )}
     </div>

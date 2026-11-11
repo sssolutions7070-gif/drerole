@@ -138,3 +138,70 @@ describe('UserApplications rejection explanation', () => {
     expect(await screen.findByText(/nothing to explain yet/i)).toBeInTheDocument();
   });
 });
+
+describe('UserApplications comparison', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    localStorage.setItem('user', JSON.stringify({ id: 1, fullName: 'Asha' }));
+  });
+
+  it('does not show a Compare button with fewer than two selections', async () => {
+    api.get.mockResolvedValue({
+      data: { applications: [application(), application({ id: 2, job: { title: 'Frontend Engineer', company: 'Beta' } })] },
+    });
+    const user = userEvent.setup();
+
+    render(<UserApplications />);
+    await user.click((await screen.findAllByLabelText(/select to compare/i))[0]);
+
+    expect(screen.queryByRole('button', { name: /compare/i })).not.toBeInTheDocument();
+  });
+
+  it('shows the Compare button once two applications are selected and opens the modal', async () => {
+    api.get.mockResolvedValue({
+      data: {
+        applications: [
+          application({ id: 1, job: { title: 'Backend Engineer', company: 'Acme', salaryRange: '$100k-$120k' } }),
+          application({ id: 2, job: { title: 'Frontend Engineer', company: 'Beta', salaryRange: '$90k-$110k' } }),
+        ],
+      },
+    });
+    const user = userEvent.setup();
+
+    render(<UserApplications />);
+    const checkboxes = await screen.findAllByLabelText(/select to compare/i);
+    await user.click(checkboxes[0]);
+    await user.click(checkboxes[1]);
+
+    const compareButton = await screen.findByRole('button', { name: /compare \(2\)/i });
+    await user.click(compareButton);
+
+    expect(await screen.findByText('Compare Applications')).toBeInTheDocument();
+    expect(screen.getByText('$100k-$120k')).toBeInTheDocument();
+    expect(screen.getByText('$90k-$110k')).toBeInTheDocument();
+  });
+
+  it('limits selection to three applications', async () => {
+    api.get.mockResolvedValue({
+      data: {
+        applications: [
+          application({ id: 1 }),
+          application({ id: 2, job: { title: 'Job 2', company: 'B' } }),
+          application({ id: 3, job: { title: 'Job 3', company: 'C' } }),
+          application({ id: 4, job: { title: 'Job 4', company: 'D' } }),
+        ],
+      },
+    });
+    const user = userEvent.setup();
+
+    render(<UserApplications />);
+    const checkboxes = await screen.findAllByLabelText(/select to compare/i);
+    await user.click(checkboxes[0]);
+    await user.click(checkboxes[1]);
+    await user.click(checkboxes[2]);
+    await user.click(checkboxes[3]);
+
+    expect(checkboxes[3]).not.toBeChecked();
+    expect(await screen.findByRole('button', { name: /compare \(3\)/i })).toBeInTheDocument();
+  });
+});
