@@ -141,3 +141,67 @@ describe('CompanyProfile - responsiveness badge', () => {
     expect(screen.queryByText(/interview experience \(/i)).not.toBeInTheDocument();
   });
 });
+
+describe('CompanyProfile - richer employer branding', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    localStorage.clear();
+  });
+
+  it('shows the mission statement, benefits, headquarters and founded year when present', async () => {
+    mockApiFor({
+      reviews: reviewsWithoutReply,
+      role: 'ROLE_USER',
+      companyData: {
+        ...company,
+        missionStatement: 'We build the future of hiring.',
+        benefits: JSON.stringify(['Remote-first', 'Unlimited PTO']),
+        headquarters: 'Austin, TX',
+        foundedYear: 2015,
+      },
+    });
+
+    renderPage();
+
+    expect(await screen.findByText('We build the future of hiring.')).toBeInTheDocument();
+    expect(screen.getByText('Remote-first')).toBeInTheDocument();
+    expect(screen.getByText('Unlimited PTO')).toBeInTheDocument();
+    expect(screen.getByText('Austin, TX')).toBeInTheDocument();
+    expect(screen.getByText('Founded 2015')).toBeInTheDocument();
+  });
+
+  it('shows the logo image when the company has one', async () => {
+    mockApiFor({
+      reviews: reviewsWithoutReply,
+      role: 'ROLE_USER',
+      companyData: { ...company, companyLogo: '/uploads/company-logos/5_abc.png' },
+    });
+
+    renderPage();
+
+    expect(await screen.findByAltText('Acme logo')).toBeInTheDocument();
+  });
+
+  it('omits the branding extras entirely when the company has none', async () => {
+    mockApiFor({ reviews: reviewsWithoutReply, role: 'ROLE_USER', companyData: company });
+
+    renderPage();
+
+    await screen.findByText('Acme');
+    expect(screen.queryByText('Benefits & Perks')).not.toBeInTheDocument();
+    expect(screen.queryByAltText('Acme logo')).not.toBeInTheDocument();
+  });
+
+  it('links to LinkedIn and Twitter when provided', async () => {
+    mockApiFor({
+      reviews: reviewsWithoutReply,
+      role: 'ROLE_USER',
+      companyData: { ...company, companyLinkedin: 'https://linkedin.com/company/acme', companyTwitter: 'https://twitter.com/acme' },
+    });
+
+    renderPage();
+
+    expect(await screen.findByRole('link', { name: /linkedin/i })).toHaveAttribute('href', 'https://linkedin.com/company/acme');
+    expect(screen.getByRole('link', { name: /twitter/i })).toHaveAttribute('href', 'https://twitter.com/acme');
+  });
+});

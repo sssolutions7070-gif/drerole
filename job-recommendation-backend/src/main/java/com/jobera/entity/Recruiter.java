@@ -71,6 +71,32 @@ public class Recruiter {
     @Column(name = "verification_rejection_reason")
     private String verificationRejectionReason;
 
+    // Richer employer branding, shown on the public company profile page (CompanyService)
+    @Column(name = "company_logo")
+    private String companyLogo;
+
+    @Column(name = "company_banner")
+    private String companyBanner;
+
+    @Column(name = "mission_statement", columnDefinition = "TEXT")
+    private String missionStatement;
+
+    // JSON array of short perk/benefit strings, same JSON-string-column convention used
+    // elsewhere in this codebase (e.g. JobPosting.requiredSkills)
+    @Column(columnDefinition = "TEXT")
+    private String benefits;
+
+    @Column(name = "company_linkedin")
+    private String companyLinkedin;
+
+    @Column(name = "company_twitter")
+    private String companyTwitter;
+
+    @Column(name = "founded_year")
+    private Integer foundedYear;
+
+    private String headquarters;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
@@ -127,6 +153,22 @@ public class Recruiter {
     public String getContactEmail() { return contactEmail; }
     public void setContactEmail(String contactEmail) { this.contactEmail = contactEmail; }
     public String getContactPhone() { return contactPhone; }
+    public String getCompanyLogo() { return companyLogo; }
+    public void setCompanyLogo(String companyLogo) { this.companyLogo = companyLogo; }
+    public String getCompanyBanner() { return companyBanner; }
+    public void setCompanyBanner(String companyBanner) { this.companyBanner = companyBanner; }
+    public String getMissionStatement() { return missionStatement; }
+    public void setMissionStatement(String missionStatement) { this.missionStatement = missionStatement; }
+    public String getBenefits() { return benefits; }
+    public void setBenefits(String benefits) { this.benefits = benefits; }
+    public String getCompanyLinkedin() { return companyLinkedin; }
+    public void setCompanyLinkedin(String companyLinkedin) { this.companyLinkedin = companyLinkedin; }
+    public String getCompanyTwitter() { return companyTwitter; }
+    public void setCompanyTwitter(String companyTwitter) { this.companyTwitter = companyTwitter; }
+    public Integer getFoundedYear() { return foundedYear; }
+    public void setFoundedYear(Integer foundedYear) { this.foundedYear = foundedYear; }
+    public String getHeadquarters() { return headquarters; }
+    public void setHeadquarters(String headquarters) { this.headquarters = headquarters; }
     public void setContactPhone(String contactPhone) { this.contactPhone = contactPhone; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

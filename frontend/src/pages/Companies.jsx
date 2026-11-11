@@ -4,6 +4,12 @@ import { Link } from 'react-router-dom';
 import { Building, Briefcase, Users } from 'lucide-react';
 import api from '../services/api';
 import VerifiedBadge from '../components/VerifiedBadge';
+import { BACKEND_ORIGIN } from '../config';
+
+const toAbsoluteUrl = (path) => {
+  if (!path) return null;
+  return path.startsWith('http') ? path : `${BACKEND_ORIGIN}${path}`;
+};
 
 const Companies = () => {
   const [companies, setCompanies] = useState([]);
@@ -63,9 +69,17 @@ const Companies = () => {
               className="bg-white rounded-lg shadow border border-gray-200 p-6 hover:shadow-lg transition-shadow"
             >
               <div className="flex items-start space-x-3">
-                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <Building className="h-6 w-6 text-blue-600" />
-                </div>
+                {company.companyLogo ? (
+                  <img
+                    src={toAbsoluteUrl(company.companyLogo)}
+                    alt={`${company.companyName} logo`}
+                    className="w-12 h-12 rounded-full object-cover border border-gray-200 flex-shrink-0 bg-white"
+                  />
+                ) : (
+                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <Building className="h-6 w-6 text-blue-600" />
+                  </div>
+                )}
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
                     {company.companyName}

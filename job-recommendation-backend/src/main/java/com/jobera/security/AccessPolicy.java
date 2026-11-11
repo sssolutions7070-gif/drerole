@@ -160,6 +160,8 @@ public class AccessPolicy {
         rule("POST", "/api/recruiters/register", authenticated);
         rule("GET", "/api/recruiters/user/{userId}", self("userId"));
         rule("PUT", "/api/recruiters/user/{userId}/profile", self("userId"));
+        rule("POST", "/api/recruiters/user/{userId}/logo", self("userId"));
+        rule("POST", "/api/recruiters/user/{userId}/banner", self("userId"));
         rule("POST", "/api/recruiters/jobs", recruiter);
         rule("POST", "/api/recruiters/jobs/suggest-screening-questions", recruiter);
         rule("GET", "/api/recruiters/jobs/recruiter/{recruiterId}", ownRecruiterId("recruiterId"));

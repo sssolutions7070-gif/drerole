@@ -1,10 +1,27 @@
 // src/pages/CompanyProfile.jsx
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Building, Globe, Users, Briefcase, MapPin, Clock, ArrowLeft, Star, MessageSquare } from 'lucide-react';
+import { Building, Globe, Users, Briefcase, MapPin, Clock, ArrowLeft, Star, MessageSquare, Linkedin, Twitter, Calendar, CheckCircle2 } from 'lucide-react';
 import api from '../services/api';
 import VerifiedBadge from '../components/VerifiedBadge';
 import ResponsiveBadge from '../components/ResponsiveBadge';
+import { BACKEND_ORIGIN } from '../config';
+
+const toAbsoluteUrl = (path) => {
+  if (!path) return null;
+  return path.startsWith('http') ? path : `${BACKEND_ORIGIN}${path}`;
+};
+
+const parseBenefits = (raw) => {
+  if (Array.isArray(raw)) return raw;
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
 
 const OUTCOME_LABELS = {
   OFFER: 'Got an offer', REJECTED: 'Rejected', NO_RESPONSE: 'No response', WITHDREW: 'Withdrew',
@@ -204,54 +221,129 @@ const CompanyProfile = () => {
         All companies
       </Link>
 
-      <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-6 mb-6">
-        <div className="flex items-start space-x-4">
-          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-            <Building className="h-8 w-8 text-blue-600" />
-          </div>
-          <div className="flex-1">
-            <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-              {company.companyName}
-              {company.verified && <VerifiedBadge />}
-              {company.responsiveBadge && <ResponsiveBadge />}
-            </h1>
-            <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-gray-500">
-              {company.industry && <span>{company.industry}</span>}
-              {company.companySize && (
-                <span className="flex items-center">
-                  <Users className="h-4 w-4 mr-1" />
-                  {company.companySize} employees
-                </span>
-              )}
-              {company.companyWebsite && (
-                <a
-                  href={company.companyWebsite}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center text-blue-600 hover:text-blue-800"
-                >
-                  <Globe className="h-4 w-4 mr-1" />
-                  Website
-                </a>
-              )}
-              {reviews.totalReviews > 0 && (
-                <span className="flex items-center">
-                  <StarRow rating={reviews.averageRating} />
-                  <span className="ml-1">{reviews.averageRating} ({reviews.totalReviews} {reviews.totalReviews === 1 ? 'review' : 'reviews'})</span>
-                </span>
-              )}
-              {company.averageInterviewRating != null && (
-                <span className="flex items-center" title="How candidates who were actually interviewed rated the interview process itself">
-                  <StarRow rating={company.averageInterviewRating} />
-                  <span className="ml-1">
-                    {company.averageInterviewRating} interview experience ({company.interviewFeedbackCount} {company.interviewFeedbackCount === 1 ? 'rating' : 'ratings'})
+      <div className="bg-white rounded-lg shadow-lg border border-gray-200 mb-6 overflow-hidden">
+        {company.companyBanner ? (
+          <img
+            src={toAbsoluteUrl(company.companyBanner)}
+            alt=""
+            className="w-full h-40 object-cover"
+          />
+        ) : (
+          <div className="w-full h-24 bg-gradient-to-r from-blue-500 to-indigo-600" />
+        )}
+
+        <div className="p-6">
+          <div className="flex items-start space-x-4">
+            {company.companyLogo ? (
+              <img
+                src={toAbsoluteUrl(company.companyLogo)}
+                alt={`${company.companyName} logo`}
+                className="w-16 h-16 rounded-full object-cover border border-gray-200 flex-shrink-0 bg-white"
+              />
+            ) : (
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <Building className="h-8 w-8 text-blue-600" />
+              </div>
+            )}
+            <div className="flex-1">
+              <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                {company.companyName}
+                {company.verified && <VerifiedBadge />}
+                {company.responsiveBadge && <ResponsiveBadge />}
+              </h1>
+              <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-gray-500">
+                {company.industry && <span>{company.industry}</span>}
+                {company.companySize && (
+                  <span className="flex items-center">
+                    <Users className="h-4 w-4 mr-1" />
+                    {company.companySize} employees
                   </span>
-                </span>
+                )}
+                {company.headquarters && (
+                  <span className="flex items-center">
+                    <MapPin className="h-4 w-4 mr-1" />
+                    {company.headquarters}
+                  </span>
+                )}
+                {company.foundedYear && (
+                  <span className="flex items-center">
+                    <Calendar className="h-4 w-4 mr-1" />
+                    Founded {company.foundedYear}
+                  </span>
+                )}
+                {company.companyWebsite && (
+                  <a
+                    href={company.companyWebsite}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center text-blue-600 hover:text-blue-800"
+                  >
+                    <Globe className="h-4 w-4 mr-1" />
+                    Website
+                  </a>
+                )}
+                {company.companyLinkedin && (
+                  <a
+                    href={company.companyLinkedin}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center text-blue-600 hover:text-blue-800"
+                  >
+                    <Linkedin className="h-4 w-4 mr-1" />
+                    LinkedIn
+                  </a>
+                )}
+                {company.companyTwitter && (
+                  <a
+                    href={company.companyTwitter}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center text-blue-600 hover:text-blue-800"
+                  >
+                    <Twitter className="h-4 w-4 mr-1" />
+                    Twitter
+                  </a>
+                )}
+                {reviews.totalReviews > 0 && (
+                  <span className="flex items-center">
+                    <StarRow rating={reviews.averageRating} />
+                    <span className="ml-1">{reviews.averageRating} ({reviews.totalReviews} {reviews.totalReviews === 1 ? 'review' : 'reviews'})</span>
+                  </span>
+                )}
+                {company.averageInterviewRating != null && (
+                  <span className="flex items-center" title="How candidates who were actually interviewed rated the interview process itself">
+                    <StarRow rating={company.averageInterviewRating} />
+                    <span className="ml-1">
+                      {company.averageInterviewRating} interview experience ({company.interviewFeedbackCount} {company.interviewFeedbackCount === 1 ? 'rating' : 'ratings'})
+                    </span>
+                  </span>
+                )}
+              </div>
+              {company.companyDescription && (
+                <p className="mt-4 text-gray-700 whitespace-pre-line">{company.companyDescription}</p>
+              )}
+              {company.missionStatement && (
+                <blockquote className="mt-4 border-l-4 border-blue-200 pl-4 italic text-gray-600">
+                  {company.missionStatement}
+                </blockquote>
+              )}
+              {parseBenefits(company.benefits).length > 0 && (
+                <div className="mt-4">
+                  <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Benefits & Perks</p>
+                  <div className="flex flex-wrap gap-2">
+                    {parseBenefits(company.benefits).map((benefit, i) => (
+                      <span
+                        key={i}
+                        className="inline-flex items-center gap-1 text-sm bg-green-50 text-green-700 px-3 py-1 rounded-full"
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        {benefit}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
-            {company.companyDescription && (
-              <p className="mt-4 text-gray-700 whitespace-pre-line">{company.companyDescription}</p>
-            )}
           </div>
         </div>
       </div>

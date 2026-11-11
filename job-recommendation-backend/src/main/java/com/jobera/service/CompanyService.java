@@ -75,6 +75,7 @@ public class CompanyService {
         summary.put("companySize", recruiter.getCompanySize());
         summary.put("openJobCount", openJobCount);
         summary.put("verified", Recruiter.VERIFICATION_VERIFIED.equals(recruiter.getVerificationStatus()));
+        summary.put("companyLogo", recruiter.getCompanyLogo());
         return summary;
     }
 
@@ -91,6 +92,14 @@ public class CompanyService {
         profile.put("companySize", recruiter.getCompanySize());
         profile.put("industry", recruiter.getIndustry());
         profile.put("verified", Recruiter.VERIFICATION_VERIFIED.equals(recruiter.getVerificationStatus()));
+        profile.put("companyLogo", recruiter.getCompanyLogo());
+        profile.put("companyBanner", recruiter.getCompanyBanner());
+        profile.put("missionStatement", recruiter.getMissionStatement());
+        profile.put("benefits", recruiter.getBenefits());
+        profile.put("companyLinkedin", recruiter.getCompanyLinkedin());
+        profile.put("companyTwitter", recruiter.getCompanyTwitter());
+        profile.put("foundedYear", recruiter.getFoundedYear());
+        profile.put("headquarters", recruiter.getHeadquarters());
         // Contact email/phone are deliberately left out of the public profile - a candidate
         // reaches the company by applying or messaging through the platform, not a cold contact.
         profile.put("jobs", openJobsFor(recruiterId).stream().map(JobPostingDTO::new).toList());

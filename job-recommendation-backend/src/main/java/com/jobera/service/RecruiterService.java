@@ -59,14 +59,27 @@ public class RecruiterService {
         return recruiterRepository.findByUserId(userId);
     }
     
-    public Recruiter updateRecruiterProfile(Long userId, String companyDescription, 
+    public Recruiter updateRecruiterProfile(Long userId, String companyDescription,
                                            String companyWebsite, String companySize, String industry,
                                            String contactEmail, String contactPhone) {
+        return updateRecruiterProfile(userId, companyDescription, companyWebsite, companySize, industry,
+            contactEmail, contactPhone, null, null, null, null, null, null);
+    }
+
+    /** @param missionStatement, benefits (JSON array string), companyLinkedin, companyTwitter,
+     *   foundedYear, headquarters - the richer employer-branding fields shown on the public
+     *   company profile page (see CompanyService.getCompanyProfile). */
+    public Recruiter updateRecruiterProfile(Long userId, String companyDescription,
+                                           String companyWebsite, String companySize, String industry,
+                                           String contactEmail, String contactPhone,
+                                           String missionStatement, String benefits,
+                                           String companyLinkedin, String companyTwitter,
+                                           Integer foundedYear, String headquarters) {
         Optional<Recruiter> recruiterOpt = recruiterRepository.findByUserId(userId);
         if (recruiterOpt.isEmpty()) {
             throw new RecruiterException("Recruiter not found for user ID: " + userId);
         }
-        
+
         Recruiter recruiter = recruiterOpt.get();
         if (companyDescription != null) recruiter.setCompanyDescription(companyDescription);
         if (companyWebsite != null) recruiter.setCompanyWebsite(companyWebsite);
@@ -74,10 +87,30 @@ public class RecruiterService {
         if (industry != null) recruiter.setIndustry(industry);
         if (contactEmail != null) recruiter.setContactEmail(contactEmail);
         if (contactPhone != null) recruiter.setContactPhone(contactPhone);
-        
+        if (missionStatement != null) recruiter.setMissionStatement(missionStatement);
+        if (benefits != null) recruiter.setBenefits(benefits);
+        if (companyLinkedin != null) recruiter.setCompanyLinkedin(companyLinkedin);
+        if (companyTwitter != null) recruiter.setCompanyTwitter(companyTwitter);
+        if (foundedYear != null) recruiter.setFoundedYear(foundedYear);
+        if (headquarters != null) recruiter.setHeadquarters(headquarters);
+
         return recruiterRepository.save(recruiter);
     }
-    
+
+    public Recruiter updateCompanyLogo(Long userId, String logoUrl) {
+        Recruiter recruiter = recruiterRepository.findByUserId(userId)
+            .orElseThrow(() -> new RecruiterException("Recruiter not found for user ID: " + userId));
+        recruiter.setCompanyLogo(logoUrl);
+        return recruiterRepository.save(recruiter);
+    }
+
+    public Recruiter updateCompanyBanner(Long userId, String bannerUrl) {
+        Recruiter recruiter = recruiterRepository.findByUserId(userId)
+            .orElseThrow(() -> new RecruiterException("Recruiter not found for user ID: " + userId));
+        recruiter.setCompanyBanner(bannerUrl);
+        return recruiterRepository.save(recruiter);
+    }
+
     public static class RecruiterException extends RuntimeException {
         public RecruiterException(String message) {
             super(message);

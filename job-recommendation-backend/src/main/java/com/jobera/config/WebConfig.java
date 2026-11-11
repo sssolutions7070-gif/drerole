@@ -59,5 +59,18 @@ public class WebConfig implements WebMvcConfigurer {
                 .addResourceLocations(videoIntrosPath)
                 .setCachePeriod(3600)
                 .resourceChain(true);
+
+        // Company logos/banners on the public employer branding page - public the same way.
+        Path companyLogosDir = Paths.get("uploads/company-logos").toAbsolutePath().normalize();
+        registry.addResourceHandler("/uploads/company-logos/**")
+                .addResourceLocations("file:" + companyLogosDir.toString() + "/")
+                .setCachePeriod(3600)
+                .resourceChain(true);
+
+        Path companyBannersDir = Paths.get("uploads/company-banners").toAbsolutePath().normalize();
+        registry.addResourceHandler("/uploads/company-banners/**")
+                .addResourceLocations("file:" + companyBannersDir.toString() + "/")
+                .setCachePeriod(3600)
+                .resourceChain(true);
     }
 }
