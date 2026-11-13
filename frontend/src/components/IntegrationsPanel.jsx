@@ -1,6 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { Key, Webhook as WebhookIcon, Trash2, Copy, Plus } from 'lucide-react';
+import { Key, Webhook as WebhookIcon, Trash2, Copy, Plus, Code2, ChevronDown, ChevronUp } from 'lucide-react';
 import { apiKeyAPI, webhookAPI } from '../services/api';
+import { BACKEND_ORIGIN } from '../config';
+
+// A curated slice of the full API, documented here for external integrators - every endpoint a
+// recruiter can call with a browser session also accepts an X-API-Key header (see ApiKeyService
+// and AuthInterceptor), so this list is a starting point, not the whole surface.
+const DOCUMENTED_ENDPOINTS = [
+  { method: 'POST', path: '/api/recruiters/jobs', description: 'Create a job posting' },
+  { method: 'GET', path: '/api/recruiters/jobs/recruiter/{recruiterId}', description: "List your job postings" },
+  { method: 'PUT', path: '/api/recruiters/jobs/{jobId}', description: 'Update a job posting' },
+  { method: 'GET', path: '/api/recruiters/jobs/{jobId}/applications', description: 'List applications to one job' },
+  { method: 'PUT', path: '/api/applications/{applicationId}/status', description: "Update an application's status" },
+  { method: 'GET', path: '/api/candidates/discover', description: 'Search the open-to-work candidate pool' },
+];
 
 const EVENT_TYPES = [
   { value: 'APPLICATION_SUBMITTED', label: 'Application submitted' },
@@ -56,6 +69,7 @@ const IntegrationsPanel = ({ recruiterId }) => {
   const [justCreatedWebhook, setJustCreatedWebhook] = useState(null);
   const [testResults, setTestResults] = useState({});
   const [testingWebhookId, setTestingWebhookId] = useState(null);
+  const [showApiDocs, setShowApiDocs] = useState(false);
 
   const fetchAll = async () => {
     try {
@@ -195,6 +209,45 @@ const IntegrationsPanel = ({ recruiterId }) => {
             </div>
           ))}
         </div>
+
+        <button
+          type="button"
+          onClick={() => setShowApiDocs((prev) => !prev)}
+          className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 font-medium mt-4"
+        >
+          <Code2 className="h-4 w-4" />
+          API Documentation
+          {showApiDocs ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </button>
+
+        {showApiDocs && (
+          <div className="mt-3 bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-4">
+            <div>
+              <p className="text-sm text-gray-700 mb-2">
+                Authenticate every request with an <code>X-API-Key</code> header set to a key generated above.
+                It authenticates exactly as you - the same permissions a browser session would have.
+              </p>
+              <CopyBox value={`curl ${BACKEND_ORIGIN}/api/recruiters/jobs/recruiter/${recruiterId} \\\n  -H "X-API-Key: dr_live_..."`} />
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Common endpoints</p>
+              <div className="space-y-1.5">
+                {DOCUMENTED_ENDPOINTS.map((endpoint) => (
+                  <div key={`${endpoint.method} ${endpoint.path}`} className="flex items-start gap-2 text-sm">
+                    <span className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 flex-shrink-0 mt-0.5">
+                      {endpoint.method}
+                    </span>
+                    <div>
+                      <span className="font-mono text-xs text-gray-800">{endpoint.path}</span>
+                      <span className="text-gray-500 ml-2">{endpoint.description}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div>

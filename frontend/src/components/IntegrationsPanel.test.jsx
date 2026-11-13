@@ -119,4 +119,21 @@ describe('IntegrationsPanel', () => {
     expect(webhookAPI.testPing).toHaveBeenCalledWith(100, 55);
     expect(await screen.findByText(/test ping delivered!/i)).toBeInTheDocument();
   });
+
+  it('toggles the API documentation section', async () => {
+    const user = userEvent.setup();
+
+    render(<IntegrationsPanel recruiterId={100} />);
+    await screen.findByText('API Keys');
+
+    expect(screen.queryByText(/common endpoints/i)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /api documentation/i }));
+
+    expect(screen.getByText(/common endpoints/i)).toBeInTheDocument();
+    expect(screen.getByText('/api/recruiters/jobs')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /api documentation/i }));
+    expect(screen.queryByText(/common endpoints/i)).not.toBeInTheDocument();
+  });
 });
