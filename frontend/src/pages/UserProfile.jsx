@@ -18,6 +18,7 @@ import ActiveSessionsPanel from '../components/ActiveSessionsPanel';
 import ProfileViewsPanel from '../components/ProfileViewsPanel';
 import ProfileStrengthPanel from '../components/ProfileStrengthPanel';
 import VideoIntroPanel from '../components/VideoIntroPanel';
+import DiversityInfoPanel from '../components/DiversityInfoPanel';
 import GoogleCalendarPanel from '../components/GoogleCalendarPanel';
 
 const UserProfile = () => {
@@ -592,6 +593,11 @@ const UserProfile = () => {
                 videoIntroUrl={profile?.videoIntroUrl}
                 onChange={(videoIntroUrl) => setProfile((prev) => ({ ...prev, videoIntroUrl }))}
               />
+            </div>
+
+            {/* Diversity & Inclusion (voluntary) */}
+            <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-6 mt-6">
+              <DiversityInfoPanel userId={currentUser.id} />
             </div>
           </div>
 

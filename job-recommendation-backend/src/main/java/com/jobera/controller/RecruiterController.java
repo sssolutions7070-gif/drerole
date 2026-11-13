@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.jobera.entity.Recruiter;
+import com.jobera.service.DiversityAnalyticsService;
 import com.jobera.service.RecruiterService;
 
 @RestController
@@ -31,13 +32,20 @@ import com.jobera.service.RecruiterService;
 public class RecruiterController {
     private static final Logger log = LoggerFactory.getLogger(RecruiterController.class);
 
-    
+
     private final RecruiterService recruiterService;
-    
-    public RecruiterController(RecruiterService recruiterService) {
+    private final DiversityAnalyticsService diversityAnalyticsService;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public RecruiterController(RecruiterService recruiterService, DiversityAnalyticsService diversityAnalyticsService) {
         this.recruiterService = recruiterService;
+        this.diversityAnalyticsService = diversityAnalyticsService;
     }
-    
+
+    public RecruiterController(RecruiterService recruiterService) {
+        this(recruiterService, null);
+    }
+
     @PostMapping("/register")
     public ResponseEntity<Map<String, Object>> registerRecruiter(@RequestBody Map<String, Object> request) {
         try {
@@ -95,6 +103,11 @@ public class RecruiterController {
             log.error("Unexpected error", e); // Add logging for debugging
             return ResponseEntity.badRequest().body(Map.of("error", "Failed to fetch recruiter profile: " + e.getMessage()));
         }
+    }
+
+    @GetMapping("/{recruiterId}/diversity-analytics")
+    public ResponseEntity<Map<String, Object>> getDiversityAnalytics(@PathVariable Long recruiterId) {
+        return ResponseEntity.ok(diversityAnalyticsService.getAggregateForRecruiter(recruiterId));
     }
     
     @PutMapping("/user/{userId}/profile")

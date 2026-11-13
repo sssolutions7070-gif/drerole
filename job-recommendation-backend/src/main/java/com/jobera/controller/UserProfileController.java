@@ -94,7 +94,49 @@ public class UserProfileController {
             return ResponseEntity.notFound().build();
         }
     }
-    
+
+    /** Entirely voluntary EEO-style self-identification - used only for anonymous, aggregate
+     *  diversity reporting (see DiversityAnalyticsService), never shown against this candidate's
+     *  name. Kept as its own endpoint, separate from the main profile, so a candidate can see at
+     *  a glance that answering it is a distinct, optional step. */
+    @GetMapping("/{userId}/diversity-info")
+    public ResponseEntity<Map<String, Object>> getDiversityInfo(@PathVariable Long userId) {
+        Optional<User> userOpt = userRepository.findById(userId);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        User user = userOpt.get();
+        Map<String, Object> response = new HashMap<>();
+        response.put("genderIdentity", user.getGenderIdentity());
+        response.put("ethnicity", user.getEthnicity());
+        response.put("veteranStatus", user.getVeteranStatus());
+        response.put("disabilityStatus", user.getDisabilityStatus());
+        return ResponseEntity.ok(response);
+    }
+
+    @PutMapping("/{userId}/diversity-info")
+    public ResponseEntity<Map<String, Object>> updateDiversityInfo(@PathVariable Long userId,
+                                                                     @RequestBody Map<String, String> request) {
+        Optional<User> userOpt = userRepository.findById(userId);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        User user = userOpt.get();
+        user.setGenderIdentity(request.get("genderIdentity"));
+        user.setEthnicity(request.get("ethnicity"));
+        user.setVeteranStatus(request.get("veteranStatus"));
+        user.setDisabilityStatus(request.get("disabilityStatus"));
+        userRepository.save(user);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("message", "Diversity info updated");
+        response.put("genderIdentity", user.getGenderIdentity());
+        response.put("ethnicity", user.getEthnicity());
+        response.put("veteranStatus", user.getVeteranStatus());
+        response.put("disabilityStatus", user.getDisabilityStatus());
+        return ResponseEntity.ok(response);
+    }
+
     @GetMapping("/{userId}/profile")
     public ResponseEntity<Map<String, Object>> getUserProfile(@PathVariable Long userId) {
         try {

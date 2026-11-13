@@ -65,6 +65,21 @@ public class User {
     @Column(name = "video_intro_url")
     private String videoIntroUrl;
 
+    // Entirely voluntary EEO-style self-identification, used ONLY for anonymous, aggregate
+    // diversity reporting to recruiters (see DiversityAnalyticsService) - never shown against
+    // this candidate's name or on any individual application.
+    @Column(name = "gender_identity")
+    private String genderIdentity;
+
+    @Column(name = "ethnicity")
+    private String ethnicity;
+
+    @Column(name = "veteran_status")
+    private String veteranStatus;
+
+    @Column(name = "disability_status")
+    private String disabilityStatus;
+
     @Column(updatable = false)
     private LocalDateTime createdAt;
     
@@ -200,6 +215,14 @@ public class User {
     public void setProfilePicture(String profilePicture) { this.profilePicture = profilePicture; }
     public String getVideoIntroUrl() { return videoIntroUrl; }
     public void setVideoIntroUrl(String videoIntroUrl) { this.videoIntroUrl = videoIntroUrl; }
+    public String getGenderIdentity() { return genderIdentity; }
+    public void setGenderIdentity(String genderIdentity) { this.genderIdentity = genderIdentity; }
+    public String getEthnicity() { return ethnicity; }
+    public void setEthnicity(String ethnicity) { this.ethnicity = ethnicity; }
+    public String getVeteranStatus() { return veteranStatus; }
+    public void setVeteranStatus(String veteranStatus) { this.veteranStatus = veteranStatus; }
+    public String getDisabilityStatus() { return disabilityStatus; }
+    public void setDisabilityStatus(String disabilityStatus) { this.disabilityStatus = disabilityStatus; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }

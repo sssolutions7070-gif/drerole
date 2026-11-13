@@ -22,6 +22,7 @@ import IntegrationsPanel from '../components/IntegrationsPanel';
 import DirectMessagesInbox from '../components/DirectMessagesInbox';
 import VerificationPanel from '../components/VerificationPanel';
 import CompanyBrandingPanel from '../components/CompanyBrandingPanel';
+import DiversityAnalyticsPanel from '../components/DiversityAnalyticsPanel';
 
 const RecruiterDashboard = () => {
   // Lets another page (e.g. the voice assistant navigating here) land directly on a specific
@@ -1095,6 +1096,8 @@ const RecruiterDashboard = () => {
               )}
             </>
           )}
+
+          {recruiterProfile && <DiversityAnalyticsPanel recruiterId={recruiterProfile.id} />}
         </div>
       )}
 
