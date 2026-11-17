@@ -91,6 +91,70 @@ describe('AdminDashboard - bulk moderation of pending jobs', () => {
   });
 });
 
+describe('AdminDashboard - fraud risk badges on pending jobs', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('shows a high-risk badge and its flags for a job that scores high', async () => {
+    const user = userEvent.setup();
+    api.get.mockImplementation((url) => {
+      if (url === '/admin/dashboard/stats') return Promise.resolve({ data: {} });
+      if (url === '/admin/jobs/pending') return Promise.resolve({ data: pendingJobs });
+      if (url === '/admin/jobs/pending/fraud-scores') return Promise.resolve({
+        data: {
+          1: { riskScore: 0, riskLevel: 'LOW', flags: [] },
+          2: { riskScore: 55, riskLevel: 'HIGH', flags: [{ reason: 'Asks the candidate to pay a fee to proceed' }] },
+        },
+      });
+      return Promise.resolve({ data: [] });
+    });
+
+    render(<MemoryRouter><AdminDashboard /></MemoryRouter>);
+    await user.click(await screen.findByRole('button', { name: /Pending Jobs \(2\)/i }));
+
+    expect(await screen.findByText('High fraud risk')).toBeInTheDocument();
+    expect(screen.getByText('Asks the candidate to pay a fee to proceed')).toBeInTheDocument();
+    expect(screen.queryByText('Possible fraud risk')).not.toBeInTheDocument();
+  });
+
+  it('shows no badge for jobs scored low risk', async () => {
+    const user = userEvent.setup();
+    api.get.mockImplementation((url) => {
+      if (url === '/admin/dashboard/stats') return Promise.resolve({ data: {} });
+      if (url === '/admin/jobs/pending') return Promise.resolve({ data: pendingJobs });
+      if (url === '/admin/jobs/pending/fraud-scores') return Promise.resolve({
+        data: {
+          1: { riskScore: 0, riskLevel: 'LOW', flags: [] },
+          2: { riskScore: 0, riskLevel: 'LOW', flags: [] },
+        },
+      });
+      return Promise.resolve({ data: [] });
+    });
+
+    render(<MemoryRouter><AdminDashboard /></MemoryRouter>);
+    await user.click(await screen.findByRole('button', { name: /Pending Jobs \(2\)/i }));
+    await screen.findByText('Backend Engineer');
+
+    expect(screen.queryByText(/fraud risk/i)).not.toBeInTheDocument();
+  });
+
+  it('does not break the pending-jobs list if the fraud-scores request fails', async () => {
+    const user = userEvent.setup();
+    api.get.mockImplementation((url) => {
+      if (url === '/admin/dashboard/stats') return Promise.resolve({ data: {} });
+      if (url === '/admin/jobs/pending') return Promise.resolve({ data: pendingJobs });
+      if (url === '/admin/jobs/pending/fraud-scores') return Promise.reject(new Error('boom'));
+      return Promise.resolve({ data: [] });
+    });
+
+    render(<MemoryRouter><AdminDashboard /></MemoryRouter>);
+    await user.click(await screen.findByRole('button', { name: /Pending Jobs \(2\)/i }));
+
+    expect(await screen.findByText('Backend Engineer')).toBeInTheDocument();
+  });
+});
+
 describe('AdminDashboard - deep-linking to a tab without a remount', () => {
   beforeEach(() => {
     vi.resetAllMocks();

@@ -32,6 +32,7 @@ import com.jobera.repository.ResumeRepository;
 import com.jobera.repository.UserRepository;
 import com.jobera.service.AdminAuditService;
 import com.jobera.service.CompanyReviewService;
+import com.jobera.service.FraudDetectionService;
 import com.jobera.service.InterviewExperienceService;
 import com.jobera.service.JobPostingService;
 import com.jobera.service.NotificationService;
@@ -60,6 +61,32 @@ public class AdminController {
     private final NotificationService notificationService;
     private final CompanyReviewService companyReviewService;
     private final InterviewExperienceService interviewExperienceService;
+    private final FraudDetectionService fraudDetectionService;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public AdminController(UserRepository userRepository,
+                         RecruiterRepository recruiterRepository,
+                         JobPostingRepository jobPostingRepository,
+                         ApplicationRepository applicationRepository,
+                         ResumeRepository resumeRepository,
+                         AdminAuditService adminAuditService,
+                         JobPostingService jobPostingService,
+                         NotificationService notificationService,
+                         CompanyReviewService companyReviewService,
+                         InterviewExperienceService interviewExperienceService,
+                         FraudDetectionService fraudDetectionService) {
+        this.userRepository = userRepository;
+        this.recruiterRepository = recruiterRepository;
+        this.jobPostingRepository = jobPostingRepository;
+        this.applicationRepository = applicationRepository;
+        this.resumeRepository = resumeRepository;
+        this.adminAuditService = adminAuditService;
+        this.jobPostingService = jobPostingService;
+        this.notificationService = notificationService;
+        this.companyReviewService = companyReviewService;
+        this.interviewExperienceService = interviewExperienceService;
+        this.fraudDetectionService = fraudDetectionService;
+    }
 
     public AdminController(UserRepository userRepository,
                          RecruiterRepository recruiterRepository,
@@ -71,16 +98,9 @@ public class AdminController {
                          NotificationService notificationService,
                          CompanyReviewService companyReviewService,
                          InterviewExperienceService interviewExperienceService) {
-        this.userRepository = userRepository;
-        this.recruiterRepository = recruiterRepository;
-        this.jobPostingRepository = jobPostingRepository;
-        this.applicationRepository = applicationRepository;
-        this.resumeRepository = resumeRepository;
-        this.adminAuditService = adminAuditService;
-        this.jobPostingService = jobPostingService;
-        this.notificationService = notificationService;
-        this.companyReviewService = companyReviewService;
-        this.interviewExperienceService = interviewExperienceService;
+        this(userRepository, recruiterRepository, jobPostingRepository, applicationRepository, resumeRepository,
+            adminAuditService, jobPostingService, notificationService, companyReviewService,
+            interviewExperienceService, new FraudDetectionService());
     }
 
     private User actingAdmin(HttpServletRequest request) {
@@ -330,6 +350,13 @@ public class AdminController {
     @GetMapping("/jobs/pending")
     public ResponseEntity<List<JobPosting>> getPendingJobs() {
         return ResponseEntity.ok(jobPostingService.getPendingJobPostings());
+    }
+
+    /** Heuristic fraud/spam risk score for every pending job, keyed by job id - an aid for the
+     *  admin reviewing the queue above, never an automatic rejection (see FraudDetectionService). */
+    @GetMapping("/jobs/pending/fraud-scores")
+    public ResponseEntity<Map<Long, Map<String, Object>>> getPendingJobFraudScores() {
+        return ResponseEntity.ok(fraudDetectionService.scanAll(jobPostingService.getPendingJobPostings()));
     }
 
     @PutMapping("/jobs/{jobId}/approve")

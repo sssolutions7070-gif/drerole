@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Users, Building, Briefcase, FileText, Trash2, ToggleLeft, ToggleRight, BarChart3, ScrollText, Clock, CheckCircle, XCircle, Star, MessageSquare, TrendingUp, BadgeCheck, Download } from 'lucide-react';
+import { Users, Building, Briefcase, FileText, Trash2, ToggleLeft, ToggleRight, BarChart3, ScrollText, Clock, CheckCircle, XCircle, Star, MessageSquare, TrendingUp, BadgeCheck, Download, AlertTriangle } from 'lucide-react';
 import api from '../services/api';
 import PlatformAnalyticsPanel from '../components/PlatformAnalyticsPanel';
 import PendingVerificationsPanel from '../components/PendingVerificationsPanel';
@@ -16,6 +16,7 @@ const AdminDashboard = () => {
   const [recruiters, setRecruiters] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [pendingJobs, setPendingJobs] = useState([]);
+  const [fraudScores, setFraudScores] = useState({});
   const [pendingReviews, setPendingReviews] = useState([]);
   const [pendingExperiences, setPendingExperiences] = useState([]);
   const [applications, setApplications] = useState([]);
@@ -272,6 +273,12 @@ const AdminDashboard = () => {
       setPendingJobs(response.data);
     } catch (error) {
       console.error('Error fetching pending jobs:', error);
+    }
+    try {
+      const fraudResponse = await api.get('/admin/jobs/pending/fraud-scores');
+      setFraudScores(fraudResponse.data || {});
+    } catch (error) {
+      console.error('Error fetching fraud scores:', error);
     }
   };
 
@@ -779,11 +786,33 @@ const AdminDashboard = () => {
                       className="h-4 w-4 mt-1 mr-3 text-blue-600 rounded border-gray-300"
                     />
                     <div>
-                    <div className="text-sm font-medium text-gray-900">{job.title}</div>
+                    <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                      {job.title}
+                      {fraudScores[job.id] && fraudScores[job.id].riskLevel !== 'LOW' && (
+                        <span
+                          title={fraudScores[job.id].flags.map((f) => f.reason).join('; ')}
+                          className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${
+                            fraudScores[job.id].riskLevel === 'HIGH'
+                              ? 'bg-red-100 text-red-700'
+                              : 'bg-amber-100 text-amber-700'
+                          }`}
+                        >
+                          <AlertTriangle className="h-3 w-3" />
+                          {fraudScores[job.id].riskLevel === 'HIGH' ? 'High fraud risk' : 'Possible fraud risk'}
+                        </span>
+                      )}
+                    </div>
                     <div className="text-sm text-gray-500">
                       {job.company} • {job.location || 'No location specified'} • {job.jobType}
                     </div>
                     <p className="text-sm text-gray-600 mt-2 max-w-xl line-clamp-2">{job.description}</p>
+                    {fraudScores[job.id]?.flags?.length > 0 && (
+                      <ul className="mt-1 text-xs text-amber-700 list-disc list-inside">
+                        {fraudScores[job.id].flags.map((flag, i) => (
+                          <li key={i}>{flag.reason}</li>
+                        ))}
+                      </ul>
+                    )}
                     </div>
                   </div>
                   <div className="flex items-center space-x-3 flex-shrink-0 ml-4">
